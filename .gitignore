@@ -1,0 +1,128 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+.spyproject/
+.claude/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# MATLAB
+*.asv
+*.m~
+
+# Results and outputs (regenerable)
+results/
+*/results/*
+figures/
+*/figures/*
+outputs/
+*/outputs/*
+
+# Data (large files, typically not in git)
+data/
+*/data/*
+*.nii
+*.nii.gz
+*.mat
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# Logs
+*.log
+logs/
+
+# Local folders (private scripts, notes, etc.)
+local/
+*/local/*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SPM/neuroimaging specific
+spm*.m
+SPM.mat
+*/SPM.mat
+beta_*.nii
+con_*.nii
+ResMS.nii
+RPV.nii
+mask.nii
+spm*.nii
+
+# Keep directory structure (allow empty directories)
+!.gitkeep
+
+# Keep example/template files
+!*_template.*
+!*_example.*
+
+# LaTeX/manuscript files (large, token-heavy)
+*.tex
+*.bib
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Documentation
+!docs/
+
+# Keep requirements and configs
+!requirements.txt
+!environment.yml
+
+# Exclude all markdown files (documentation, notes, plans)
+*.md
+
+# Keep old-implementation for reference (but not its results)
+!old-implementation/**/*.py
+!old-implementation/**/*.m
+old-implementation/**/results/*
+old-implementation/**/figures/*
