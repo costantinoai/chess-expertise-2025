@@ -121,8 +121,5 @@ spm*.nii
 # Exclude all markdown files (documentation, notes, plans)
 *.md
 
-# Keep old-implementation for reference (but not its results)
-!old-implementation/**/*.py
-!old-implementation/**/*.m
-old-implementation/**/results/*
-old-implementation/**/figures/*
+# Old implementation - never commit (read-only reference only)
+old-implementation/
