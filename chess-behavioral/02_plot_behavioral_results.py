@@ -40,7 +40,7 @@ from common import CONFIG, load_stimulus_metadata
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory, copy_script_to_results
 from common.report_utils import create_figure_summary, generate_latex_table
-from common.plotting_utils import plot_rdm, compute_stimulus_palette, plot_2d_embedding
+from common.plotting import plot_rdm, compute_stimulus_palette, plot_2d_embedding
 from modules.plotting import (
     plot_choice_frequency,
     plot_model_correlations,

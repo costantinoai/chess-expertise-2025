@@ -28,8 +28,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Centralized plotting params and helpers
-from common.plotting_utils import (
-    figure_style,
+from common.plotting import (
+    apply_nature_rc,
     style_spines,
     set_axis_title,
     plot_grouped_bars_with_ci,  # Unified function (handles both single and per-item colors)
@@ -70,7 +70,7 @@ def plot_pr_roi_bars(
     Path
         Path to saved combined figure (pr_roi_combined_panel.pdf)
     """
-    figure_style(PLOT_PARAMS)
+    apply_nature_rc(PLOT_PARAMS)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if figsize is None:
@@ -142,13 +142,8 @@ def plot_pr_roi_bars(
     ax_top.tick_params(axis='y', labelsize=PLOT_PARAMS['font_size_tick'])
     ax_top.set_ylim(top=35, bottom=15)  # Start y-axis at 10 instead of 0
 
-    # Set title and subtitle with increased pad to move them up
-    title_params = PLOT_PARAMS.copy()
-    title_params['title_pad'] = PLOT_PARAMS['title_pad'] + 200  # Increase pad to move title up
-    title_params['font_size_title'] = PLOT_PARAMS['font_size_title']
-    title_params['font_size_subtitle'] = PLOT_PARAMS['font_size_subtitle']*.9
-    
-    set_axis_title(ax_top, 'Participation Ratio', subtitle='FDR p < .05', params=title_params)
+    # Set title and subtitle (no manual overrides)
+    set_axis_title(ax_top, title='Participation Ratio', subtitle='FDR p < .05')
 
     # Legend at center above plot
     ax_top.legend(frameon=False, loc='lower center', bbox_to_anchor=(0.5, .9),
@@ -184,10 +179,8 @@ def plot_pr_roi_bars(
     ax_bottom.tick_params(axis='y', labelsize=PLOT_PARAMS['font_size_tick'])
     ax_bottom.set_xlabel('')  # No x-axis label needed
 
-    # Update title params for bottom panel too
-    bottom_title_params = PLOT_PARAMS.copy()
-    bottom_title_params['font_size_title'] = PLOT_PARAMS['font_size_title']
-    set_axis_title(ax_bottom, 'Participation Ratio Difference', subtitle='', params=bottom_title_params)
+    # Set title for bottom panel (no manual overrides)
+    set_axis_title(ax_bottom, title='Participation Ratio Difference', subtitle='')
 
     # Color x-tick labels: matching color for significant, grey for non-significant
     for i, (ticklabel, sig, color) in enumerate(zip(ax_bottom.get_xticklabels(), is_significant, roi_colors)):
@@ -251,7 +244,7 @@ def plot_pr_voxel_correlations(
     2. Novice PR vs ROI size
     3. PR difference (Expert - Novice) vs ROI size
     """
-    figure_style(params)
+    apply_nature_rc(params)
 
     # Data is precomputed in analysis; no calculations here
 
@@ -376,7 +369,7 @@ def plot_pr_feature_importance(
     Positive weights (green bars): Higher PR predictive of expert group.
     ROI names appear on right y-axis.
     """
-    figure_style(PLOT_PARAMS)
+    apply_nature_rc(PLOT_PARAMS)
     if figsize is None:
         # Use wide figure format for horizontal bars
         figsize = (7.0, 3.5)  # Wide aspect ratio
@@ -483,7 +476,7 @@ def plot_pr_matrix_and_loadings(
     Both heatmaps have black outlines and squares are sized to match.
     Uses 'mako' colormap for PR matrix (matching old implementation).
     """
-    figure_style(PLOT_PARAMS)
+    apply_nature_rc(PLOT_PARAMS)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Map labels to pretty names (passed in, not loaded here)

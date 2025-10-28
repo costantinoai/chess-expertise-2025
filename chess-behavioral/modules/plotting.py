@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import List, Tuple, Optional
 
 from common import CONFIG
-from common.plotting_utils import (
-    figure_style, style_spines, hide_ticks, set_axis_title,
+from common.plotting import (
+    apply_nature_rc, style_spines, hide_ticks, set_axis_title,
     plot_grouped_bars_with_ci, PLOT_PARAMS,
     COLORS_EXPERT_NOVICE,
     compute_stimulus_palette,
@@ -26,10 +26,10 @@ from common.plotting_utils import (
 from common import MODEL_ORDER, MODEL_LABELS_PRETTY
 
 
-## RDM heatmaps are provided by common.plotting_utils.plot_rdm
+## RDM heatmaps are provided by common.plotting.plot_rdm
 
 
-## 2D embedding plotting is centralized in common.plotting_utils.plot_2d_embedding
+## 2D embedding plotting is centralized in common.plotting.plot_2d_embedding
 
 
 def plot_choice_frequency(
@@ -72,7 +72,7 @@ def plot_choice_frequency(
     >>> plot_choice_frequency(pairwise_df, "Experts", output_dir / "freq.pdf", stimuli_df)
     """
     # Use centralized styling
-    figure_style()
+    apply_nature_rc()
 
     # Compute frequency of each stimulus being chosen
     # Handle both raw and aggregated data

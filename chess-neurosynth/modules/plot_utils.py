@@ -13,8 +13,8 @@ from nilearn import plotting, surface, datasets
 from nilearn import image
 from plotly.subplots import make_subplots
 
-from common.plotting_utils import (
-    figure_style,
+from common.plotting import (
+    apply_nature_rc,
     CMAP_BRAIN,
     PLOT_PARAMS,
     plot_grouped_bars_with_ci,
@@ -26,7 +26,7 @@ def plot_map(arr, ref_img, title: str, outpath: Path | str, thresh: float = 1e-5
     """
     Glass brain plot for a 3D array using CMAP_BRAIN and consistent style.
     """
-    figure_style()
+    apply_nature_rc()
     img = image.new_img_like(ref_img, arr)
     disp = plotting.plot_glass_brain(
         img,
@@ -174,10 +174,7 @@ def plot_correlations(df_pos, df_neg, df_diff, run_id: str, out_fig: Path | str)
     # Fixed publication y-limits for correlations
     ylim = (-0.15, 0.30)
 
-    # Hide error bars by using a local params with zero errorbar linewidth
-    local_params = dict(PLOT_PARAMS)
-    local_params['errorbar_linewidth'] = 0
-
+    # Plot with centralized parameters (no manual overrides)
     plot_grouped_bars_with_ci(
         group1_values=r_pos,
         group2_values=r_neg,
@@ -197,7 +194,6 @@ def plot_correlations(df_pos, df_neg, df_diff, run_id: str, out_fig: Path | str)
         ylim=ylim,
         add_zero_line=True,
         output_path=Path(out_fig),
-        params=local_params,
     )
 
 
@@ -219,11 +215,8 @@ def plot_difference(df_diff, run_id: str, out_fig: Path | str):
     ylim = (-0.20, 0.35)
 
     # Hide error bars in single-bar plot as well
-    local_params = dict(PLOT_PARAMS)
-    local_params['errorbar_linewidth'] = 0
-
-    # Make this figure 2/3 the default width (same height)
-    fig_w, base_h = PLOT_PARAMS['figure_sizes']['large']
+    # Plot with centralized parameters (no manual overrides)
+    # NOTE: figsize will be computed automatically by auto_bar_figure_size()
     plot_grouped_bars_with_ci(
         group1_values=diffs,
         group1_cis=cis,
@@ -240,8 +233,6 @@ def plot_difference(df_diff, run_id: str, out_fig: Path | str):
         add_zero_line=True,
         output_path=Path(out_fig),
         show_legend=True,
-        params=local_params,
-        figsize=(fig_w*0.85, base_h),
     )
 
 

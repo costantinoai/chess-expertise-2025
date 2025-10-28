@@ -43,7 +43,7 @@ from modules.plotting import (
     plot_pr_feature_importance,
     PLOT_PARAMS
 )
-from common.plotting_utils import plot_2d_embedding, COLORS_EXPERT_NOVICE
+from common.plotting import plot_2d_embedding, COLORS_EXPERT_NOVICE
 from modules.tables import generate_pr_results_table
 
 # ============================================================================

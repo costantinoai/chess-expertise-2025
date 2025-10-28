@@ -3,7 +3,7 @@ Common utilities for chess expertise analyses.
 
 This package provides shared functionality across all analyses:
 - constants: CONFIG dictionary with all paths and parameters
-- plotting_utils: Centralized plotting configuration, colors, and utilities
+- plotting: Nature-compliant plotting utilities (modular structure)
 - logging_utils: Logging and analysis setup functions
 - neuro_utils: Brain data loading and manipulation
 - bids_utils: BIDS path helpers and participant information
@@ -12,7 +12,7 @@ This package provides shared functionality across all analyses:
 Example Usage
 -------------
 >>> from common import CONFIG, setup_analysis
->>> from common import COLORS_EXPERT_NOVICE, figure_style
+>>> from common import COLORS_EXPERT_NOVICE, apply_nature_rc
 >>> from common import get_subject_list, load_nifti
 """
 
@@ -25,19 +25,42 @@ MODEL_ORDER = CONFIG.get('MODEL_ORDER')
 MODEL_LABELS = CONFIG.get('MODEL_LABELS')
 MODEL_LABELS_PRETTY = CONFIG.get('MODEL_LABELS_PRETTY')
 
-# Plotting
-from .plotting_utils import (
+# Plotting (Nature-compliant, modular structure)
+from .plotting import (
+    # Style
+    PLOT_PARAMS,
+    apply_nature_rc,
+    figure_size,
+    auto_bar_figure_size,
+    # Colors
     CMAP_BRAIN,
     COLORS_EXPERT_NOVICE,
     COLORS_CHECKMATE_NONCHECKMATE,
-    figure_style,
-    PLOT_PARAMS,
+    COLORS_WONG,
+    compute_stimulus_palette,
+    # Helpers
+    compute_symmetric_range,
+    compute_ylim_range,
+    format_axis_commas,
+    label_axes,
     style_spines,
     hide_ticks,
+    save_figure,
+    # Panels
+    make_panel_grid,
     set_axis_title,
-    add_rdm_category_bars,
+    add_panel_label,
+    # Bars
     plot_grouped_bars_with_ci,
-    compute_stimulus_palette,
+    plot_grouped_bars_on_ax,
+    # Heatmaps
+    plot_rdm,
+    plot_rdm_on_ax,
+    add_rdm_category_bars,
+    add_roi_color_legend,
+    # Scatter
+    plot_2d_embedding,
+    plot_2d_embedding_on_ax,
 )
 
 # Logging and setup
@@ -76,18 +99,40 @@ __all__ = [
     'MODEL_ORDER',
     'MODEL_LABELS',
     'MODEL_LABELS_PRETTY',
-    # Plotting
+    # Plotting - Style
+    'PLOT_PARAMS',
+    'apply_nature_rc',
+    'figure_size',
+    'auto_bar_figure_size',
+    # Plotting - Colors
     'CMAP_BRAIN',
     'COLORS_EXPERT_NOVICE',
     'COLORS_CHECKMATE_NONCHECKMATE',
-    'figure_style',
-    'PLOT_PARAMS',
+    'COLORS_WONG',
+    'compute_stimulus_palette',
+    # Plotting - Helpers
+    'compute_symmetric_range',
+    'compute_ylim_range',
+    'format_axis_commas',
+    'label_axes',
     'style_spines',
     'hide_ticks',
+    'save_figure',
+    # Plotting - Panels
+    'make_panel_grid',
     'set_axis_title',
-    'add_rdm_category_bars',
+    'add_panel_label',
+    # Plotting - Bars
     'plot_grouped_bars_with_ci',
-    'compute_stimulus_palette',
+    'plot_grouped_bars_on_ax',
+    # Plotting - Heatmaps
+    'plot_rdm',
+    'plot_rdm_on_ax',
+    'add_rdm_category_bars',
+    'add_roi_color_legend',
+    # Plotting - Scatter
+    'plot_2d_embedding',
+    'plot_2d_embedding_on_ax',
     # Logging and setup
     'setup_analysis',
     'setup_analysis_in_dir',

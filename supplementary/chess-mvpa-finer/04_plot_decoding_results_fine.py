@@ -17,12 +17,12 @@ script_dir = Path(__file__).parent
 repo_root = script_dir.parent.parent  # supplementary/ -> repo
 sys.path.insert(0, str(repo_root))
 
-from common import CONFIG, figure_style
+from common import CONFIG, apply_nature_rc
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.bids_utils import load_roi_metadata
 from common.neuro_utils import get_roi_names_and_colors
-from common.plotting_utils import plot_grouped_bars_with_ci, select_roi_labels_for_plot
+from common.plotting import plot_grouped_bars_with_ci, select_roi_labels_for_plot
 from common.report_utils import generate_latex_table, create_figure_summary
 
 
@@ -71,7 +71,7 @@ roi_names_default, roi_colors_default = get_roi_names_and_colors(CONFIG['ROI_GLA
 # -----------------------------------------------------------------------------
 # Figures
 # -----------------------------------------------------------------------------
-figure_style()
+apply_nature_rc()
 
 for method, results in group_stats.items():
     for tgt, blocks in results.items():
