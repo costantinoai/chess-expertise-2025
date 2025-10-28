@@ -123,3 +123,7 @@ spm*.nii
 
 # Old implementation - never commit (read-only reference only)
 old-implementation/
+
+# Scripts and docs - local development only
+scripts/
+docs/
