@@ -24,7 +24,6 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).parent.parent  # Assumes constants.py is in common/
 # Repository results root (outputs stay repo-local)
 _DATA_DIR = _REPO_ROOT / "data"  # reserved for local assets; not the primary dataset
-_RESULTS_DIR = _REPO_ROOT / "results"
 
 # External manuscript data root (ALL inputs live here)
 _EXTERNAL_DATA_ROOT = Path("/media/costantino_ai/eik-T9/manuscript-data")
@@ -42,7 +41,8 @@ CONFIG = {
     # Repository paths
     'REPO_ROOT': _REPO_ROOT,
     'DATA_DIR': _DATA_DIR,
-    'RESULTS_DIR': _RESULTS_DIR,
+    # Results directories are analysis-specific and created via
+    # logging_utils.setup_analysis() under each package's results/ folder.
 
     # ROI paths (external)
     'ROI_ROOT': _EXTERNAL_DATA_ROOT / "rois",
@@ -75,13 +75,7 @@ CONFIG = {
     'RANDOM_SEED': 42,
     'CHANCE_LEVEL_RSA': 0.0,  # For RSA correlation tests, chance level is 0 (no correlation)
 
-    # Dataset info
-    'N_BOARDS_TOTAL': 40,
-    'N_BOARDS_CHECKMATE': 20,
-    'N_BOARDS_NONCHECKMATE': 20,
-    'N_SUBJECTS_TOTAL': 44,
-    'N_SUBJECTS_EXPERT': 20,
-    'N_SUBJECTS_NOVICE': 24,
+    # Dataset info (derived dynamically from BIDS ground truth; do not hardcode counts)
 
     # Model info
     'MODEL_RDM_NAMES': ['Checkmate', 'Strategy', 'Visual_Similarity'],

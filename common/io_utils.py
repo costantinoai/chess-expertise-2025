@@ -156,6 +156,10 @@ __all__ = [
     'resolve_latest_dir',
     'sanitize_matlab_varnames',
     'pick_first_present',
+    'find_nifti_files',
+    'split_by_group',
+    'discover_files_by_group',
+    'find_subject_tsvs',
 ]
 
 
@@ -393,3 +397,83 @@ def pick_first_present(obj, candidates: List[str]) -> Optional[str]:
         if c in cols:
             return c
     return None
+
+
+# =============================================================================
+# Generalized file discovery helpers (consolidated)
+# =============================================================================
+
+def find_nifti_files(data_dir: Path | str, pattern: str | None = None) -> List[Path]:
+    """
+    Recursively find .nii or .nii.gz files under `data_dir` optionally matching a substring.
+    """
+    root = Path(data_dir)
+    matches: List[Path] = []
+    for p in root.rglob('*'):
+        if p.is_file() and (p.suffix in {'.nii', '.gz'} or p.name.endswith('.nii.gz')):
+            if pattern is None or (pattern in p.name):
+                matches.append(p)
+    return sorted(matches)
+
+
+def _normalize_sub_id(s: str) -> str:
+    s = str(s)
+    return s if s.startswith('sub-') else f"sub-{int(s):02d}" if s.isdigit() else f"sub-{s}"
+
+
+def split_by_group(
+    files: List[Path],
+    expert_ids: List[str],
+    novice_ids: List[str],
+) -> tuple[List[Path], List[Path]]:
+    """
+    Split file paths into experts and novices based on subject IDs.
+    Matches 'sub-XX' substrings within filenames.
+    """
+    exp: List[Path] = []
+    nov: List[Path] = []
+    exp_tags = {_normalize_sub_id(sid) for sid in expert_ids}
+    nov_tags = {_normalize_sub_id(sid) for sid in novice_ids}
+    for f in files:
+        full = str(f)
+        if any(tag in full for tag in exp_tags):
+            exp.append(f)
+        elif any(tag in full for tag in nov_tags):
+            nov.append(f)
+    return exp, nov
+
+
+def discover_files_by_group(
+    base_dir: Path | str,
+    filename_substring: str,
+    expert_ids: List[str],
+    novice_ids: List[str],
+) -> tuple[List[Path], List[Path]]:
+    """
+    Convenience wrapper: find NIfTIs matching a substring and split by group.
+    """
+    files = find_nifti_files(base_dir, pattern=filename_substring)
+    return split_by_group(files, expert_ids, novice_ids)
+
+
+def find_subject_tsvs(method_dir: Path) -> List[Path]:
+    """
+    Find subject-level TSV files under a method directory of the form:
+        method_dir/sub-XX/*.tsv
+    Returns one TSV per subject (first in lexical order when multiple found).
+    """
+    logger = logging.getLogger(__name__)
+    tsvs: List[Path] = []
+    method_dir = Path(method_dir)
+    for sub_dir in sorted(method_dir.glob("sub-*")):
+        if not sub_dir.is_dir():
+            continue
+        candidates = sorted(sub_dir.glob("*.tsv"))
+        if not candidates:
+            continue
+        if len(candidates) > 1:
+            raise RuntimeError(
+                f"Multiple TSVs found under {sub_dir} — explicit disambiguation required: {', '.join(p.name for p in candidates)}"
+            )
+        tsvs.append(candidates[0])
+    return tsvs

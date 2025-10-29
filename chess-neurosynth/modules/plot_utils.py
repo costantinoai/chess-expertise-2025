@@ -13,12 +13,15 @@ from nilearn import plotting, surface, datasets
 from nilearn import image
 from plotly.subplots import make_subplots
 
-from common.plotting_utils import (
-    figure_style,
+from common.plotting import (
+    apply_nature_rc,
     CMAP_BRAIN,
     PLOT_PARAMS,
     plot_grouped_bars_with_ci,
+    plot_grouped_bars_on_ax,
     COLORS_EXPERT_NOVICE,
+    plot_flat_pair,
+    plot_flat_hemisphere,
 )
 
 
@@ -26,7 +29,7 @@ def plot_map(arr, ref_img, title: str, outpath: Path | str, thresh: float = 1e-5
     """
     Glass brain plot for a 3D array using CMAP_BRAIN and consistent style.
     """
-    figure_style()
+    apply_nature_rc()
     img = image.new_img_like(ref_img, arr)
     disp = plotting.plot_glass_brain(
         img,
@@ -42,33 +45,7 @@ def plot_map(arr, ref_img, title: str, outpath: Path | str, thresh: float = 1e-5
     plt.close('all')
 
 
-def _save_plotly(fig, title: str, output_file: Path | str):
-    """
-    Save Plotly figure to HTML and PDF (requires kaleido); silently skip on error.
-
-    Notes
-    -----
-    - Always writes a sidecar HTML for interactive inspection
-    - Primary static export is PDF to match publication requirements
-    - If PDF export fails (e.g., kaleido missing), we do not raise
-    """
-    output_file = Path(output_file)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    # HTML
-    html_path = output_file.with_suffix('.html')
-    try:
-        fig.write_html(str(html_path))
-    except Exception:
-        pass
-    # Optional static export via kaleido (PDF) — can be disabled via env
-    skip_static = os.environ.get('SKIP_PLOTLY_STATIC_EXPORT', '').strip().lower() in {'1', 'true', 'yes'}
-    if not skip_static:
-        try:
-            pdf_path = output_file.with_suffix('.pdf')
-            fig.write_image(str(pdf_path))
-        except Exception:
-            # Fallback: ignore if kaleido not installed or fails
-            pass
+from common.plotting.surfaces import _save_plotly  # centralized
 
 
 def plot_surface_map(img, title: str, threshold: float | None, output_file: Path | str):
@@ -155,6 +132,99 @@ def plot_surface_map(img, title: str, threshold: float | None, output_file: Path
     _save_plotly(fig, title, output_file)
 
 
+# =============================================================================
+# On-axis helpers used by pylustrator scripts
+# =============================================================================
+
+def zero_cis(values):
+    """Return zero-width CIs for a list of values, as (v, v) pairs."""
+    return [(v, v) for v in values]
+
+
+def plot_correlations_on_ax(ax, df_pos: 'pd.DataFrame', df_neg: 'pd.DataFrame', title: str):
+    """
+    Plot paired bars for POS vs NEG correlations onto an existing axis.
+
+    Uses centralized grouped bar plotting and PLOT_PARAMS styling.
+    """
+    import numpy as np
+    terms = [t.title() for t in df_pos['term']]
+    r_pos = df_pos['r'].to_numpy().tolist()
+    r_neg = df_neg['r'].to_numpy().tolist()
+    cis_pos = zero_cis(r_pos)
+    cis_neg = zero_cis(r_neg)
+
+    green = COLORS_EXPERT_NOVICE.get('expert', '#198019')
+    red = COLORS_EXPERT_NOVICE.get('novice', '#a90f0f')
+
+    x = np.arange(len(terms))
+    plot_grouped_bars_on_ax(
+        ax=ax,
+        x_positions=x,
+        group1_values=r_pos,
+        group1_cis=cis_pos,
+        group1_color=green,
+        group2_values=r_neg,
+        group2_cis=cis_neg,
+        group2_color=red,
+        group1_label='POS',
+        group2_label='NEG',
+        ylim=None,
+        params=PLOT_PARAMS,
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(terms, rotation=30, ha='right', fontsize=PLOT_PARAMS['font_size_tick'])
+    ax.set_ylabel('Correlation (z)', fontsize=PLOT_PARAMS['font_size_label'])
+    from common.plotting import set_axis_title
+    set_axis_title(ax, title=title)
+
+
+def plot_differences_on_ax(ax, df_diff: 'pd.DataFrame', title: str):
+    """
+    Plot Δr bars with sign-colored bars onto an existing axis.
+    """
+    import numpy as np
+    terms = [t.title() for t in df_diff['term']]
+    diffs = df_diff['r_diff'].to_numpy().tolist()
+    cis = zero_cis(diffs)
+    green = COLORS_EXPERT_NOVICE.get('expert', '#198019')
+    red = COLORS_EXPERT_NOVICE.get('novice', '#a90f0f')
+    colors = [green if (isinstance(v, (int, float)) and np.isfinite(v) and v >= 0) else red for v in diffs]
+
+    x = np.arange(len(terms))
+    plot_grouped_bars_on_ax(
+        ax=ax,
+        x_positions=x,
+        group1_values=diffs,
+        group1_cis=cis,
+        group1_color=colors,
+        params=PLOT_PARAMS,
+        bar_width_multiplier=2.0,
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(terms, rotation=30, ha='right', fontsize=PLOT_PARAMS['font_size_tick'])
+    ax.set_ylabel('ΔCorrelation (z)', fontsize=PLOT_PARAMS['font_size_label'])
+    from common.plotting import set_axis_title
+    set_axis_title(ax, title=title)
+
+
+def embed_flat_pair_on_ax(ax, zmap_path: Path, title: str, tmp_stem: Path, vmin=None, vmax=None):
+    """
+    Create a flat-surface PNG via plotly helper; embed into a Matplotlib axis.
+    """
+    from nilearn import image
+    import matplotlib.image as mpimg
+    z_img = image.load_img(str(zmap_path))
+    plot_flat_pair(z_img, title='', threshold=0, output_file=tmp_stem, vmin=vmin, vmax=vmax)
+    png_path = tmp_stem.with_suffix('.png')
+    ax.set_axis_off()
+    if png_path.exists():
+        img = mpimg.imread(png_path)
+        ax.imshow(img)
+    from common.plotting import set_axis_title
+    set_axis_title(ax, title=title)
+
+
 def plot_correlations(df_pos, df_neg, df_diff, run_id: str, out_fig: Path | str):
     """
     Paired bars for POS vs NEG correlations using common.plotting_utils.
@@ -174,10 +244,7 @@ def plot_correlations(df_pos, df_neg, df_diff, run_id: str, out_fig: Path | str)
     # Fixed publication y-limits for correlations
     ylim = (-0.15, 0.30)
 
-    # Hide error bars by using a local params with zero errorbar linewidth
-    local_params = dict(PLOT_PARAMS)
-    local_params['errorbar_linewidth'] = 0
-
+    # Plot with centralized parameters (no manual overrides)
     plot_grouped_bars_with_ci(
         group1_values=r_pos,
         group2_values=r_neg,
@@ -197,7 +264,6 @@ def plot_correlations(df_pos, df_neg, df_diff, run_id: str, out_fig: Path | str)
         ylim=ylim,
         add_zero_line=True,
         output_path=Path(out_fig),
-        params=local_params,
     )
 
 
@@ -219,11 +285,8 @@ def plot_difference(df_diff, run_id: str, out_fig: Path | str):
     ylim = (-0.20, 0.35)
 
     # Hide error bars in single-bar plot as well
-    local_params = dict(PLOT_PARAMS)
-    local_params['errorbar_linewidth'] = 0
-
-    # Make this figure 2/3 the default width (same height)
-    fig_w, base_h = PLOT_PARAMS['figure_sizes']['large']
+    # Plot with centralized parameters (no manual overrides)
+    # NOTE: figsize will be computed automatically by auto_bar_figure_size()
     plot_grouped_bars_with_ci(
         group1_values=diffs,
         group1_cis=cis,
@@ -240,8 +303,6 @@ def plot_difference(df_diff, run_id: str, out_fig: Path | str):
         add_zero_line=True,
         output_path=Path(out_fig),
         show_legend=True,
-        params=local_params,
-        figsize=(fig_w*0.85, base_h),
     )
 
 
@@ -313,91 +374,4 @@ def _plot_hemisphere_flat(
     return tmin, tmax
 
 
-def plot_surface_map_flat(img, title: str, threshold: float | None, output_file: Path | str):
-    """
-    Publication-style flat surface plot (left and right hemispheres).
-
-    - Samples volume→surface on pial meshes (fsaverage, high-res)
-    - Renders on fsaverage flat meshes for left and right hemispheres
-    - Central title + per-hemisphere subtitles
-    - Left hemisphere: rotated 90° clockwise around y-axis (lateral view)
-    - Right hemisphere: flat surface, rotated 90° counterclockwise around y-axis
-    """
-    # Fetch matching-resolution meshes for sampling and flat rendering
-    fsavg_fetch = datasets.fetch_surf_fsaverage(mesh='fsaverage')
-    # Use flat meshes from fetch_surf_fsaverage to ensure both hemispheres are flat
-    flat_left = getattr(fsavg_fetch, 'flat_left', None)
-    flat_right = getattr(fsavg_fetch, 'flat_right', None)
-
-    # Sample volume to pial
-    tex_l = surface.vol_to_surf(img, fsavg_fetch.pial_left)
-    tex_r = surface.vol_to_surf(img, fsavg_fetch.pial_right)
-    vmax = float(np.nanmax(np.abs(np.concatenate([tex_l, tex_r])))) if tex_l.size and tex_r.size else float(np.nanmax(np.abs(tex_l)))
-    vmin = -vmax
-
-    # Two-panel plot (Left, Right)
-    fig = make_subplots(
-        rows=1, cols=2,
-        specs=[[{"type": "scene"}, {"type": "scene"}]],
-        horizontal_spacing=0.05,
-    )
-
-    # Plot left hemisphere using helper
-    _plot_hemisphere_flat(
-        fig, flat_left, fsavg_fetch.pial_left, tex_l,
-        hemi='left', vmin=vmin, vmax=vmax, threshold=threshold,
-        row=1, col=1, show_colorbar=False
-    )
-
-    # Plot right hemisphere using helper (with colorbar)
-    tmin, tmax = _plot_hemisphere_flat(
-        fig, flat_right, fsavg_fetch.pial_right, tex_r,
-        hemi='right', vmin=vmin, vmax=vmax, threshold=threshold,
-        row=1, col=2, show_colorbar=False
-    )
-
-    # Camera angles - ORIGINAL:
-    # Both hemispheres: dorsal view from above with 90° CW in-plane rotation
-    cam_left_cw = dict(eye=dict(x=0.0, y=0.0, z=2.1), up=dict(x=0.0, y=1.0, z=.0))
-    cam_right_cw = dict(eye=dict(x=-0.0, y=0.0, z=2.1), up=dict(x=0.0, y=1.0, z=0.0))
-
-    fig.update_scenes(
-        dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='data', camera=cam_left_cw),
-        row=1, col=1
-    )
-    fig.update_scenes(
-        dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='data', camera=cam_right_cw),
-        row=1, col=2
-    )
-
-    # Update lighting on all mesh traces to eliminate harsh shadows
-    # High ambient light with low specular creates a flat, evenly-lit appearance
-    for trace in fig.data:
-        if hasattr(trace, 'lighting'):
-            trace.lighting = dict(
-                ambient=0.2,      # High ambient light (reduces shadows)
-                diffuse=.7,      # Moderate diffuse reflection
-                specular=0.1,     # Low specular highlights
-                roughness=1,    # High roughness (matte finish)
-                fresnel=0.0       # No fresnel effect
-            )
-        if hasattr(trace, 'lightposition'):
-            # Position light at camera location for consistent illumination
-            trace.lightposition = dict(x=0, y=0, z=1000)
-
-    # Layout with central title and hemisphere subtitles
-    fig.update_layout(
-        title=dict(text=title, x=0.5, font=dict(size=int(PLOT_PARAMS['font_size_title']*1.3), family=PLOT_PARAMS['font_family'])),
-        font=dict(size=int(PLOT_PARAMS['font_size_tick']*1.1), family=PLOT_PARAMS['font_family']),
-        showlegend=False,
-        margin=dict(t=60, l=0, r=0, b=0),
-        width=1400,
-        height=850,
-        annotations=[
-            dict(text='Left Hemisphere', x=0.25, y=0.98, xref='paper', yref='paper', showarrow=False,
-                 font=dict(size=int(PLOT_PARAMS['font_size_title']), family=PLOT_PARAMS['font_family'])),
-            dict(text='Right Hemisphere', x=0.75, y=0.98, xref='paper', yref='paper', showarrow=False,
-                 font=dict(size=int(PLOT_PARAMS['font_size_title']), family=PLOT_PARAMS['font_family'])),
-        ]
-    )
-    _save_plotly(fig, title, output_file)
+# Removed thin wrapper plot_surface_map_flat; use common.plotting.plot_flat_pair directly

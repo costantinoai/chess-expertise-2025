@@ -46,7 +46,7 @@ def generate_pr_results_table(
         Statistical test results with columns: ROI_Label, mean_diff, ci95_low, ci95_high,
         p_val, p_val_fdr
     roi_info : pd.DataFrame
-        ROI metadata with columns: ROI_idx, region_name
+        ROI metadata with columns: roi_id, pretty_name
     output_dir : Path
         Output directory for saving tables
     use_fdr : bool, default=True
@@ -91,21 +91,21 @@ def generate_pr_results_table(
 
     # Merge with ROI names (use pretty_name for tables)
     expert_stats = expert_stats.merge(
-        roi_info[['ROI_idx', 'pretty_name']],
+        roi_info[['roi_id', 'pretty_name']],
         left_on='ROI_Label',
-        right_on='ROI_idx',
+        right_on='roi_id',
         how='left'
     )
     novice_stats = novice_stats.merge(
-        roi_info[['ROI_idx', 'pretty_name']],
+        roi_info[['roi_id', 'pretty_name']],
         left_on='ROI_Label',
-        right_on='ROI_idx',
+        right_on='roi_id',
         how='left'
     )
     stats_with_names = stats_results.merge(
-        roi_info[['ROI_idx', 'pretty_name']],
+        roi_info[['roi_id', 'pretty_name']],
         left_on='ROI_Label',
-        right_on='ROI_idx',
+        right_on='roi_id',
         how='left'
     )
 

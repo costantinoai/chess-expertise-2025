@@ -25,6 +25,30 @@ from datetime import datetime
 from .io_utils import copy_script_to_results
 
 
+def log_dataset_summary(logger: logging.Logger) -> None:
+    """
+    Log dynamic dataset summaries derived from BIDS ground truth.
+
+    Logs participant counts (total/experts/novices) and number of stimuli boards.
+    Safe to call in any analysis setup; guards all failures.
+    """
+    try:
+        from .bids_utils import get_group_summary, load_stimulus_metadata
+        summary = get_group_summary()
+        logger.info(
+            f"Participants: {summary['n_total']} total "
+            f"({summary['n_expert']} experts, {summary['n_novice']} novices)"
+        )
+        try:
+            stim_df = load_stimulus_metadata()
+            n_stim = int(stim_df['stim_id'].nunique()) if 'stim_id' in stim_df.columns else len(stim_df)
+            logger.info(f"Stimuli: {n_stim} boards")
+        except Exception as e:
+            logger.warning(f"Could not compute stimuli summary: {e}")
+    except Exception as e:
+        logger.warning(f"Could not compute participant summary: {e}")
+
+
 def setup_logging(log_file=None, level=logging.INFO, console=True):
     """
     Set up logging with consistent formatting for file and console output.
@@ -278,8 +302,9 @@ def setup_analysis(
     if extra_config is not None:
         config.update(extra_config)
 
-    # 7. Log script start
+    # 7. Log script start and dataset summary
     log_script_start(logger, script_file, config)
+    log_dataset_summary(logger)
 
     return config, output_dir, logger
 
@@ -350,8 +375,9 @@ def setup_analysis_in_dir(
     if extra_config is not None:
         config.update(extra_config)
 
-    # Log start
+    # Log start and dataset summary
     log_script_start(logger, script_file, config)
+    log_dataset_summary(logger)
 
     return config, results_dir, logger
 
@@ -362,4 +388,5 @@ __all__ = [
     'log_script_end',
     'setup_analysis',
     'setup_analysis_in_dir',
+    'log_dataset_summary',
 ]

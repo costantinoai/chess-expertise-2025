@@ -29,20 +29,18 @@ Higher PR = more distributed, lower PR = more specialized.
 - analysis.log: Execution log
 """
 
+import os
 import sys
 from pathlib import Path
-
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
-repo_root = script_dir.parent
-sys.path.insert(0, str(repo_root))
-sys.path.insert(0, str(script_dir))
 
 import pickle
 import pandas as pd
 
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
-from common.bids_utils import get_subject_list
+from common.bids_utils import get_subject_list, get_group_summary
 from common.neuro_utils import load_atlas
 
 from modules.data import (
@@ -54,6 +52,7 @@ from modules.models import (
     train_logreg_on_pr,
     compute_pca_2d,
     compute_2d_decision_boundary,
+    evaluate_classification_significance,
 )
 from modules.analysis import (
     summarize_pr_by_group,
@@ -93,10 +92,9 @@ atlas_data, roi_labels, roi_info, participants = load_atlas_and_metadata(
     load_atlas_func=load_atlas
 )
 
-# Get subject lists
+# Get subject list and group summary (DRY)
 all_subjects = get_subject_list()
-expert_subjects = get_subject_list(group='expert')
-novice_subjects = get_subject_list(group='novice')
+group_summary = get_group_summary()
 
 # =============================================================================
 # Compute Participation Ratios
@@ -157,9 +155,9 @@ stats_results = compare_groups_welch_fdr(
 sig_fdr = stats_results['significant_fdr'].sum()
 if sig_fdr > 0:
     sig_rois = stats_results[stats_results['significant_fdr']].merge(
-        roi_info[['ROI_idx', 'roi_name']],
+        roi_info[['roi_id', 'roi_name']],
         left_on='ROI_Label',
-        right_on='ROI_idx',
+        right_on='roi_id',
         how='left'
     )
 
@@ -198,6 +196,69 @@ xx, yy, Z = compute_2d_decision_boundary(
     labels=labels,
     random_seed=CONFIG['RANDOM_SEED']
 )
+
+# =============================================================================
+# Classification Significance Tests (ROI space and PCA-2D)
+# =============================================================================
+
+logger.info("Running significance tests for classification accuracy...")
+
+cls_test_roi = evaluate_classification_significance(
+    pr_df=pr_df,
+    participants=participants,
+    roi_labels=roi_labels,
+    space='roi',
+    random_seed=CONFIG['RANDOM_SEED'],
+    n_splits=None,
+    n_permutations=1000,
+)
+
+cls_test_pca2d = evaluate_classification_significance(
+    pr_df=pr_df,
+    participants=participants,
+    roi_labels=roi_labels,
+    space='pca2d',
+    random_seed=CONFIG['RANDOM_SEED'],
+    n_splits=None,
+    n_permutations=1000,
+)
+
+# Save a compact CSV summary
+cls_summary_df = pd.DataFrame([
+    {
+        'space': 'roi',
+        'cv_accuracy_mean': cls_test_roi['cv_accuracy_mean'],
+        'cv_accuracy_std': cls_test_roi['cv_accuracy_std'],
+        'n_splits': cls_test_roi['n_splits'],
+        'n_subjects': cls_test_roi['n_subjects'],
+        'n_experts': cls_test_roi['n_experts'],
+        'n_novices': cls_test_roi['n_novices'],
+        'perm_pvalue': cls_test_roi['perm_pvalue'],
+        'binom_pvalue': cls_test_roi['binom_pvalue'],
+        'perm_null_mean': cls_test_roi['perm_null_mean'],
+        'perm_null_std': cls_test_roi['perm_null_std'],
+        'n_permutations': cls_test_roi['n_permutations'],
+        'n_correct': cls_test_roi['n_correct'],
+        'n_trials': cls_test_roi['n_trials'],
+    },
+    {
+        'space': 'pca2d',
+        'cv_accuracy_mean': cls_test_pca2d['cv_accuracy_mean'],
+        'cv_accuracy_std': cls_test_pca2d['cv_accuracy_std'],
+        'n_splits': cls_test_pca2d['n_splits'],
+        'n_subjects': cls_test_pca2d['n_subjects'],
+        'n_experts': cls_test_pca2d['n_experts'],
+        'n_novices': cls_test_pca2d['n_novices'],
+        'perm_pvalue': cls_test_pca2d['perm_pvalue'],
+        'binom_pvalue': cls_test_pca2d['binom_pvalue'],
+        'perm_null_mean': cls_test_pca2d['perm_null_mean'],
+        'perm_null_std': cls_test_pca2d['perm_null_std'],
+        'n_permutations': cls_test_pca2d['n_permutations'],
+        'n_correct': cls_test_pca2d['n_correct'],
+        'n_trials': cls_test_pca2d['n_trials'],
+    },
+])
+cls_summary_df.to_csv(output_dir / "pr_classification_tests.csv", index=False)
 
 # =============================================================================
 # Save data for visualizations
@@ -246,12 +307,16 @@ results = {
         'diff_data': diff_data,
         'stats': stats_vox,
     },
+    'classification_tests': {
+        'roi': cls_test_roi,
+        'pca2d': cls_test_pca2d,
+    },
     'config': {
         'atlas_path': str(ATLAS_PATH),
         'glm_path': str(GLM_BASE_PATH),
         'alpha': ALPHA,
-        'n_experts': len(expert_subjects),
-        'n_novices': len(novice_subjects),
+        'n_experts': int(group_summary['n_expert']),
+        'n_novices': int(group_summary['n_novice']),
         'n_rois': len(roi_labels),
     }
 }
