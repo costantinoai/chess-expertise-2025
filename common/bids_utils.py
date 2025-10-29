@@ -362,9 +362,10 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
 
     Supported files (first found is used):
     - roi_labels.tsv with columns: roi_id, roi_name, family, color
-    - region_info.tsv with columns: index, name, [family], color
+    - region_info.tsv with columns: ROI_idx, roi_name, pretty_name, [family/group], color
 
-    Returns a DataFrame standardized to columns: roi_id, roi_name, family, color.
+    Returns a DataFrame standardized to columns: roi_id, roi_name, [pretty_name], family, color.
+    The pretty_name column is included if available in the source file.
 
     Parameters
     ----------
@@ -374,7 +375,7 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        Standardized metadata with columns: roi_id, roi_name, family, color
+        Standardized metadata with columns: roi_id, roi_name, [pretty_name], family, color
 
     Raises
     ------
@@ -395,7 +396,11 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
                 f"Missing required columns in {roi_labels_path}: {missing}\n"
                 f"Expected: {required_cols}, Found: {list(df.columns)}"
             )
-        return df[required_cols]
+        # Include pretty_name if available
+        cols_to_return = required_cols.copy()
+        if 'pretty_name' in df.columns:
+            cols_to_return.insert(2, 'pretty_name')  # Insert after roi_name
+        return df[cols_to_return]
 
     if region_info_path.exists():
         df_raw = pd.read_csv(region_info_path, sep='\t')
@@ -437,7 +442,12 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
         else:
             df['family'] = 'ROI'
 
-        return df[['roi_id', 'roi_name', 'family', 'color']]
+        # Include pretty_name if available
+        if has('pretty_name'):
+            df['pretty_name'] = df_raw[get('pretty_name')]
+            return df[['roi_id', 'roi_name', 'pretty_name', 'family', 'color']]
+        else:
+            return df[['roi_id', 'roi_name', 'family', 'color']]
 
     raise FileNotFoundError(
         f"No ROI metadata found under {roi_dir}. Expected roi_labels.tsv or region_info.tsv"
@@ -562,7 +572,7 @@ def get_participants_with_expertise(participants_file=None, bids_root=None):
     return participants_list, (n_experts, n_novices)
 
 
-def load_stimulus_metadata(stimuli_file=None):
+def load_stimulus_metadata(stimuli_file=None, return_all: bool = False):
     """
     Load stimulus metadata for model RDM construction.
     
@@ -573,6 +583,9 @@ def load_stimulus_metadata(stimuli_file=None):
     ----------
     stimuli_file : str or Path, optional
         Path to stimuli.tsv file. If None, uses CONFIG['STIMULI_FILE']
+    return_all : bool, default=False
+        If True, return all available columns after filtering and renaming
+        (no restriction to ['stim_id', 'check', 'visual', 'strategy']).
     
     Returns
     -------
@@ -586,7 +599,7 @@ def load_stimulus_metadata(stimuli_file=None):
     Notes
     -----
     - Loads from data/stimuli/stimuli.tsv (BIDS ground truth)
-    - Filters to valid stim_id range (1 to CONFIG['N_BOARDS_TOTAL'])
+    - Determines number of boards dynamically from the file (no hardcoded counts)
     - Renames 'check_status' to 'check' for compatibility
     - Returns only relevant columns for model RDM construction
     
@@ -608,21 +621,26 @@ def load_stimulus_metadata(stimuli_file=None):
     # Load from TSV (BIDS ground truth)
     df = pd.read_csv(stimuli_file, sep='\t')
     
-    # Filter to valid stim_id range
-    n_boards = CONFIG.get('N_BOARDS_TOTAL', 40)
-    df_filtered = df[
-        (df["stim_id"] >= 1) & 
-        (df["stim_id"] <= n_boards)
-    ].reset_index(drop=True)
+    # Filter to valid stim_id rows (positive integers) using dynamic range
+    # Determine maximum stim_id present to avoid hardcoded board counts
+    if 'stim_id' not in df.columns:
+        raise ValueError("Stimulus metadata must contain a 'stim_id' column")
+
+    # Keep only finite, positive stim_id values
+    df_filtered = df[pd.to_numeric(df['stim_id'], errors='coerce').notna()].copy()
+    df_filtered['stim_id'] = df_filtered['stim_id'].astype(int)
+    df_filtered = df_filtered[df_filtered['stim_id'] >= 1].reset_index(drop=True)
     
     # Rename check_status to check for compatibility
     if 'check_status' in df_filtered.columns:
         df_filtered = df_filtered.rename(columns={'check_status': 'check'})
     
+    if return_all:
+        return df_filtered
+
     # Return only relevant columns
     relevant_cols = ["stim_id", "check", "visual", "strategy"]
     available_cols = [col for col in relevant_cols if col in df_filtered.columns]
-    
     return df_filtered[available_cols]
 
 
@@ -688,4 +706,121 @@ __all__ = [
     'get_participants_with_expertise',
     'load_stimulus_metadata',
     'validate_bids_paths',
+    'merge_group_labels',
+    'to_sub_id',
+    'from_sub_id',
+    'derive_target_chance_from_stimuli',
 ]
+
+
+def merge_group_labels(df: pd.DataFrame, participants_df: pd.DataFrame, subject_col: str = 'subject_id') -> pd.DataFrame:
+    """
+    Attach 'group' labels to a DataFrame using participants.tsv.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing a subject column (default 'subject_id') with 'sub-XX' strings.
+    participants_df : pd.DataFrame
+        Output of load_participants_tsv(); must include 'participant_id' and 'group'.
+    subject_col : str
+        Name of the subject column in df.
+
+    Returns
+    -------
+    pd.DataFrame
+        df with 'participant_id' and 'group' columns merged.
+    """
+    return df.merge(
+        participants_df[['participant_id', 'group']],
+        left_on=subject_col,
+        right_on='participant_id',
+        how='left'
+    )
+
+
+def to_sub_id(x: str | int) -> str:
+    """
+    Convert a numeric subject code or string 'XX' to BIDS-style 'sub-XX' (zero-padded to 2 digits).
+    """
+    s = str(x).strip()
+    if s.startswith('sub-'):
+        return s
+    # Keep original width if >=2, else pad to 2
+    if s.isdigit() and len(s) < 2:
+        s = s.zfill(2)
+    return f"sub-{s}"
+
+
+def from_sub_id(sub: str) -> str:
+    """
+    Extract numeric portion 'XX' from BIDS-style 'sub-XX'. If already 'XX', return as-is.
+    """
+    sub = str(sub)
+    if sub.startswith('sub-'):
+        return sub.split('sub-')[-1]
+    return sub
+
+
+def derive_target_chance_from_stimuli(
+    targets: list[str],
+    stimuli_df: pd.DataFrame | None = None,
+) -> dict:
+    """
+    Derive per-target chance levels from stimuli metadata.
+
+    For each target in `targets`, computes chance as 1 / n_unique where
+    n_unique is the number of distinct labels in the corresponding
+    column of stimuli.tsv. Requires that each target name matches a column
+    in the stimuli DataFrame.
+
+    Parameters
+    ----------
+    targets : list[str]
+        List of target column names to derive chance for.
+    stimuli_df : pd.DataFrame, optional
+        If provided, use this DataFrame; otherwise loads via
+        load_stimulus_metadata(return_all=True).
+
+    Returns
+    -------
+    dict
+        Mapping target -> chance level (float).
+
+    Raises
+    ------
+    ValueError
+        If a target column is missing or has <2 unique values.
+    """
+    if stimuli_df is None:
+        stimuli_df = load_stimulus_metadata(return_all=True)
+
+    chance_map: dict[str, float] = {}
+    for t in targets:
+        # Support alias: 'stimuli' → 'stim_id' (explicit mapping)
+        col = t
+        if t == 'stimuli':
+            col = 'stim_id'
+
+        if col in stimuli_df.columns:
+            n_unique = int(pd.Series(stimuli_df[col]).dropna().nunique())
+            if n_unique < 2:
+                raise ValueError(f"Target '{t}' has <2 unique labels in stimuli.tsv (column '{col}')")
+            chance_map[t] = 1.0 / float(n_unique)
+            continue
+
+        # Explicit rule: any *_half target is a binary split (chance = 0.5)
+        if t.endswith('_half'):
+            chance_map[t] = 0.5
+            continue
+
+        # Configured defaults (e.g., categories, visualStimuli, checkmate)
+        defaults = CONFIG.get('MVPA_SVM_CHANCE_DEFAULTS', {})
+        if t in defaults:
+            chance_map[t] = float(defaults[t])
+            continue
+
+        raise ValueError(
+            f"No chance level available for target '{t}'. Not found in stimuli.tsv (or alias) and no configured default."
+        )
+    return chance_map
