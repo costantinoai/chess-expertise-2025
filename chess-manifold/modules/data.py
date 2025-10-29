@@ -18,6 +18,9 @@ from pathlib import Path
 from scipy.stats import linregress
 from typing import Tuple
 
+from common.bids_utils import load_participants_tsv, load_roi_metadata, merge_group_labels
+from .utils import ensure_roi_order
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,12 +64,12 @@ def load_atlas_and_metadata(
     atlas_data, roi_labels = load_atlas_func(atlas_path)
     logger.info(f"  Loaded atlas: {len(roi_labels)} ROIs")
 
-    # Load ROI metadata
-    roi_info = pd.read_csv(roi_info_path, sep='\t')
+    # Load ROI metadata (use centralized loader; path → directory)
+    roi_info = load_roi_metadata(Path(roi_info_path).parent)
     logger.info(f"  Loaded ROI metadata: {len(roi_info)} regions")
 
     # Load participant data
-    participants = pd.read_csv(participants_path, sep='\t')
+    participants = load_participants_tsv(participants_path)
     logger.info(f"  Loaded participants: {len(participants)} subjects")
 
     return atlas_data, roi_labels, roi_info, participants
@@ -107,19 +110,15 @@ def pivot_pr_long_to_subject_roi(
     logger.info("Reshaping PR data to subject × ROI matrix...")
 
     # Add group labels
-    pr_with_group = pr_df.merge(
-        participants[['participant_id', 'group']],
-        left_on='subject_id',
-        right_on='participant_id',
-        how='left'
-    )
+    pr_with_group = merge_group_labels(pr_df, participants, subject_col='subject_id')
 
     # Pivot: rows=subjects, columns=ROIs
     pr_pivot = pr_with_group.pivot(
         index='subject_id',
         columns='ROI_Label',
         values='PR'
-    )[roi_labels]  # Ensure ROI order
+    )
+    pr_pivot = ensure_roi_order(pr_pivot, roi_labels)
 
     # Add group labels and ELO ratings, then sort (experts first, then by ELO descending within each group)
     subject_info = participants[['participant_id', 'group', 'rating']].copy()
@@ -165,7 +164,7 @@ def correlate_pr_with_roi_size(
     participants : pd.DataFrame
         Participant metadata (columns: participant_id, group)
     roi_info : pd.DataFrame
-        ROI metadata (columns: ROI_idx, pretty_name, color)
+        ROI metadata (columns: roi_id, pretty_name, color)
 
     Returns
     -------
@@ -188,12 +187,7 @@ def correlate_pr_with_roi_size(
     logger.info("Computing PR vs voxel count correlations...")
 
     # Add group labels
-    pr_with_group = pr_df.merge(
-        participants[['participant_id', 'group']],
-        left_on='subject_id',
-        right_on='participant_id',
-        how='left'
-    )
+    pr_with_group = merge_group_labels(pr_df, participants, subject_col='subject_id')
 
     # Average by ROI and group
     group_avg = pr_with_group.groupby(['ROI_Label', 'group']).agg({
@@ -203,9 +197,9 @@ def correlate_pr_with_roi_size(
 
     # Add ROI colors/names for plotting
     group_avg = group_avg.merge(
-        roi_info[['ROI_idx', 'pretty_name', 'color']],
+        roi_info[['roi_id', 'pretty_name', 'color']],
         left_on='ROI_Label',
-        right_on='ROI_idx',
+        right_on='roi_id',
         how='left'
     )
 
