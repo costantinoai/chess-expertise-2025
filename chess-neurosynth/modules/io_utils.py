@@ -20,70 +20,10 @@ from pathlib import Path
 from typing import Iterable, Tuple, Dict, List
 import pandas as pd
 from common import CONFIG
+# Avoid re-exporting common helpers; import them where needed at call sites
 
 
-def _normalize_sub_id(s: str) -> str:
-    s = str(s)
-    return s if s.startswith('sub-') else f"sub-{int(s):02d}" if s.isdigit() else f"sub-{s}"
-
-
-def find_nifti_files(data_dir: str | Path, pattern: str | None = None) -> List[Path]:
-    """
-    Recursively find .nii or .nii.gz files under `data_dir` optionally matching a substring.
-
-    Parameters
-    ----------
-    data_dir : str or Path
-    pattern : str or None
-        If provided, only filenames containing this substring are returned.
-
-    Returns
-    -------
-    list[Path]
-        Sorted list of file paths.
-    """
-    root = Path(data_dir)
-    matches: List[Path] = []
-    for p in root.rglob('*'):
-        if p.is_file() and (p.suffix in {'.nii', '.gz'} or p.name.endswith('.nii.gz')):
-            if pattern is None or (pattern in p.name):
-                matches.append(p)
-    return sorted(matches)
-
-
-def split_by_group(
-    files: Iterable[Path],
-    expert_ids: Iterable[str],
-    novice_ids: Iterable[str],
-) -> Tuple[List[Path], List[Path]]:
-    """
-    Split file paths into experts and novices based on subject IDs.
-
-    Matching is done by checking for the substring 'sub-XX' within the filename.
-
-    Parameters
-    ----------
-    files : iterable of Path
-    expert_ids, novice_ids : iterable of str
-        Subject identifiers; can be '03', 'sub-03', etc.
-
-    Returns
-    -------
-    (exp_files, nov_files) : tuple of lists of Path
-    """
-    exp: List[Path] = []
-    nov: List[Path] = []
-
-    exp_tags = { _normalize_sub_id(sid) for sid in expert_ids }
-    nov_tags = { _normalize_sub_id(sid) for sid in novice_ids }
-
-    for f in files:
-        full = str(f)
-        if any(tag in full for tag in exp_tags):
-            exp.append(f)
-        elif any(tag in full for tag in nov_tags):
-            nov.append(f)
-    return exp, nov
+## find_nifti_files and split_by_group are imported from common.io_utils
 
 
 def load_term_maps(map_dir: str | Path) -> Dict[str, Path]:

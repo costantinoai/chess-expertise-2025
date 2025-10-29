@@ -21,11 +21,7 @@ from .rdm_utils import (
     correlate_with_all_models
 )
 
-from .plotting import (
-    compute_stimulus_palette,
-    plot_choice_frequency,
-    plot_model_correlations
-)
+# Plotting helpers are provided centrally via common.plotting.
 
 __all__ = [
     # Data loading
@@ -36,8 +32,5 @@ __all__ = [
     'compute_symmetric_rdm',
     'compute_directional_dsm',
     'correlate_with_all_models',
-    # Plotting
-    'compute_stimulus_palette',
-    'plot_choice_frequency',
-    'plot_model_correlations',
+    # Plotting helpers live in common.plotting
 ]

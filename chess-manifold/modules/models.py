@@ -15,10 +15,12 @@ compute_2d_decision_boundary : Precompute decision boundary grid for plotting
 import logging
 import numpy as np
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, Dict, Any
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.model_selection import StratifiedKFold, cross_val_score, cross_val_predict, permutation_test_score
+from scipy.stats import binomtest
 
 logger = logging.getLogger(__name__)
 
@@ -68,25 +70,24 @@ def train_logreg_on_pr(
     logger.info("Training logistic regression on PR features (expert vs novice)...")
 
     # Merge PR data with group labels
-    pr_with_group = pr_df.merge(
-        participants[['participant_id', 'group']],
-        left_on='subject_id',
-        right_on='participant_id',
-        how='left'
-    )
+    from common.bids_utils import merge_group_labels
+    from .utils import ensure_roi_order
+    pr_with_group = merge_group_labels(pr_df, participants, subject_col='subject_id')
 
     # Convert to wide format (subjects × ROIs)
     expert_pr = pr_with_group[pr_with_group['group'] == 'expert'].pivot(
         index='subject_id',
         columns='ROI_Label',
         values='PR'
-    )[roi_labels].values
+    )
+    expert_pr = ensure_roi_order(expert_pr, roi_labels)[roi_labels].values
 
     novice_pr = pr_with_group[pr_with_group['group'] == 'novice'].pivot(
         index='subject_id',
         columns='ROI_Label',
         values='PR'
-    )[roi_labels].values
+    )
+    novice_pr = ensure_roi_order(novice_pr, roi_labels)[roi_labels].values
 
     # Stack data: experts first, then novices
     all_pr = np.vstack([expert_pr, novice_pr])
@@ -223,3 +224,163 @@ __all__ = [
     'compute_pca_2d',
     'compute_2d_decision_boundary',
 ]
+
+
+def _build_feature_matrix(
+    pr_df: pd.DataFrame,
+    participants: pd.DataFrame,
+    roi_labels: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray, int, int]:
+    """
+    Construct X (subjects × ROIs) and y (1=expert, 0=novice) from long PR data.
+
+    Returns
+    -------
+    X : np.ndarray
+        Feature matrix ordered by [experts, novices]
+    y : np.ndarray
+        Binary labels (1=expert, 0=novice)
+    n_expert : int
+        Number of expert subjects
+    n_novice : int
+        Number of novice subjects
+    """
+    pr_with_group = pr_df.merge(
+        participants[['participant_id', 'group']],
+        left_on='subject_id',
+        right_on='participant_id',
+        how='left'
+    )
+
+    expert_pr = pr_with_group[pr_with_group['group'] == 'expert'].pivot(
+        index='subject_id',
+        columns='ROI_Label',
+        values='PR'
+    )[roi_labels].values
+
+    novice_pr = pr_with_group[pr_with_group['group'] == 'novice'].pivot(
+        index='subject_id',
+        columns='ROI_Label',
+        values='PR'
+    )[roi_labels].values
+
+    X = np.vstack([expert_pr, novice_pr])
+    y = np.array([1] * len(expert_pr) + [0] * len(novice_pr))
+    return X, y, len(expert_pr), len(novice_pr)
+
+
+def evaluate_classification_significance(
+    pr_df: pd.DataFrame,
+    participants: pd.DataFrame,
+    roi_labels: np.ndarray,
+    space: str = 'roi',
+    random_seed: int = 42,
+    n_splits: int = None,
+    n_permutations: int = 1000,
+) -> Dict[str, Any]:
+    """
+    Test whether classification accuracy is above chance (50%).
+
+    Uses stratified K-fold CV to estimate accuracy and two significance tests:
+    - Permutation test (label shuffling within CV)
+    - Binomial test on total correct predictions across CV folds
+
+    Parameters
+    ----------
+    pr_df : pd.DataFrame
+        Long-format PR results.
+    participants : pd.DataFrame
+        Participant metadata with group labels.
+    roi_labels : np.ndarray
+        ROI labels defining feature order.
+    space : {'roi', 'pca2d'}, default='roi'
+        Feature space to evaluate. 'roi' uses all ROIs as features; 'pca2d'
+        uses a pipeline with PCA(2) fit within each CV fold.
+    random_seed : int, default=42
+        Random seed for reproducibility.
+    n_splits : int or None, default=None
+        Number of CV folds (StratifiedKFold). If None, chooses the maximum
+        feasible up to 5 given class counts.
+    n_permutations : int, default=1000
+        Number of permutations for permutation test.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys:
+        - 'space': 'roi' or 'pca2d'
+        - 'cv_accuracy_mean', 'cv_accuracy_std'
+        - 'n_splits', 'n_subjects', 'n_experts', 'n_novices'
+        - 'perm_pvalue', 'perm_null_mean', 'perm_null_std', 'n_permutations'
+        - 'binom_pvalue', 'n_correct', 'n_trials'
+    """
+    from sklearn.pipeline import Pipeline
+
+    logger.info(f"Evaluating classification significance in '{space}' space...")
+
+    X, y, n_expert, n_novice = _build_feature_matrix(pr_df, participants, roi_labels)
+    n_subjects = X.shape[0]
+
+    # Determine feasible number of splits
+    if n_splits is None:
+        max_splits = max(2, min(5, n_expert, n_novice))
+        n_splits = max_splits
+    if n_splits < 2 or n_splits > min(n_expert, n_novice):
+        n_splits = min(max(2, n_splits), n_expert, n_novice)
+
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_seed)
+
+    steps = [('scaler', StandardScaler())]
+    if space.lower() in ['pca2d', 'pca_2d', '2d', 'pca']:
+        steps.append(('pca', PCA(n_components=2, random_state=random_seed)))
+    steps.append(('clf', LogisticRegression(random_state=random_seed, max_iter=1000)))
+    estimator = Pipeline(steps)
+
+    # Cross-validated accuracy (mean ± std across folds)
+    cv_scores = cross_val_score(estimator, X, y, cv=cv, scoring='accuracy')
+    cv_acc_mean = float(np.mean(cv_scores))
+    cv_acc_std = float(np.std(cv_scores, ddof=1)) if len(cv_scores) > 1 else 0.0
+
+    # Predictions for binomial test
+    y_pred = cross_val_predict(estimator, X, y, cv=cv, method='predict')
+    n_correct = int((y_pred == y).sum())
+    n_trials = int(len(y))
+    binom_p = float(binomtest(n_correct, n_trials, p=0.5, alternative='greater').pvalue)
+
+    # Permutation test (scikit-learn handles CV internally)
+    score, perm_scores, pvalue = permutation_test_score(
+        estimator, X, y,
+        scoring='accuracy',
+        cv=cv,
+        n_permutations=n_permutations,
+        random_state=random_seed,
+        n_jobs=None,
+    )
+
+    results = {
+        'space': 'pca2d' if ('pca' in [name for name, _ in steps]) else 'roi',
+        'cv_accuracy_mean': cv_acc_mean,
+        'cv_accuracy_std': cv_acc_std,
+        'n_splits': int(n_splits),
+        'n_subjects': int(n_subjects),
+        'n_experts': int(n_expert),
+        'n_novices': int(n_novice),
+        'perm_pvalue': float(pvalue),
+        'perm_null_mean': float(np.mean(perm_scores)),
+        'perm_null_std': float(np.std(perm_scores, ddof=1)) if len(perm_scores) > 1 else 0.0,
+        'n_permutations': int(n_permutations),
+        'binom_pvalue': binom_p,
+        'n_correct': n_correct,
+        'n_trials': n_trials,
+    }
+
+    logger.info(
+        f"  CV accuracy: {cv_acc_mean:.3f} ± {cv_acc_std:.3f} (n_splits={n_splits})\n"
+        f"  Permutation p={pvalue:.4g} (null mean={np.mean(perm_scores):.3f})\n"
+        f"  Binomial p={binom_p:.4g} (n_correct={n_correct}/{n_trials})"
+    )
+
+    return results
+
+
+__all__.extend(['evaluate_classification_significance'])

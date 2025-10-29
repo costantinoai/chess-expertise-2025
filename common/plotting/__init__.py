@@ -39,19 +39,22 @@ from .helpers import (
     style_spines,
     hide_ticks,
     save_figure,
+    sanitize_label_to_filename,
+    save_axes_svgs,
+    save_panel_svg,
+    format_roi_labels_and_colors,
 )
 
-# Panels
-from .panels import (
-    make_panel_grid,
+# Titles (pylustrator handles layout; only titles retained)
+from .helpers import (
     set_axis_title,
-    add_panel_label,
 )
 
 # Bar plots
 from .bars import (
     plot_grouped_bars_with_ci,
     plot_grouped_bars_on_ax,
+    plot_counts_on_ax,
 )
 
 # Heatmaps (RDMs)
@@ -60,12 +63,19 @@ from .heatmaps import (
     plot_rdm_on_ax,
     add_rdm_category_bars,
     add_roi_color_legend,
+    plot_matrix_on_ax,
 )
 
 # Scatter plots (2D embeddings)
 from .scatter import (
     plot_2d_embedding,
     plot_2d_embedding_on_ax,
+)
+
+# Surface plots (flat hemispheres via Plotly)
+from .surfaces import (
+    plot_flat_pair,
+    plot_flat_hemisphere,
 )
 
 __all__ = [
@@ -90,23 +100,31 @@ __all__ = [
     'style_spines',
     'hide_ticks',
     'save_figure',
+    'sanitize_label_to_filename',
+    'save_axes_svgs',
+    'save_panel_svg',
+    'format_roi_labels_and_colors',
 
-    # Panels
-    'make_panel_grid',
+    # Titles
     'set_axis_title',
-    'add_panel_label',
 
     # Bars
     'plot_grouped_bars_with_ci',
     'plot_grouped_bars_on_ax',
+    'plot_counts_on_ax',
 
     # Heatmaps
     'plot_rdm',
     'plot_rdm_on_ax',
     'add_rdm_category_bars',
     'add_roi_color_legend',
+    'plot_matrix_on_ax',
 
     # Scatter
     'plot_2d_embedding',
     'plot_2d_embedding_on_ax',
+
+    # Surfaces
+    'plot_flat_pair',
+    'plot_flat_hemisphere',
 ]

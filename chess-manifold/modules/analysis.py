@@ -85,12 +85,8 @@ def summarize_pr_by_group(
     from common.stats_utils import compute_group_mean_and_ci
 
     # Step 1: Merge PR data with group labels (expert/novice)
-    pr_with_group = pr_df.merge(
-        participants_df[['participant_id', 'group']],
-        left_on='subject_id',
-        right_on='participant_id',
-        how='left'
-    )
+    from common.bids_utils import merge_group_labels
+    pr_with_group = merge_group_labels(pr_df, participants_df, subject_col='subject_id')
 
     summary_records = []
 
@@ -208,18 +204,15 @@ def compare_groups_welch_fdr(
     logger.info(f"Running statistical analysis: expert vs novice, {len(roi_labels)} ROIs")
 
     # Step 1: Merge PR data with group assignment
-    pr_with_group = pr_df.merge(
-        participants_df[['participant_id', 'group']],
-        left_on='subject_id',
-        right_on='participant_id',
-        how='left'
-    )
+    from common.bids_utils import merge_group_labels
+    pr_with_group = merge_group_labels(pr_df, participants_df, subject_col='subject_id')
 
     # Step 2: Pivot to wide format (subjects × ROIs) separately for each group
     # This makes it easy to pass to the statistical testing function
     expert_data = pr_with_group[pr_with_group['group'] == 'expert']
     novice_data = pr_with_group[pr_with_group['group'] == 'novice']
 
+    from .utils import ensure_roi_order
     expert_pivot = expert_data.pivot(
         index='subject_id',
         columns='ROI_Label',
@@ -232,6 +225,8 @@ def compare_groups_welch_fdr(
     )
 
     # Step 3: Ensure ROIs are in the correct order (matching roi_labels)
+    expert_pivot = ensure_roi_order(expert_pivot, roi_labels)
+    novice_pivot = ensure_roi_order(novice_pivot, roi_labels)
     expert_vals = expert_pivot[roi_labels].values  # Shape: (n_experts, n_rois)
     novice_vals = novice_pivot[roi_labels].values  # Shape: (n_novices, n_rois)
 

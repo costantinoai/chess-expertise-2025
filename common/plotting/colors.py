@@ -72,18 +72,17 @@ CMAP_BRAIN = _make_brain_cmap()
 # Color Palettes
 # =============================================================================
 
-# Expert vs Novice (Nature-compliant, colorblind safe)
-# NO red/green contrast - uses Wong palette blue + vermillion
+# Expert vs Novice (Tol palette - colorblind safe, pretty, distinct)
 COLORS_EXPERT_NOVICE = {
-    'expert': '#0072B2',   # Blue (Wong palette)
-    'novice': '#D55E00',   # Vermillion/orange (Wong palette)
+    'expert': '#4477AA',   # Blue (Tol bright palette)
+    'novice': '#EE6677',   # Red (Tol bright palette) - distinct from blue
 }
 
-# Checkmate vs Non-Checkmate (for behavioral visualizations)
+# Checkmate vs Non-Checkmate (Tol palette - colorblind safe, distinct from expert/novice)
 # Used for stimulus visualizations in behavioral RDMs, MDS, etc.
 COLORS_CHECKMATE_NONCHECKMATE = {
-    'checkmate': "#B96F25",      # Brown
-    'non_checkmate': "#305B7F",  # Blue
+    'checkmate': '#CCBB44',      # Yellow (Tol bright palette)
+    'non_checkmate': '#228833',  # Green (Tol bright palette)
 }
 
 # Wong Colorblind-Safe Palette (Reference)

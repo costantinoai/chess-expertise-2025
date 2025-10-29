@@ -7,6 +7,7 @@ Provides:
 - plot_grouped_bars_with_ci(): Standalone bar figure (automatic sizing)
 - plot_grouped_bars_on_ax(): Bar plotting on existing axes (for panels)
 - Helper functions: _convert_ci_to_yerr, _should_use_hatching, _add_significance_stars
+ - plot_counts_on_ax(): Simple count bar plot on existing axes (for panels)
 """
 
 import numpy as np
@@ -91,6 +92,97 @@ def _calculate_offset_from_range(ax, offset_pct: float = 0.02) -> float:
     return y_range * offset_pct
 
 
+def _calculate_auto_ylim(
+    values: List[float],
+    yerr: np.ndarray,
+    pvals: Optional[List[float]] = None,
+    group2_values: Optional[List[float]] = None,
+    group2_yerr: Optional[np.ndarray] = None,
+    group2_pvals: Optional[List[float]] = None,
+    comparison_pvals: Optional[List[float]] = None,
+    params: dict = None,
+    padding_pct: float = 0.05
+) -> Tuple[float, float]:
+    """
+    Calculate automatic y-limits based on data range including error bars and significance stars.
+
+    Parameters
+    ----------
+    values : List[float]
+        Group 1 bar values
+    yerr : np.ndarray
+        Group 1 error bars (2 x n array: [lower_errors, upper_errors])
+    pvals : List[float], optional
+        Group 1 p-values for significance stars
+    group2_values : List[float], optional
+        Group 2 bar values (for grouped plots)
+    group2_yerr : np.ndarray, optional
+        Group 2 error bars
+    group2_pvals : List[float], optional
+        Group 2 p-values
+    comparison_pvals : List[float], optional
+        Comparison p-values between groups
+    params : dict, optional
+        Plotting parameters
+    padding_pct : float, default=0.05
+        Padding percentage (5%)
+
+    Returns
+    -------
+    Tuple[float, float]
+        (ymin, ymax) for y-axis limits
+    """
+    if params is None:
+        from .style import PLOT_PARAMS
+        params = PLOT_PARAMS
+
+    # Find data range including error bars
+    min_vals = []
+    max_vals = []
+
+    # Group 1
+    for val, err in zip(values, yerr.T):
+        min_vals.append(val - err[0])  # val - lower_error
+        max_vals.append(val + err[1])  # val + upper_error
+
+    # Group 2 (if present)
+    if group2_values is not None and group2_yerr is not None:
+        for val, err in zip(group2_values, group2_yerr.T):
+            min_vals.append(val - err[0])
+            max_vals.append(val + err[1])
+
+    data_min = min(min_vals)
+    data_max = max(max_vals)
+    data_range = data_max - data_min
+
+    # Add space for significance stars if present
+    offset_pct = params.get('significance_offset_pct', 0.02)
+    has_stars = (
+        (pvals is not None and any(p < 0.05 for p in pvals if p is not None)) or
+        (group2_pvals is not None and any(p < 0.05 for p in group2_pvals if p is not None)) or
+        (comparison_pvals is not None and any(p < 0.05 for p in comparison_pvals if p is not None))
+    )
+
+    if has_stars:
+        # Add extra space for stars (offset + line + star height)
+        # For comparison mode: offset * 2.0 (line) + offset (star) = 3.0× total
+        # For single mode positive: offset (star) = 1.0×
+        # For single mode negative: offset * 3.5 (star) = 3.5×
+        star_space = data_range * offset_pct * 4.5  # Conservative estimate for all cases
+        data_max += star_space
+        if data_min < 0:  # Also add space below if we have negative bars
+            data_min -= star_space
+
+    # Add padding
+    total_range = data_max - data_min
+    padding = total_range * padding_pct
+
+    ymin = data_min - padding
+    ymax = data_max + padding
+
+    return ymin, ymax
+
+
 def _add_significance_stars(
     ax, x_positions: np.ndarray,
     values: List[float],
@@ -143,8 +235,9 @@ def _add_significance_stars(
     - Star positioned above the line
     - Line spans both bars (uses bar_width)
     """
-    # Calculate dynamic offset (2% of y-range)
-    y_offset = _calculate_offset_from_range(ax, offset_pct=0.02)
+    # Calculate dynamic offset (from centralized params, default 2% of y-range)
+    offset_pct = params.get('significance_offset_pct', 0.02)
+    y_offset = _calculate_offset_from_range(ax, offset_pct=offset_pct)
 
     if comparison_mode:
         # Between-group comparison mode
@@ -162,22 +255,22 @@ def _add_significance_stars(
                     group2_values[i] + group2_yerr[1, i]  # group2
                 )
 
-                # Line is at the offset level (bottom reference)
-                line_y = max_top + y_offset
+                # Line center positioned with larger offset to avoid touching error bars
+                line_y = max_top + y_offset * 2.0  # 2× offset for clear separation
 
-                # Draw connecting line first (at offset level)
+                # Draw connecting line first
                 ax.plot(
                     [x_positions[i] - bar_width/2, x_positions[i] + bar_width/2],
                     [line_y, line_y],
                     color='black', linewidth=1, zorder=3
                 )
 
-                # Star is above the line
-                star_y = line_y + y_offset * 0.5
+                # Star is above the line, centered vertically on proper distance
+                star_y = line_y + y_offset
 
-                # Draw star
+                # Draw star (use center alignment for better visual balance with line)
                 ax.text(x_positions[i], star_y, stars,
-                       ha='center', va='bottom',
+                       ha='center', va='center',
                        fontsize=params['font_size_annotation'],
                        fontweight='bold')
     else:
@@ -187,14 +280,14 @@ def _add_significance_stars(
             if stars:
                 # Determine reference point and direction based on bar value
                 if val >= 0:
-                    # Positive bar: star above
+                    # Positive bar: star above with va='bottom'
                     ref_y = val + err[1]  # Top of error bar
                     star_y = ref_y + y_offset
                     va = 'bottom'
                 else:
-                    # Negative bar: star below
+                    # Negative bar: star below with va='top' (text extends downward)
                     ref_y = val - err[0]  # Bottom of error bar
-                    star_y = ref_y - y_offset
+                    star_y = ref_y - y_offset * 3.5  # 3.5× offset for clear separation below
                     va = 'top'
 
                 # Draw star
@@ -313,9 +406,10 @@ def plot_grouped_bars_on_ax(
     # Convert CIs to yerr format
     g1_yerr = _convert_ci_to_yerr(group1_cis, group1_values)
 
-    # For bar width in data coordinates, use a reasonable fraction
-    # Assume typical bar width should be ~0.8 of the spacing between categories
-    bar_width_data = 0.4 * bar_width_multiplier
+    # Bar width in data coordinates (EXACTLY matching main branch)
+    # Main branch: bw = params['bar_width'] = 0.5
+    # Offset = ±bw/2, so bars are side-by-side with no gap
+    bw = 0.35 * bar_width_multiplier  # Slightly smaller than main (0.5) for Nature style
 
     if is_grouped:
         # === GROUPED MODE: Two groups side-by-side ===
@@ -324,86 +418,110 @@ def plot_grouped_bars_on_ax(
         # Determine if hatching is needed (only when colors are the same)
         use_hatch = _should_use_hatching(group1_color, group2_color)
 
-        # Group 1 bars (solid)
-        ax.bar(x_positions - bar_width_data/2, group1_values,
-               width=bar_width_data, color=group1_color,
+        # Group 1 bars (solid) - EXACTLY matching main branch
+        ax.bar(x_positions - bw/2, group1_values,
+               width=bw, color=group1_color,
                edgecolor=params['bar_edgecolor'],
                linewidth=params['bar_linewidth'],
                alpha=params['bar_alpha'],
                label=group1_label)
 
-        # Group 1 error bars
-        ax.errorbar(x_positions - bar_width_data/2, group1_values, yerr=g1_yerr,
+        # Group 1 error bars - EXACTLY matching main branch
+        ax.errorbar(x_positions - bw/2, group1_values, yerr=g1_yerr,
                     fmt='none', ecolor='black',
                     elinewidth=params['errorbar_linewidth'],
                     capsize=params['errorbar_capsize'], zorder=2)
 
-        # Group 2 bars (hatched only if colors are the same)
-        ax.bar(x_positions + bar_width_data/2, group2_values,
-               width=bar_width_data, color=group2_color,
+        # Group 2 bars (hatched only if colors are the same) - EXACTLY matching main branch
+        ax.bar(x_positions + bw/2, group2_values,
+               width=bw, color=group2_color,
                edgecolor=params['bar_edgecolor'],
                linewidth=params['bar_linewidth'],
                alpha=params['bar_alpha'],
                hatch=params['bar_hatch_novice'] if use_hatch else None,
                label=group2_label)
 
-        # Group 2 error bars
-        ax.errorbar(x_positions + bar_width_data/2, group2_values, yerr=g2_yerr,
+        # Group 2 error bars - EXACTLY matching main branch
+        ax.errorbar(x_positions + bw/2, group2_values, yerr=g2_yerr,
                     fmt='none', ecolor='black',
                     elinewidth=params['errorbar_linewidth'],
                     capsize=params['errorbar_capsize'], zorder=2)
 
-        # Within-group significance stars
+        # Within-group significance stars - EXACTLY matching main branch
         if group1_pvals is not None:
             _add_significance_stars(
-                ax, x_positions - bar_width_data/2, group1_values, g1_yerr, group1_pvals, params
+                ax, x_positions - bw/2, group1_values, g1_yerr, group1_pvals, params
             )
         if group2_pvals is not None:
             _add_significance_stars(
-                ax, x_positions + bar_width_data/2, group2_values, g2_yerr, group2_pvals, params
+                ax, x_positions + bw/2, group2_values, g2_yerr, group2_pvals, params
             )
 
-        # Between-group comparison stars
+        # Between-group comparison stars - EXACTLY matching main branch
         if comparison_pvals is not None:
             _add_significance_stars(
                 ax, x_positions, group1_values, g1_yerr, comparison_pvals, params,
                 comparison_mode=True,
                 group2_values=group2_values,
                 group2_yerr=g2_yerr,
-                bar_width=bar_width_data
+                bar_width=bw
             )
 
-        # Apply ylim if provided
+        # Apply ylim (auto-calculate if not provided)
         if ylim is not None:
             ax.set_ylim(ylim)
+        else:
+            auto_ymin, auto_ymax = _calculate_auto_ylim(
+                group1_values, g1_yerr,
+                pvals=group1_pvals,
+                group2_values=group2_values,
+                group2_yerr=g2_yerr,
+                group2_pvals=group2_pvals,
+                comparison_pvals=comparison_pvals,
+                params=params
+            )
+            ax.set_ylim(auto_ymin, auto_ymax)
+
+        # Add zero reference line (always, for all bar plots)
+        ax.axhline(0, color='gray', linestyle=':', linewidth=0.75, alpha=0.6, zorder=1)
 
         return g1_yerr, g2_yerr
 
     else:
         # === SINGLE-GROUP MODE: One set of bars ===
-        # Bars (centered, wider if multiplier > 1)
+        # Bars (centered, wider if multiplier > 1) - EXACTLY matching main branch
         ax.bar(x_positions, group1_values,
-               width=bar_width_data, color=group1_color,
+               width=bw, color=group1_color,
                edgecolor=params['bar_edgecolor'],
                linewidth=params['bar_linewidth'],
                alpha=params['bar_alpha'],
                label=group1_label)
 
-        # Error bars
+        # Error bars - EXACTLY matching main branch
         ax.errorbar(x_positions, group1_values, yerr=g1_yerr,
                     fmt='none', ecolor='black',
                     elinewidth=params['errorbar_linewidth'],
                     capsize=params['errorbar_capsize'], zorder=2)
 
-        # Significance stars
+        # Significance stars - EXACTLY matching main branch
         if group1_pvals is not None:
             _add_significance_stars(
                 ax, x_positions, group1_values, g1_yerr, group1_pvals, params
             )
 
-        # Apply ylim if provided
+        # Apply ylim (auto-calculate if not provided)
         if ylim is not None:
             ax.set_ylim(ylim)
+        else:
+            auto_ymin, auto_ymax = _calculate_auto_ylim(
+                group1_values, g1_yerr,
+                pvals=group1_pvals,
+                params=params
+            )
+            ax.set_ylim(auto_ymin, auto_ymax)
+
+        # Add zero reference line (always, for all bar plots)
+        ax.axhline(0, color='gray', linestyle=':', linewidth=0.75, alpha=0.6, zorder=1)
 
         return g1_yerr
 
@@ -421,6 +539,7 @@ def plot_grouped_bars_with_ci(
     group2_label: str = "Group 2",
     group1_color: Optional[Union[str, List[str]]] = None,
     group2_color: Optional[Union[str, List[str]]] = None,
+    x_label_colors: Optional[List[str]] = None,
     ylabel: str = "Value",
     title: str = "Comparison",
     subtitle: Optional[str] = None,
@@ -468,6 +587,9 @@ def plot_grouped_bars_with_ci(
 
         For per-item colors (e.g., ROI colors), pass the same list to both:
         >>> plot_grouped_bars_with_ci(..., group1_color=roi_colors, group2_color=roi_colors)
+    x_label_colors : List[str], optional
+        Colors for x-axis tick labels (e.g., from format_roi_labels_and_colors).
+        If None, labels use default black color.
     ylabel : str
         Y-axis label
     title, subtitle : str
@@ -532,7 +654,7 @@ def plot_grouped_bars_with_ci(
     """
     from .style import PLOT_PARAMS, apply_nature_rc, auto_bar_figure_size
     from .colors import COLORS_EXPERT_NOVICE
-    from .panels import set_axis_title
+    from .helpers import set_axis_title
     from .helpers import style_spines
     if params is None:
         params = PLOT_PARAMS
@@ -580,9 +702,18 @@ def plot_grouped_bars_with_ci(
     )
 
     # Add labels and styling (figure-level)
+    ax.set_xlim(-0.5, len(x_labels) - 0.5)  # Ensure all bars are visible
     ax.set_xticks(x_positions)
     ax.set_xticklabels(x_labels, rotation=30, ha='right')
-    ax.set_ylabel(ylabel, fontsize=params['font_size_label'])
+
+    # Color x-tick labels if colors provided (e.g., from format_roi_labels_and_colors)
+    if x_label_colors is not None:
+        for ticklabel, color in zip(ax.get_xticklabels(), x_label_colors):
+            ticklabel.set_color(color)
+
+    # Use centralized label formatter (sanitizes mathtext and enforces casing)
+    from .helpers import label_axes
+    label_axes(ax, ylabel=ylabel, params=params)
 
     if add_zero_line:
         ax.axhline(0, color='black', linestyle='--',
@@ -605,3 +736,76 @@ def plot_grouped_bars_with_ci(
     if return_ax:
         return fig, ax
     return fig
+
+
+def plot_counts_on_ax(
+    ax,
+    x_values,
+    counts,
+    colors=None,
+    alphas=None,
+    xlabel: str = 'Stimulus ID',
+    ylabel: str = 'Selection count',
+    title: str = None,
+    subtitle: str = None,
+    legend: Optional[List[Tuple[str, str, float]]] = None,
+    params: dict = None,
+):
+    """
+    Plot a simple count bar chart on an existing axes with optional per-bar colors/alphas.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axes to plot on
+    x_values : array-like
+        Category identifiers for x-axis
+    counts : array-like
+        Counts per category
+    colors : list of str, optional
+        Bar facecolors. If None, uses a neutral color
+    alphas : list of float, optional
+        Bar alpha values per bar. If None, uses 1.0
+    xlabel, ylabel : str
+        Axis labels (passed through label formatter)
+    title, subtitle : str, optional
+        Title and subtitle (subtitle normal weight)
+    legend : list of tuples (label, color, alpha), optional
+        Legend items to display (e.g., [('Checkmate', '#CCBB44', .7), ...])
+    params : dict, optional
+        PLOT_PARAMS override
+    """
+    from .style import PLOT_PARAMS
+    from .helpers import label_axes, style_spines
+    from .helpers import set_axis_title
+    if params is None:
+        params = PLOT_PARAMS
+
+    x_idx = np.arange(len(x_values))
+    if colors is None:
+        colors = ['#999999'] * len(x_values)
+    if alphas is None:
+        alphas = [1.0] * len(x_values)
+
+    # Draw bars
+    for i, (x, h, c, a) in enumerate(zip(x_idx, counts, colors, alphas)):
+        ax.bar(x, h, color=c, alpha=a, edgecolor='black', linewidth=params.get('bar_linewidth', 0.5))
+
+    # Labels and styling
+    label_axes(ax, xlabel=xlabel, ylabel=ylabel, params=params)
+    if title or subtitle:
+        set_axis_title(ax, title=title, subtitle=subtitle, params=params)
+
+    # X tick handling: hide tick labels by default (dense), caller can override
+    ax.set_xticks(x_idx)
+    ax.set_xticklabels([])
+
+    style_spines(ax, visible_spines=['left', 'bottom'], params=params)
+
+    # Optional legend
+    if legend:
+        from matplotlib.patches import Patch
+        handles = [Patch(facecolor=col, edgecolor='black', label=lbl, alpha=alpha) for (lbl, col, alpha) in legend]
+        ax.legend(handles=handles, loc='upper right', frameon=False, fontsize=params['font_size_legend'])
+
+    # Zero baseline gridline not required; counts are positive

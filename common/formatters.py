@@ -11,25 +11,19 @@ from typing import Optional
 def format_pvalue_plain(p: float, threshold: float = 0.001) -> str:
     """Format p-value for plain text display (no LaTeX)."""
     if p is None:
-        return 'NaN'
-    try:
-        if p < threshold:
-            return f'< {threshold}'
-        return f'{p:.3f}'
-    except Exception:
-        return 'NaN'
+        raise ValueError("p-value is None")
+    if p < threshold:
+        return f'< {threshold}'
+    return f'{p:.3f}'
 
 
 def format_pvalue_latex(p: float, threshold: float = 0.001) -> str:
     """Format p-value for LaTeX tables (wrapped in $...$)."""
     if p is None:
-        return r"$\mathrm{NaN}$"
-    try:
-        if p < threshold:
-            return rf"$< {threshold}$"
-        return f"${p:.3f}$"
-    except Exception:
-        return r"$\mathrm{NaN}$"
+        raise ValueError("p-value is None")
+    if p < threshold:
+        return rf"$< {threshold}$"
+    return f"${p:.3f}$"
 
 
 def format_ci(ci_lower: float, ci_upper: float, precision: int = 3, latex: bool = True) -> str:
@@ -50,4 +44,3 @@ def significance_stars(p_value: float) -> str:
     if p_value < 0.05:
         return '*'
     return ''
-

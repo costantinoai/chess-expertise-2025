@@ -19,14 +19,13 @@ Notes
 - This script follows CLAUDE.md conventions (no CLI args; analysis vs plotting separation)
 """
 
+import os
 import sys
 from pathlib import Path
 
-# Import path management (per CLAUDE.md)
+# Add parent (repo root) to sys.path for 'common'
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
-repo_root = script_dir.parent
-sys.path.insert(0, str(repo_root))   # common/
-sys.path.insert(0, str(script_dir))  # chess-neurosynth/modules
 
 import numpy as np
 import pandas as pd
@@ -38,20 +37,19 @@ from common.logging_utils import setup_analysis, log_script_end
 from common.bids_utils import get_subject_list
 from common.neuro_utils import load_nifti, fisher_z_transform
 
-from modules.io_utils import find_nifti_files, split_by_group, load_term_maps, reorder_by_term
+from common.io_utils import find_nifti_files, split_by_group
+from modules.io_utils import load_term_maps, reorder_by_term
 from modules.maps_utils import (
     split_zmap_by_sign,
     compute_all_zmap_correlations,
 )
 from modules.glm_utils import build_design_matrix
-# Plotting and LaTeX are handled in 02_plot_neurosynth.py
 
 
 # =====================
 # Configuration (local)
 # =====================
 N_BOOTSTRAPS = 10000
-ALPHA_FDR = 0.05
 PLOT_THRESH = 1e-5
 SMOOTHING_FWHM_MM = None
 
@@ -66,7 +64,7 @@ PATTERNS = {
 # 1) Setup
 extra = {
     'N_BOOTSTRAPS': N_BOOTSTRAPS,
-    'ALPHA_FDR': ALPHA_FDR,
+    'ALPHA_FDR': CONFIG['ALPHA_FDR'],
     'PLOT_THRESH': PLOT_THRESH,
     'SMOOTHING_FWHM_MM': SMOOTHING_FWHM_MM,
 }
@@ -123,7 +121,7 @@ for pattern, pretty in PATTERNS.items():
     z_pos, z_neg = split_zmap_by_sign(z_map)
     df_pos, df_neg, df_diff = compute_all_zmap_correlations(
         z_pos, z_neg, term_maps, ref_img=con_img,
-        n_boot=N_BOOTSTRAPS, fdr_alpha=ALPHA_FDR, ci_alpha=0.05, random_state=CONFIG['RANDOM_SEED']
+        n_boot=N_BOOTSTRAPS, fdr_alpha=CONFIG['ALPHA_FDR'], ci_alpha=0.05, random_state=CONFIG['RANDOM_SEED']
     )
 
     # Reorder by canonical term order

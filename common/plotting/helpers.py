@@ -151,9 +151,20 @@ def label_axes(
     if params is None:
         params = PLOT_PARAMS
 
+    import re
+
+    def _sanitize(text: str) -> str:
+        # Remove math delimiters and simple LaTeX styling commands
+        t = text.replace('$', '')
+        t = re.sub(r"\\it\{([^}]*)\}", r"\1", t)
+        t = re.sub(r"\\mathrm\{([^}]*)\}", r"\1", t)
+        t = re.sub(r"\\mathbf\{([^}]*)\}", r"\1", t)
+        return t
+
     def _format_label(text: str) -> str:
         if not text:
             return text
+        text = _sanitize(text)
         text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
         return text.rstrip('.')
 
@@ -228,6 +239,73 @@ def hide_ticks(ax, hide_x: bool = True, hide_y: bool = True):
 # =============================================================================
 # Figure Saving
 # =============================================================================
+
+def format_roi_labels_and_colors(
+    welch_df,
+    roi_info,
+    alpha: float = 0.05
+) -> Tuple[List[str], List[str], List[str]]:
+    """
+    Format ROI labels and get matching colors (EXACTLY matching PR ttest plot).
+
+    Merges welch dataframe with roi_info to get pretty names and colors.
+    This is the standard helper for all bar plots, ensuring consistency.
+
+    Parameters
+    ----------
+    welch_df : pd.DataFrame
+        Statistics dataframe with columns: ROI_Label, ROI_Name, p_val_fdr, etc.
+    roi_info : pd.DataFrame
+        ROI metadata with columns: roi_id, roi_name, pretty_name, color
+        (from load_roi_metadata)
+    alpha : float, default=0.05
+        Significance threshold
+
+    Returns
+    -------
+    formatted_names : list of str
+        Pretty ROI names with newlines removed (for display)
+    roi_colors : list of str
+        Hex colors matching ROI order
+    label_colors : list of str
+        Colors for x-tick labels (ROI color if sig, grey if not sig)
+
+    Examples
+    --------
+    >>> # Standard usage in bar plot panels (EXACTLY like PR plot)
+    >>> welch = group_stats['rsa_corr']['checkmate']['welch_expert_vs_novice']
+    >>> roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
+    >>> names, colors, label_colors = format_roi_labels_and_colors(welch, roi_info)
+    >>> plot_grouped_bars_on_ax(ax, x, vals, cis, group1_color=colors)
+    >>> ax.set_xticklabels(names, rotation=30, ha='right')
+    >>> for ticklabel, color in zip(ax.get_xticklabels(), label_colors):
+    ...     ticklabel.set_color(color)
+    """
+    import pandas as pd
+
+    # Merge with roi_info to get pretty names and colors (EXACTLY like PR plot)
+    # welch has ROI_Label (numeric), roi_info has roi_id (numeric)
+    merged = welch_df.merge(
+        roi_info[['roi_id', 'pretty_name', 'color']],
+        left_on='ROI_Label', right_on='roi_id', how='left'
+    )
+
+    # Extract pretty names and format (remove newlines)
+    formatted_names = merged['pretty_name'].tolist()
+    formatted_names = [name.replace("\\n", " ") for name in formatted_names]
+
+    # Extract colors
+    roi_colors = merged['color'].tolist()
+
+    # Determine label colors based on significance (EXACTLY like PR plot bottom panel)
+    pvals = merged['p_val_fdr'].values
+    label_colors = [
+        color if pval < alpha else '#999999'
+        for pval, color in zip(pvals, roi_colors)
+    ]
+
+    return formatted_names, roi_colors, label_colors
+
 
 def save_figure(
     fig: plt.Figure,
@@ -321,3 +399,146 @@ def save_figure(
         saved_files.append(png_path)
 
     return saved_files
+
+
+# =============================================================================
+# Export utilities (DRY): save arranged axes and panel SVGs
+# =============================================================================
+
+def sanitize_label_to_filename(label: str) -> str:
+    """Sanitize an axes label to a safe filename token."""
+    import re
+    if not label:
+        return 'axis'
+    return re.sub(r'[^A-Za-z0-9_.-]+', '_', str(label))
+
+
+def save_axes_svgs(fig, out_dir: Path | str, prefix: str,
+                   expand_xy: tuple = (1.02, 1.08),
+                   dpi: int = 450) -> List[Path]:
+    """
+    Save each axes in a Matplotlib figure as a separate SVG using tight bboxes.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Figure whose axes will be exported
+    out_dir : Path | str
+        Output directory to place individual axis SVGs
+    prefix : str
+        Filename prefix for exported SVGs
+    expand_xy : (float, float)
+        Expansion factors for bbox width and height to avoid clipping titles
+
+    Returns
+    -------
+    list[Path]
+        Paths of saved SVG files
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+
+    saved: List[Path] = []
+    for idx, ax in enumerate(fig.axes, start=1):
+        label = getattr(ax, 'get_label', lambda: f'ax{idx}')()
+        safe = sanitize_label_to_filename(label or f'ax{idx}')
+        out_path = out_dir / f"{prefix}__{safe}.svg"
+        bbox = ax.get_tightbbox(renderer).expanded(expand_xy[0], expand_xy[1])
+        bbox_in = bbox.transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(out_path, format='svg', bbox_inches=bbox_in, dpi=dpi)
+        saved.append(out_path)
+    return saved
+
+
+def save_panel_svg(fig, output_file: Path | str, dpi: int = 450) -> Path:
+    """Save full arranged panel as SVG with tight bbox and return path."""
+    output_file = Path(output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_file, format='svg', bbox_inches='tight', dpi=dpi)
+    return output_file
+
+
+# =============================================================================
+# Titles
+# =============================================================================
+
+def set_axis_title(
+    ax: plt.Axes,
+    title: Optional[str] = None,
+    subtitle: Optional[str] = None,
+    params: dict = None
+) -> None:
+    """
+    Set title and subtitle above plot area.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Axes to add title to
+    title : str, optional
+        Main title (bold)
+    subtitle : str, optional
+        Subtitle below title (normal weight)
+    params : dict, optional
+        PLOT_PARAMS override
+    """
+    from .style import PLOT_PARAMS
+    if params is None:
+        params = PLOT_PARAMS
+
+    import re
+
+    def _sanitize_text(s: Optional[str]) -> Optional[str]:
+        if not s:
+            return s
+        s = s.replace('$', '')
+        s = re.sub(r"\\it\{([^}]*)\}", r"\1", s)
+        s = re.sub(r"\\mathrm\{([^}]*)\}", r"\1", s)
+        s = re.sub(r"\\mathbf\{([^}]*)\}", r"\1", s)
+        s = s.replace('  ', ' ')
+        return s
+
+    title = _sanitize_text(title)
+    subtitle = _sanitize_text(subtitle)
+
+    title_size = params['font_size_title']
+    subtitle_size = params['font_size_label']
+    pad_pts = params.get('title_pad', 10.0)
+
+    if title and not subtitle:
+        ax.set_title(title, fontsize=title_size, fontweight='bold', pad=pad_pts)
+        return
+
+    if subtitle and not title:
+        ax.set_title(subtitle, fontsize=subtitle_size, fontweight='normal', pad=pad_pts)
+        return
+
+    ax.set_title("")
+
+    fig = ax.get_figure()
+    bbox_axes_in_fig = ax.get_position()
+    fig_h_in = fig.get_figheight()
+    axes_h_in = bbox_axes_in_fig.height * fig_h_in
+    pts_to_axes = (1.0/72.0) / axes_h_in
+
+    title_y = 1.0 + pad_pts * pts_to_axes
+    ax.text(
+        0.5, title_y, title,
+        transform=ax.transAxes,
+        fontsize=title_size,
+        fontweight='bold',
+        ha='center', va='bottom'
+    )
+
+    subtitle_offset_pts = title_size * 0.9
+    subtitle_y = title_y - subtitle_offset_pts * pts_to_axes
+    ax.text(
+        0.5, subtitle_y, subtitle,
+        transform=ax.transAxes,
+        fontsize=subtitle_size,
+        fontweight='normal',
+        ha='center', va='bottom'
+    )

@@ -14,35 +14,12 @@ from typing import Dict, Iterable, List, Tuple
 import pandas as pd
 import re
 import numpy as np
+import logging
 
-from common.io_utils import sanitize_matlab_varnames
+from common.io_utils import sanitize_matlab_varnames, find_subject_tsvs
+from common.bids_utils import to_sub_id
 
-
-def find_subject_tsvs(method_dir: Path) -> List[Path]:
-    """
-    Find subject-level TSV files under a method directory.
-
-    Expected layout:
-        method_dir/
-          sub-XX/mvpa_cv.tsv        (for svm)
-          sub-XX/rsa_corr.tsv       (for rsa_corr)
-
-    Returns
-    -------
-    list of Path
-        Sorted list of TSV file paths (one per subject)
-    """
-    tsvs: List[Path] = []
-    for sub_dir in sorted(method_dir.glob("sub-*")):
-        if not sub_dir.is_dir():
-            continue
-        # Prefer canonical filenames but fall back to any .tsv present
-        candidates = list(sub_dir.glob("*.tsv"))
-        if not candidates:
-            continue
-        # Choose first (there should be only one)
-        tsvs.append(sorted(candidates)[0])
-    return tsvs
+## find_subject_tsvs now provided by common.io_utils
 
 
 def parse_subject_id_from_path(path: Path) -> str:
@@ -110,13 +87,20 @@ def build_group_dataframe(
         sub_df = load_subject_tsv(f)
         sid = sub_df["subject"].iloc[0]
         # participants.tsv uses 'sub-XX' IDs; TSVs store 'XX'. Normalize.
-        key = f"sub-{sid}"
+        key = to_sub_id(sid)
         sub_df.insert(1, "expert", bool(expert_lookup.get(key, False)))
 
         # Identify ROI columns present in file
         present_roi_cols = [c for c in sub_df.columns if c not in ("subject", "expert", "target")]
-        # Try to align using sanitized names; if poor overlap, fall back to passthrough
-        overlap = set(present_roi_cols).intersection(roi_names_sanitized)
+
+        # CRITICAL FIX: Sanitize the MATLAB column names to match expected names
+        # MATLAB outputs have characters like + and - that need to be removed
+        present_roi_cols_sanitized = sanitize_matlab_varnames(present_roi_cols)
+        col_rename_from_matlab = {orig: san for orig, san in zip(present_roi_cols, present_roi_cols_sanitized)}
+        sub_df = sub_df.rename(columns=col_rename_from_matlab)
+
+        # Now check overlap with sanitized expected names
+        overlap = set(present_roi_cols_sanitized).intersection(roi_names_sanitized)
         if len(overlap) >= max(1, int(0.5 * len(roi_names))):
             # Create missing sanitized columns to preserve shape
             for col in roi_names_sanitized:
@@ -127,7 +111,10 @@ def build_group_dataframe(
             sub_df = sub_df[["subject", "expert", "target"] + roi_names]
         else:
             # Passthrough: keep whatever ROI columns exist; do not rename
-            sub_df = sub_df[["subject", "expert", "target"] + present_roi_cols]
+            raise ValueError(
+                f"Low ROI name overlap for {f.name} (overlap={len(overlap)}/{len(roi_names)})."
+            )
+            sub_df = sub_df[["subject", "expert", "target"] + present_roi_cols_sanitized]
         rows.append(sub_df)
 
     if not rows:

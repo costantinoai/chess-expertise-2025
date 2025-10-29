@@ -30,7 +30,8 @@ def plot_2d_embedding_on_ax(
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
     fill: Optional[Dict] = None,
-    params: dict = None
+    params: dict = None,
+    hide_tick_marks: bool = False
 ) -> None:
     """
     Plot 2D embedding on existing axes (PRIMARY function for panels).
@@ -77,7 +78,7 @@ def plot_2d_embedding_on_ax(
     >>> plot_2d_embedding_on_ax(axes['B'], novice_coords, xlim=xlim, ylim=ylim)
     """
     from .style import PLOT_PARAMS
-    from .panels import set_axis_title
+    from .helpers import set_axis_title
     from .helpers import style_spines, hide_ticks
     if params is None:
         params = PLOT_PARAMS
@@ -103,8 +104,8 @@ def plot_2d_embedding_on_ax(
     # Plot points with larger marker size for visibility
     for (x, y), c, a in zip(coords, point_colors, point_alphas):
         ax.scatter(x, y, color=c, marker='o', alpha=a,
-                   s=params['marker_size'] * 60,  # Scale up for visibility
-                   edgecolors='black', linewidths=0.5)
+                   s=params['marker_size'],
+                   edgecolors='black', linewidths=params['plot_linewidth'])
 
     # Apply axis limits if provided
     if xlim is not None:
@@ -113,20 +114,23 @@ def plot_2d_embedding_on_ax(
         ax.set_ylim(ylim)
 
     # Axis labels (ticks remain hidden per style)
-    if x_label:
-        ax.set_xlabel(x_label, fontsize=params['font_size_label'])
-    if y_label:
-        ax.set_ylabel(y_label, fontsize=params['font_size_label'])
+    if x_label or y_label:
+        from .helpers import label_axes
+        label_axes(ax, xlabel=x_label, ylabel=y_label, params=params)
 
     # Set title if provided
     if title or subtitle:
         set_axis_title(ax, title, subtitle=subtitle, params=params)
 
-    # Hide tick labels but keep axes
-    hide_ticks(ax, hide_x=True, hide_y=True)
-
     # Apply consistent styling (keep all 4 spines for embeddings)
     style_spines(ax, visible_spines=['left', 'right', 'top', 'bottom'], params=params)
+
+    # Hide tick labels but keep axes (AFTER style_spines to avoid being overridden)
+    hide_ticks(ax, hide_x=True, hide_y=True)
+
+    # Hide tick marks if requested
+    if hide_tick_marks:
+        ax.tick_params(axis='both', which='both', length=0)
 
 
 def plot_2d_embedding(
@@ -192,7 +196,7 @@ def plot_2d_embedding(
         params = PLOT_PARAMS
 
     # Create figure
-    figsize = figure_size(columns=1, height_mm=100)
+    figsize = figure_size(columns=2, height_mm=100)
     apply_nature_rc(params)
     fig, ax = plt.subplots(figsize=figsize, facecolor=params['facecolor'])
 

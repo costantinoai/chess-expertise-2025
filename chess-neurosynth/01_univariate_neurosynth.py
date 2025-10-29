@@ -16,14 +16,13 @@ Notes
 - This script follows CLAUDE.md conventions (no CLI args; analysis vs plotting separation)
 """
 
+import os
 import sys
 from pathlib import Path
 
-# Import path management (per CLAUDE.md)
+# Add parent (repo root) to sys.path for 'common'
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
-repo_root = script_dir.parent
-sys.path.insert(0, str(repo_root))   # common/
-sys.path.insert(0, str(script_dir))  # chess-neurosynth/modules
 
 import numpy as np
 import pandas as pd
@@ -33,8 +32,8 @@ from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
  
 
+from common.io_utils import find_nifti_files
 from modules.io_utils import (
-    find_nifti_files,
     load_term_maps,
     extract_run_label,
     reorder_by_term,
@@ -53,7 +52,6 @@ from modules.maps_utils import (
 # =====================
 DOF = 38                 # Degrees of freedom for group T-maps (set to manuscript value)
 N_BOOTSTRAPS = 10000
-ALPHA_FDR = 0.05
 PLOT_THRESH = 1e-5
 
 
@@ -66,7 +64,7 @@ Follows CLAUDE.md: no CLI/if-main. Configure and run sequentially.
 extra = {
     'DOF': DOF,
     'N_BOOTSTRAPS': N_BOOTSTRAPS,
-    'ALPHA_FDR': ALPHA_FDR,
+    'ALPHA_FDR': CONFIG['ALPHA_FDR'],
     'PLOT_THRESH': PLOT_THRESH,
 }
 config, output_dir, logger = setup_analysis(
@@ -110,7 +108,7 @@ for t_path in t_files:
     # 4c) Correlate z+ and z− vs each term map, with bootstrap/FDR
     df_pos, df_neg, df_diff = compute_all_zmap_correlations(
         z_pos, z_neg, term_maps, ref_img=z_img,
-        n_boot=N_BOOTSTRAPS, fdr_alpha=ALPHA_FDR, ci_alpha=0.05, random_state=CONFIG['RANDOM_SEED']
+        n_boot=N_BOOTSTRAPS, fdr_alpha=CONFIG['ALPHA_FDR'], ci_alpha=0.05, random_state=CONFIG['RANDOM_SEED']
     )
 
     # 4d) Reorder rows to canonical term order for consistent outputs

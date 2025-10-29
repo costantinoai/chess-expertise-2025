@@ -9,19 +9,9 @@ import numpy as np
 import pandas as pd
 from typing import Tuple, Optional
 from scipy.stats import ttest_ind, ttest_1samp
-try:
-    from statsmodels.stats.multitest import multipletests as _smm_multipletests
-except Exception:
-    _smm_multipletests = None
-try:
-    from pingouin import compute_effsize as _pg_compute_effsize
-    import pingouin as pg
-except Exception:
-    _pg_compute_effsize = None
-    class _PGStub:
-        def corr(self, *a, **k):
-            return pd.DataFrame({'r': [np.nan], 'p-val': [np.nan], 'CI95%': [(np.nan, np.nan)]})
-    pg = _PGStub()
+from statsmodels.stats.multitest import multipletests
+from pingouin import compute_effsize
+import pingouin as pg
 from .formatters import format_pvalue_plain as _format_pvalue_plain
 
 
@@ -182,22 +172,12 @@ def apply_fdr_correction(
     nan_mask = np.isnan(pvals)
     pvals[nan_mask] = 1.0
 
-    # Apply correction
-    if _smm_multipletests is not None:
-        reject, pvals_corrected, _, _ = _smm_multipletests(
-            pvals,
-            alpha=alpha,
-            method=method
-        )
-    else:
-        # Simple BH implementation
-        order = np.argsort(pvals)
-        ranked = np.empty_like(pvals)
-        ranked[order] = np.arange(1, len(pvals) + 1)
-        pvals_corrected = pvals * (len(pvals) / ranked)
-        # Ensure monotonicity
-        pvals_corrected[order] = np.minimum.accumulate(pvals_corrected[order][::-1])[::-1]
-        reject = pvals_corrected < alpha
+    # Apply correction (requires statsmodels)
+    reject, pvals_corrected, _, _ = multipletests(
+        pvals,
+        alpha=alpha,
+        method=method
+    )
 
     # Restore NaNs
     pvals_corrected[nan_mask] = np.nan
@@ -242,15 +222,8 @@ def compute_cohens_d(
     if g1.size < 2 or g2.size < 2:
         return np.nan
 
-    # Use pingouin for standardized calculation
-    if _pg_compute_effsize is not None:
-        d = _pg_compute_effsize(g1, g2, eftype='cohen', paired=False)
-    else:
-        # Manual Cohen's d (unbiased not needed here)
-        n1, n2 = g1.size, g2.size
-        s1, s2 = np.var(g1, ddof=1), np.var(g2, ddof=1)
-        sp = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
-        d = (np.mean(g1) - np.mean(g2)) / sp if sp > 0 else np.nan
+    # Pingouin compute_effsize (required dependency)
+    d = compute_effsize(g1, g2, eftype='cohen', paired=False)
     return float(d)
 
 
@@ -276,6 +249,10 @@ def correlate_vectors_bootstrap(
     -------
     r : float, p : float, ci_low : float, ci_high : float
     """
+    if pg is None:
+        raise ImportError(
+            "correlate_vectors_bootstrap requires 'pingouin'. Install it to compute bootstrap CIs."
+        )
     res = pg.corr(
         x=x,
         y=y,
@@ -285,20 +262,22 @@ def correlate_vectors_bootstrap(
         method_ci='percentile',
         alternative=alternative,
     )
-    r = float(res['r'].iloc[0]) if 'r' in res.columns else float('nan')
-    p = float(res['p-val'].iloc[0]) if 'p-val' in res.columns else float('nan')
-    ci_val = res.get('CI95%')
-    ci_low = float('nan')
-    ci_high = float('nan')
-    if ci_val is not None:
-        v = ci_val.iloc[0]
-        try:
-            # Expect a tuple/list-like of length 2
-            if hasattr(v, '__len__') and len(v) == 2:
-                ci_low, ci_high = float(v[0]), float(v[1])
-        except Exception:
-            ci_low = float('nan')
-            ci_high = float('nan')
+    # Validate expected columns strictly (no silent fallbacks)
+    required_cols = {'r', 'p-val', 'CI95%'}
+    missing = required_cols - set(res.columns)
+    if missing:
+        raise RuntimeError(
+            f"pingouin.corr missing expected columns: {sorted(missing)}; got columns={list(res.columns)}"
+        )
+    r = float(res['r'].iloc[0])
+    p = float(res['p-val'].iloc[0])
+    v = res['CI95%'].iloc[0]
+    if not (hasattr(v, '__len__') and len(v) == 2):
+        raise RuntimeError("pingouin.corr returned CI95% not parseable as (low, high)")
+    try:
+        ci_low, ci_high = float(v[0]), float(v[1])
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse CI95% values: {v}") from e
     return r, p, ci_low, ci_high
 
 
@@ -328,10 +307,7 @@ def format_pvalue(p: float, threshold: float = 0.001) -> str:
     '0.456'
     """
     # Delegate to centralized formatter for consistency
-    try:
-        return _format_pvalue_plain(float(p), threshold=threshold)
-    except Exception:
-        return 'NaN'
+    return _format_pvalue_plain(float(p), threshold=threshold)
 
 
 __all__ = [
@@ -342,85 +318,6 @@ __all__ = [
     'format_pvalue',
     'correlate_vectors_bootstrap',
 ]
-
-
-def run_roi_group_comparison(
-    group1_values: np.ndarray,
-    group2_values: np.ndarray,
-    roi_labels: np.ndarray,
-    alpha_fdr: float = 0.05,
-    confidence_level: float = 0.95
-) -> pd.DataFrame:
-    """
-    Run group comparisons across multiple ROIs with FDR correction.
-
-    Performs Welch t-tests for each ROI and applies FDR correction across ROIs.
-
-    Parameters
-    ----------
-    group1_values : np.ndarray
-        Shape (n_subjects_group1, n_rois)
-    group2_values : np.ndarray
-        Shape (n_subjects_group2, n_rois)
-    roi_labels : np.ndarray
-        ROI labels (length n_rois)
-    alpha_fdr : float, default=0.05
-        FDR significance level
-    confidence_level : float, default=0.95
-        Confidence level for CIs
-
-    Returns
-    -------
-    results : pd.DataFrame
-        Columns: ROI_Label, mean_group1, mean_group2, mean_diff,
-                 ci_low, ci_high, t_stat, p_val, p_val_fdr,
-                 cohen_d, significant, significant_fdr
-
-    Example
-    -------
-    >>> expert_pr = np.random.rand(20, 22)  # 20 experts, 22 ROIs
-    >>> novice_pr = np.random.rand(20, 22)  # 20 novices, 22 ROIs
-    >>> roi_labels = np.arange(1, 23)
-    >>> results = run_roi_group_comparison(expert_pr, novice_pr, roi_labels)
-    """
-    n_rois = len(roi_labels)
-
-    # Initialize storage
-    results = []
-
-    for i, roi in enumerate(roi_labels):
-        g1 = group1_values[:, i]
-        g2 = group2_values[:, i]
-
-        # Welch t-test with CI
-        m1, m2, diff, ci_low, ci_high, t_stat, p_val = welch_ttest(
-            g1, g2, confidence_level=confidence_level
-        )
-
-        # Effect size
-        d = compute_cohens_d(g1, g2)
-
-        results.append({
-            'ROI_Label': int(roi),
-            'mean_group1': m1,
-            'mean_group2': m2,
-            'mean_diff': diff,
-            'ci_low': ci_low,
-            'ci_high': ci_high,
-            't_stat': t_stat,
-            'p_val': p_val,
-            'cohen_d': d
-        })
-
-    df = pd.DataFrame(results)
-
-    # Apply FDR correction
-    reject, pvals_fdr = apply_fdr_correction(df['p_val'].values, alpha=alpha_fdr)
-    df['p_val_fdr'] = pvals_fdr
-    df['significant'] = df['p_val'] < 0.05
-    df['significant_fdr'] = reject
-
-    return df
 
 
 def ci_to_errorbar_format(
@@ -466,57 +363,7 @@ def ci_to_errorbar_format(
     return np.array([lower_errors, upper_errors])
 
 
-def compute_classification_chance_level(n_classes: int) -> float:
-    """
-    Compute chance level for multi-class classification.
-
-    For balanced classification tasks, chance level is 1 / n_classes.
-    This represents the expected accuracy if a classifier were to guess
-    randomly with uniform probability across all classes.
-
-    Parameters
-    ----------
-    n_classes : int
-        Number of classes in the classification task
-        Must be >= 2
-
-    Returns
-    -------
-    float
-        Chance level accuracy (between 0 and 1)
-
-    Raises
-    ------
-    ValueError
-        If n_classes < 2
-
-    Notes
-    -----
-    - Assumes balanced classes (equal number of trials per class)
-    - All MVPA/decoding analyses in this project use balanced classes via resampling
-    - Returned value is accuracy (e.g., 0.5 for binary, 0.25 for 4-class)
-    - This is the correct way to compute chance level (NOT hardcoded)
-
-    Examples
-    --------
-    >>> # Binary classification (e.g., checkmate vs non-checkmate)
-    >>> chance = compute_classification_chance_level(2)
-    >>> print(f"Binary chance level: {chance:.2f}")  # 0.50
-
-    >>> # 5-class classification (e.g., chess strategies)
-    >>> chance = compute_classification_chance_level(5)
-    >>> print(f"5-class chance level: {chance:.2f}")  # 0.20
-
-    >>> # Use in significance testing
-    >>> svm_accuracy = 0.65
-    >>> chance = compute_classification_chance_level(n_classes=2)
-    >>> if svm_accuracy > chance:
-    ...     print(f"Above chance ({chance:.2f})")
-    """
-    if n_classes < 2:
-        raise ValueError(f"n_classes must be >= 2, got {n_classes}")
-
-    return 1.0 / n_classes
+ 
 
 
 def per_roi_welch_and_fdr(
@@ -609,24 +456,18 @@ def per_roi_welch_and_fdr(
 
         # Degrees of freedom (Welch-Satterthwaite)
         result_obj = ttest_ind(expert_clean, novice_clean, equal_var=False)
-        try:
+        if hasattr(result_obj, 'df'):
             dof = result_obj.df
-        except Exception:
-            # Compute Welch-Satterthwaite df manually if SciPy object lacks .df
+        else:
+            # Compute Welch-Satterthwaite df if SciPy object lacks .df
             n1, n2 = expert_clean.size, novice_clean.size
             v1, v2 = np.var(expert_clean, ddof=1), np.var(novice_clean, ddof=1)
             num = (v1/n1 + v2/n2) ** 2
             den = ((v1**2)/((n1**2)*(n1-1))) + ((v2**2)/((n2**2)*(n2-1)))
             dof = num/den if den > 0 else np.nan
 
-        # Cohen's d
-        if _pg_compute_effsize is not None:
-            cohen_d = _pg_compute_effsize(expert_clean, novice_clean, eftype='cohen')
-        else:
-            n1, n2 = expert_clean.size, novice_clean.size
-            s1, s2 = np.var(expert_clean, ddof=1), np.var(novice_clean, ddof=1)
-            sp = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
-            cohen_d = (np.mean(expert_clean) - np.mean(novice_clean)) / sp if sp > 0 else np.nan
+        # Cohen's d (pingouin)
+        cohen_d = compute_effsize(expert_clean, novice_clean, eftype='cohen')
 
         results.append({
             'ROI_Label': int(roi_label),

@@ -40,18 +40,14 @@ Strategy (r=0.20); Novices show no significant correlations.
 """
 
 import sys
+import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import pickle
 
-# Add paths for imports
-script_dir = Path(__file__).parent
-repo_root = script_dir.parent
-
-# Add both repo root (for common) and script dir (for local modules) to path
-sys.path.insert(0, str(repo_root))
-sys.path.insert(0, str(script_dir))
+# Add parent (repo root) to sys.path for 'common'
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import from common utilities
 from common import (

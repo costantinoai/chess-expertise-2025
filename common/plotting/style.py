@@ -52,14 +52,14 @@ PLOT_PARAMS = {
     'font_size_label': _FONT_SIZE_LABEL,
     'font_size_tick': _FONT_SIZE_TICK,
     'font_size_legend': _FONT_SIZE_LEGEND,
-    'font_size_annotation': _FONT_SIZE_ANNOTATION,
+    'font_size_annotation': _FONT_SIZE_ANNOTATION * 1.4,  # Larger asterisks for visibility
 
     # Line widths (points, scaled for 6pt fonts)
     'spine_linewidth': 0.5,
     'axes_linewidth': 0.5,
     'errorbar_linewidth': 0.5,
     'bar_linewidth': 0.5,
-    'plot_linewidth': 1.0,
+    'plot_linewidth': 0.5,
 
     # Tick parameters
     'tick_major_size': 3.0,
@@ -68,8 +68,9 @@ PLOT_PARAMS = {
     'tick_minor_width': 0.5,
     'tick_max_nbins': 6,  # MaxNLocator for legible tick counts
 
-    # Marker size
-    'marker_size': 3.0,
+    # Marker size for scatter/MDS (Matplotlib scatter 's' in points^2)
+    'marker_size': 12.0,
+    'line_alpha': 0.5,
 
     # Bar parameters
     'target_bar_width_mm': _TARGET_BAR_WIDTH_MM,
@@ -77,12 +78,13 @@ PLOT_PARAMS = {
     'bar_edgecolor': 'black',
     'bar_hatch_novice': '//',
 
-    # Error bars
-    'errorbar_capsize': 2.0,
+    # Error bars (capsize set to 0 - no caps)
+    'errorbar_capsize': 0,
 
     # Spacing
     'title_pad': 10.0,  # Points above plot
-    'panel_label_offset_mm': (-5, 3),  # (x, y) from upper-left corner
+    'panel_label_offset_mm': (-5, 6),  # (x, y) from upper-left corner (increased y for higher placement)
+    'significance_offset_pct': 0.02,  # Significance star offset as percentage of y-range (2%)
 
     # Export settings
     'dpi': 450,
@@ -94,6 +96,9 @@ PLOT_PARAMS = {
     # RDM-specific
     'rdm_category_bar_offset': -0.06,
     'rdm_category_bar_thickness': 0.035,
+
+    # Canonical labels (DRY)
+    'ylabel_correlation_r': 'Correlation (r)',
 }
 
 # =============================================================================

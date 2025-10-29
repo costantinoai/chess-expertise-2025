@@ -8,6 +8,7 @@ Provides:
 - plot_rdm_on_ax(): RDM on existing axes (for panels)
 - add_rdm_category_bars(): Add colored category bars to RDM axes
 - add_roi_color_legend(): Add ROI color legend
+- plot_matrix_on_ax(): Generic matrix heatmap on existing axes
 """
 
 import numpy as np
@@ -240,7 +241,7 @@ def plot_rdm_on_ax(
     """
     from .style import PLOT_PARAMS
     from .colors import CMAP_BRAIN
-    from .panels import set_axis_title
+    from .helpers import set_axis_title
     from .helpers import style_spines, hide_ticks
     if params is None:
         params = PLOT_PARAMS
@@ -288,6 +289,99 @@ def plot_rdm_on_ax(
 
     # Apply consistent styling (keep all 4 spines for heatmaps)
     style_spines(ax, visible_spines=['left', 'right', 'top', 'bottom'], params=params)
+
+
+def plot_matrix_on_ax(
+    ax: plt.Axes,
+    matrix: np.ndarray,
+    title: Optional[str] = None,
+    subtitle: Optional[str] = None,
+    cmap: str = 'mako',
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    center: Optional[float] = None,
+    show_colorbar: bool = False,
+    xticklabels: Optional[List[str]] = None,
+    yticklabels: Optional[List[str]] = None,
+    square: bool = False,
+    params: dict = None
+) -> None:
+    """
+    Plot a generic matrix heatmap on an existing axes with Nature-compliant styling.
+
+    This is a general-purpose counterpart to plot_rdm_on_ax for non-RDM matrices
+    (e.g., PR subject×ROI matrix, PCA loadings). It centralizes seaborn heatmap
+    usage and spine/tick/title handling to keep panel scripts DRY.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Axes to plot on
+    matrix : np.ndarray
+        2D array to visualize
+    title, subtitle : str, optional
+        Axis title and subtitle (subtitle normal weight)
+    cmap : str, default='mako'
+        Colormap name
+    vmin, vmax : float, optional
+        Color scale limits. If not provided, inferred from data
+    center : float, optional
+        Center value for diverging colormaps (e.g., 0 for loadings)
+    show_colorbar : bool, default=False
+        Whether to show a colorbar
+    xticklabels, yticklabels : list of str, optional
+        Tick labels to display. If None, no labels are shown
+    square : bool, default=False
+        If True, set square aspect
+    params : dict, optional
+        PLOT_PARAMS override
+
+    Notes
+    -----
+    - Uses centralized set_axis_title, style_spines
+    - Hides tick marks by default; pass labels to show them
+    """
+    from .style import PLOT_PARAMS
+    from .helpers import set_axis_title
+    from .helpers import style_spines, hide_ticks
+    if params is None:
+        params = PLOT_PARAMS
+
+    hm = sns.heatmap(
+        matrix,
+        ax=ax,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        center=center,
+        cbar=show_colorbar,
+        xticklabels=bool(xticklabels),
+        yticklabels=bool(yticklabels),
+        linewidths=0,
+        linecolor='none',
+        square=square,
+    )
+
+    # Apply spine styling first (this may apply MaxNLocator and change ticks)
+    style_spines(ax, visible_spines=['left', 'right', 'top', 'bottom'], params=params)
+
+    # Now set tick positions and labels deterministically so they persist
+    n_rows, n_cols = matrix.shape
+
+    if xticklabels is not None:
+        ax.set_xticks(np.arange(n_cols) + 0.5)
+        ax.set_xticklabels(xticklabels, rotation=30, ha='right', fontsize=params['font_size_tick'])
+    else:
+        hide_ticks(ax, hide_x=True, hide_y=False)
+
+    if yticklabels is not None:
+        ax.set_yticks(np.arange(n_rows) + 0.5)
+        ax.set_yticklabels(yticklabels, fontsize=params['font_size_tick'])
+    else:
+        hide_ticks(ax, hide_x=False, hide_y=True)
+
+    if title or subtitle:
+        set_axis_title(ax, title=title, subtitle=subtitle, params=params)
 
 
 def plot_rdm(
@@ -358,7 +452,7 @@ def plot_rdm(
         params = PLOT_PARAMS
 
     # Create figure
-    figsize = figure_size(columns=1, height_mm=100)
+    figsize = figure_size(columns=2, height_mm=100)
     apply_nature_rc(params)
     fig, ax = plt.subplots(figsize=figsize, facecolor=params['facecolor'])
 
