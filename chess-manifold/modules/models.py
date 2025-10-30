@@ -19,8 +19,7 @@ from typing import Tuple, Dict, Any
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.model_selection import StratifiedKFold, cross_val_score, cross_val_predict, permutation_test_score
-from scipy.stats import binomtest
+from sklearn.model_selection import StratifiedKFold, cross_val_score, permutation_test_score
 
 logger = logging.getLogger(__name__)
 
@@ -269,6 +268,37 @@ def _build_feature_matrix(
     return X, y, len(expert_pr), len(novice_pr)
 
 
+def build_feature_matrix(
+    pr_df: pd.DataFrame,
+    participants: pd.DataFrame,
+    roi_labels: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray, int, int]:
+    """
+    Public API to construct feature matrix X (subjects × ROIs) and labels y.
+
+    Parameters
+    ----------
+    pr_df : pd.DataFrame
+        Long-format PR results (columns: subject_id, ROI_Label, PR)
+    participants : pd.DataFrame
+        Participant metadata (columns: participant_id, group)
+    roi_labels : np.ndarray
+        ROI labels defining column order
+
+    Returns
+    -------
+    X : np.ndarray
+        Feature matrix ordered by [experts, novices]
+    y : np.ndarray
+        Binary labels (1=expert, 0=novice)
+    n_expert : int
+        Number of expert subjects
+    n_novice : int
+        Number of novice subjects
+    """
+    return _build_feature_matrix(pr_df, participants, roi_labels)
+
+
 def evaluate_classification_significance(
     pr_df: pd.DataFrame,
     participants: pd.DataFrame,
@@ -279,11 +309,25 @@ def evaluate_classification_significance(
     n_permutations: int = 1000,
 ) -> Dict[str, Any]:
     """
-    Test whether classification accuracy is above chance (50%).
+    Evaluate whether classification accuracy exceeds chance using CV and permutations.
 
-    Uses stratified K-fold CV to estimate accuracy and two significance tests:
-    - Permutation test (label shuffling within CV)
-    - Binomial test on total correct predictions across CV folds
+    Methods (for papers)
+    --------------------
+    Feature construction: For each subject we build a feature vector from PR
+    values across ROIs with a binary label (1=expert, 0=novice). We use a
+    scikit‑learn Pipeline with StandardScaler, and for the 2D analysis we add
+    PCA(n_components=2) inside the pipeline so PCA is fit only on training folds.
+
+    Cross‑validation: We estimate performance with stratified K‑fold CV (K is
+    the largest feasible up to 5 given class sizes). The classifier is logistic
+    regression (max_iter=1000). We report the mean accuracy across folds and
+    the standard deviation across folds as a descriptive spread.
+
+    Inference via permutation: Statistical significance for above‑chance
+    performance is assessed with a label‑permutation test using
+    `permutation_test_score`, run with the same CV and full pipeline. This
+    yields an assumption‑light p‑value for the null that accuracy equals chance
+    (0.5 for balanced classes).
 
     Parameters
     ----------
@@ -312,7 +356,6 @@ def evaluate_classification_significance(
         - 'cv_accuracy_mean', 'cv_accuracy_std'
         - 'n_splits', 'n_subjects', 'n_experts', 'n_novices'
         - 'perm_pvalue', 'perm_null_mean', 'perm_null_std', 'n_permutations'
-        - 'binom_pvalue', 'n_correct', 'n_trials'
     """
     from sklearn.pipeline import Pipeline
 
@@ -341,12 +384,6 @@ def evaluate_classification_significance(
     cv_acc_mean = float(np.mean(cv_scores))
     cv_acc_std = float(np.std(cv_scores, ddof=1)) if len(cv_scores) > 1 else 0.0
 
-    # Predictions for binomial test
-    y_pred = cross_val_predict(estimator, X, y, cv=cv, method='predict')
-    n_correct = int((y_pred == y).sum())
-    n_trials = int(len(y))
-    binom_p = float(binomtest(n_correct, n_trials, p=0.5, alternative='greater').pvalue)
-
     # Permutation test (scikit-learn handles CV internally)
     score, perm_scores, pvalue = permutation_test_score(
         estimator, X, y,
@@ -369,18 +406,14 @@ def evaluate_classification_significance(
         'perm_null_mean': float(np.mean(perm_scores)),
         'perm_null_std': float(np.std(perm_scores, ddof=1)) if len(perm_scores) > 1 else 0.0,
         'n_permutations': int(n_permutations),
-        'binom_pvalue': binom_p,
-        'n_correct': n_correct,
-        'n_trials': n_trials,
     }
 
     logger.info(
         f"  CV accuracy: {cv_acc_mean:.3f} ± {cv_acc_std:.3f} (n_splits={n_splits})\n"
-        f"  Permutation p={pvalue:.4g} (null mean={np.mean(perm_scores):.3f})\n"
-        f"  Binomial p={binom_p:.4g} (n_correct={n_correct}/{n_trials})"
+        f"  Permutation p={pvalue:.4g} (null mean={np.mean(perm_scores):.3f})"
     )
 
     return results
 
 
-__all__.extend(['evaluate_classification_significance'])
+__all__.extend(['evaluate_classification_significance', 'build_feature_matrix'])

@@ -143,6 +143,9 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
+plt.figure(1).ax_dict["SVM_1_visualStimuli"].set(position=[0.044, 0.7789, 0.4626, 0.1855])
+plt.figure(1).ax_dict["SVM_2_categories"].set(position=[0.044, 0.4513, 0.4626, 0.1855])
+plt.figure(1).ax_dict["SVM_3_checkmate"].set(position=[0.044, 0.1236, 0.4626, 0.1855])
 #% end: automatic generated code from pylustrator
 plt.show()
 

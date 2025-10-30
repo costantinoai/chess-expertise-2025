@@ -334,7 +334,11 @@ if group_avg is not None and diff_data is not None:
         x0, x1 = float(np.min(xvals)), float(np.max(xvals))
         y0 = intercept + slope * x0
         y1 = intercept + slope * x1
-        ax.plot([x0, x1], [y0, y1], color='black', linewidth=PLOT_PARAMS['plot_linewidth'], alpha=0.7, zorder=1)
+        ax.plot(
+            [x0, x1], [y0, y1],
+            color='black', linewidth=PLOT_PARAMS['plot_linewidth'],
+            alpha=PLOT_PARAMS.get('line_alpha', 0.5), zorder=1
+        )
         if r is not None and p is not None:
             ax.text(0.98, 0.02, f"r={r:.2f}, p={p:.3f}", transform=ax.transAxes,
                     ha='right', va='bottom', fontsize=PLOT_PARAMS['font_size_tick'], color='#666666')
@@ -342,8 +346,13 @@ if group_avg is not None and diff_data is not None:
     # Experts
     ax_E = plt.axes(); ax_E.set_label('E_PR_vs_Voxels_Experts')
     ga_exp = group_avg[group_avg['group'] == 'expert']
-    ms = PLOT_PARAMS.get('marker_size', 1.0) * 30
-    ax_E.scatter(ga_exp['n_voxels'], ga_exp['PR'], c=ga_exp['color'], s=ms, alpha=0.8, edgecolors='none')
+    ms = PLOT_PARAMS.get('marker_size', 12.0)
+    ax_E.scatter(
+        ga_exp['n_voxels'], ga_exp['PR'],
+        c=ga_exp['color'], s=ms, marker='o',
+        alpha=PLOT_PARAMS.get('marker_alpha', 0.8),
+        edgecolors='black', linewidths=PLOT_PARAMS['plot_linewidth'], zorder=2
+    )
     ax_E.set_xlabel('ROI voxel count', fontsize=PLOT_PARAMS['font_size_label'])
     ax_E.set_ylabel('Mean PR', fontsize=PLOT_PARAMS['font_size_label'])
     ax_E.tick_params(labelsize=PLOT_PARAMS['font_size_tick'])
@@ -356,8 +365,13 @@ if group_avg is not None and diff_data is not None:
     # Novices
     ax_F = plt.axes(); ax_F.set_label('F_PR_vs_Voxels_Novices')
     ga_nov = group_avg[group_avg['group'] == 'novice']
-    ms = PLOT_PARAMS.get('marker_size', 1.0) * 30
-    ax_F.scatter(ga_nov['n_voxels'], ga_nov['PR'], c=ga_nov['color'], s=ms, alpha=0.8, edgecolors='none')
+    ms = PLOT_PARAMS.get('marker_size', 12.0)
+    ax_F.scatter(
+        ga_nov['n_voxels'], ga_nov['PR'],
+        c=ga_nov['color'], s=ms, marker='o',
+        alpha=PLOT_PARAMS.get('marker_alpha', 0.8),
+        edgecolors='black', linewidths=PLOT_PARAMS['plot_linewidth'], zorder=2
+    )
     ax_F.set_xlabel('ROI voxel count', fontsize=PLOT_PARAMS['font_size_label'])
     ax_F.set_ylabel('Mean PR', fontsize=PLOT_PARAMS['font_size_label'])
     ax_F.tick_params(labelsize=PLOT_PARAMS['font_size_tick'])
@@ -369,8 +383,13 @@ if group_avg is not None and diff_data is not None:
 
     # Differences (Expert − Novice)
     ax_G = plt.axes(); ax_G.set_label('G_PRdiff_vs_VoxelsAvg')
-    ms = PLOT_PARAMS.get('marker_size', 1.0) * 30
-    ax_G.scatter(diff_data['n_voxels_avg'], diff_data['PR_diff'], c=diff_data['color'], s=ms, alpha=0.8, edgecolors='none')
+    ms = PLOT_PARAMS.get('marker_size', 12.0)
+    ax_G.scatter(
+        diff_data['n_voxels_avg'], diff_data['PR_diff'],
+        c=diff_data['color'], s=ms, marker='o',
+        alpha=PLOT_PARAMS.get('marker_alpha', 0.8),
+        edgecolors='black', linewidths=PLOT_PARAMS['plot_linewidth'], zorder=2
+    )
     ax_G.axhline(0, color='black', linewidth=PLOT_PARAMS['plot_linewidth'], alpha=PLOT_PARAMS.get('line_alpha', 0.5))
     ax_G.set_xlabel('ROI voxel count (avg E/N)', fontsize=PLOT_PARAMS['font_size_label'])
     ax_G.set_ylabel('ΔPR (Expert − Novice)', fontsize=PLOT_PARAMS['font_size_label'])
@@ -399,38 +418,36 @@ plt.figure(2).ax_dict = {ax.get_label(): ax for ax in plt.figure(2).axes}
 import matplotlib as mpl
 getattr(plt.figure(2), '_pylustrator_init', lambda: ...)()
 plt.figure(2).ax_dict["A_PR_Matrix"].set(position=[0.0903, 0.5049, 0.292, 0.4608])
-plt.figure(2).ax_dict["B_PCA_Projection"].set(position=[0.4251, 0.756, 0.2102, 0.2096])
+plt.figure(2).ax_dict["B_PCA_Projection"].set(position=[0.4251, 0.772, 0.2098, 0.1758])
 plt.figure(2).ax_dict["C_Feature_Importance"].set(position=[0.4251, 0.5049, 0.2098, 0.1935])
 plt.figure(2).ax_dict["C_Feature_Importance"].spines[['right', 'top']].set_visible(False)
-plt.figure(2).ax_dict["C_Feature_Importance"].texts[0].set(position=(0.15, 1.025), fontsize=6.)
-plt.figure(2).ax_dict["C_Feature_Importance"].texts[1].set(position=(0.85, 1.025), fontsize=6.)
+plt.figure(2).ax_dict["C_Feature_Importance"].texts[0].set(position=(0.2322, 1.033), fontsize=5.)
+plt.figure(2).ax_dict["C_Feature_Importance"].texts[1].set(position=(0.7627, 1.033), fontsize=5.)
 plt.figure(2).ax_dict["D_PCA_Loadings"].set(position=[0.0876, 0.4467, 0.292, 0.02706])
-plt.figure(2).ax_dict["D_PCA_Loadings"].text(0.4908, 1.3920, 'ROI Contributions to PCA Components', transform=plt.figure(2).ax_dict["D_PCA_Loadings"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(2).ax_dict["D_PCA_Loadings"].texts[0].new
 plt.figure(2).ax_dict["D_PCA_Loadings"].title.set(visible=False)
+plt.figure(2).ax_dict["D_PCA_Loadings"].text(0.4908, 1.3920, 'ROI Contributions to PCA Components', transform=plt.figure(2).ax_dict["D_PCA_Loadings"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(2).ax_dict["D_PCA_Loadings"].texts[0].new
 #% end: automatic generated code from pylustrator
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].set(position=[0.1886, 0.2645, 0.5077, 0.2393])
-plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].title.set(visible=False)
+plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].set(position=[0.1886, 0.311, 0.5077, 0.1775])
 plt.figure(1).ax_dict["Bars_Top_Mean_PR"].set(position=[0.1886, 0.5289, 0.5077, 0.1775])
 plt.figure(1).ax_dict["Bars_Top_Mean_PR"].texts[14].set(position=(0.4999, 1.023))
 plt.figure(1).ax_dict["Bars_Top_Mean_PR"].texts[15].set(position=(0.4999, 0.952))
-plt.figure(1).text(0.4424, 0.5084, 'Participation Ratio Difference', transform=plt.figure(1).transFigure, ha='center', fontsize=8., weight='bold')  # id=plt.figure(1).texts[0].new
-plt.figure(1).text(0.4424, 0.4952, 'FDR p < .05', transform=plt.figure(1).transFigure, ha='center')  # id=plt.figure(1).texts[1].new
+plt.figure(1).text(0.4424, 0.5016, 'Participation Ratio Difference', transform=plt.figure(1).transFigure, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).texts[0].new
+plt.figure(1).text(0.4424, 0.4892, 'FDR p < .05', transform=plt.figure(1).transFigure, ha='center')  # id=plt.figure(1).texts[1].new
 #% end: automatic generated code from pylustrator
 #% start: automatic generated code from pylustrator
 plt.figure(3).ax_dict = {ax.get_label(): ax for ax in plt.figure(3).axes}
 import matplotlib as mpl
 getattr(plt.figure(3), '_pylustrator_init', lambda: ...)()
-plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].set(position=[0.04688, 0.7026, 0.2676, 0.2557], ylim=(17., 32.))
+plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].set(position=[0.04688, 0.776, 0.2342, 0.1823], yticks=[15., 17.5, 20., 22.5, 25., 27.5, 30., 32.5], yticklabels=['15.0', '17.5', '20.0', '22.5', '25.0', '27.5', '30.0', '32.5'], ylim=(17., 32.))
 plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].texts[0].set(position=(0.5, 1.06))
-plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].set(position=[0.3841, 0.7026, 0.2676, 0.2557], ylim=(17., 32.))
+plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].set(position=[0.04688, 0.5102, 0.2342, 0.1823], yticks=[15., 17.5, 20., 22.5, 25., 27.5, 30., 32.5], yticklabels=['15.0', '17.5', '20.0', '22.5', '25.0', '27.5', '30.0', '32.5'], ylim=(17., 32.))
 plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].texts[0].set(position=(0.5, 1.06))
 plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].texts[1].set(position=(0.5, 1.008))
-plt.figure(3).ax_dict["G_PRdiff_vs_VoxelsAvg"].set(position=[0.7155, 0.7026, 0.2676, 0.2557], ylim=(-7., 5.))
-plt.figure(3).text(0.8462, 0.9605, 'Experts - Novices', transform=plt.figure(3).transFigure, ha='center')  # id=plt.figure(3).texts[0].new
+plt.figure(3).ax_dict["G_PRdiff_vs_VoxelsAvg"].set(position=[0.04688, 0.2444, 0.2342, 0.1823], ylim=(-7., 5.))
 #% end: automatic generated code from pylustrator
 plt.show()
 

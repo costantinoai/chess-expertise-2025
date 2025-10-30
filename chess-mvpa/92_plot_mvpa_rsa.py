@@ -147,8 +147,10 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
+plt.figure(1).ax_dict["RSA_1_visualStimuli"].set(position=[0.05595, 0.7798, 0.4479, 0.1829])
+plt.figure(1).ax_dict["RSA_2_categories"].set(position=[0.05595, 0.4436, 0.4479, 0.1829])
+plt.figure(1).ax_dict["RSA_3_checkmate"].set(position=[0.05595, 0.1074, 0.4479, 0.1829])
 #% end: automatic generated code from pylustrator
 plt.show()
 

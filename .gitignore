@@ -127,3 +127,4 @@ old-implementation/
 # Scripts and docs - local development only
 scripts/
 docs/
+/chess-supplementary/dataset-viz
