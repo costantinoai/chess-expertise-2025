@@ -128,3 +128,4 @@ old-implementation/
 scripts/
 docs/
 /chess-supplementary/dataset-viz
+Makefile

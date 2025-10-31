@@ -18,10 +18,11 @@ from .formatters import format_pvalue_plain as _format_pvalue_plain
 def welch_ttest(
     group1: np.ndarray,
     group2: np.ndarray,
-    confidence_level: float = 0.95
+    confidence_level: float = 0.95,
+    equal_var: bool = False
 ) -> Tuple[float, float, float, float, float, float, float]:
     """
-    Perform Welch's t-test (unequal variances) with confidence interval for the difference.
+    Perform independent samples t-test with confidence interval for the difference.
 
     Parameters
     ----------
@@ -31,6 +32,9 @@ def welch_ttest(
         Second group data (e.g., novices)
     confidence_level : float, default=0.95
         Confidence level for the CI (0.95 = 95% CI)
+    equal_var : bool, default=False
+        If False, perform Welch's t-test (unequal variances, more robust).
+        If True, perform standard t-test (equal variances, matches old implementation).
 
     Returns
     -------
@@ -58,6 +62,8 @@ def welch_ttest(
     >>> expert_vals = np.array([5.2, 6.1, 5.8, 6.3])
     >>> novice_vals = np.array([4.1, 3.9, 4.5, 4.2])
     >>> m1, m2, diff, ci_low, ci_high, t, p = welch_ttest(expert_vals, novice_vals)
+    >>> # Or with equal variances assumed:
+    >>> m1, m2, diff, ci_low, ci_high, t, p = welch_ttest(expert_vals, novice_vals, equal_var=True)
     """
     # Remove NaNs
     g1 = np.asarray(group1)[~np.isnan(group1)]
@@ -72,8 +78,8 @@ def welch_ttest(
     mean2 = float(np.mean(g2))
     mean_diff = mean1 - mean2
 
-    # Welch t-test (equal_var=False)
-    result = ttest_ind(g1, g2, equal_var=False, nan_policy='omit')
+    # T-test with configurable variance assumption
+    result = ttest_ind(g1, g2, equal_var=equal_var, nan_policy='omit')
     t_stat = float(result.statistic)
     p_value = float(result.pvalue)
 
@@ -628,13 +634,14 @@ def per_roi_welch_and_fdr(
     expert_vals: np.ndarray,
     novice_vals: np.ndarray,
     roi_labels: np.ndarray,
-    alpha: float = 0.05
+    alpha: float = 0.05,
+    equal_var: bool = False
 ) -> pd.DataFrame:
     """
-    Run Welch t-tests per ROI with FDR correction and effect sizes.
+    Run t-tests per ROI with FDR correction and effect sizes.
 
     For each ROI, performs:
-    - Welch's t-test (unequal variances) comparing expert vs. novice groups
+    - Independent samples t-test comparing expert vs. novice groups
     - Cohen's d effect size computation
     - Benjamini-Hochberg FDR correction across all ROIs
 
@@ -648,6 +655,9 @@ def per_roi_welch_and_fdr(
         1D array of ROI labels corresponding to columns
     alpha : float, default=0.05
         FDR alpha level for significance testing
+    equal_var : bool, default=False
+        If False, use Welch's t-test (unequal variances, more robust).
+        If True, use standard t-test (equal variances, matches old implementation).
 
     Returns
     -------
@@ -709,22 +719,27 @@ def per_roi_welch_and_fdr(
             })
             continue
 
-        # Welch t-test
+        # T-test with configurable variance assumption
         mean1, mean2, mean_diff, ci_low, ci_high, t_stat, p_val = welch_ttest(
-            expert_clean, novice_clean, confidence_level=0.95
+            expert_clean, novice_clean, confidence_level=0.95, equal_var=equal_var
         )
 
-        # Degrees of freedom (Welch-Satterthwaite)
-        result_obj = ttest_ind(expert_clean, novice_clean, equal_var=False)
+        # Degrees of freedom
+        result_obj = ttest_ind(expert_clean, novice_clean, equal_var=equal_var)
         if hasattr(result_obj, 'df'):
             dof = result_obj.df
         else:
-            # Compute Welch-Satterthwaite df if SciPy object lacks .df
+            # Compute df manually
             n1, n2 = expert_clean.size, novice_clean.size
-            v1, v2 = np.var(expert_clean, ddof=1), np.var(novice_clean, ddof=1)
-            num = (v1/n1 + v2/n2) ** 2
-            den = ((v1**2)/((n1**2)*(n1-1))) + ((v2**2)/((n2**2)*(n2-1)))
-            dof = num/den if den > 0 else np.nan
+            if equal_var:
+                # Standard t-test: n1 + n2 - 2
+                dof = n1 + n2 - 2
+            else:
+                # Welch-Satterthwaite approximation
+                v1, v2 = np.var(expert_clean, ddof=1), np.var(novice_clean, ddof=1)
+                num = (v1/n1 + v2/n2) ** 2
+                den = ((v1**2)/((n1**2)*(n1-1))) + ((v2**2)/((n2**2)*(n2-1)))
+                dof = num/den if den > 0 else np.nan
 
         # Cohen's d (pingouin)
         cohen_d = compute_effsize(expert_clean, novice_clean, eftype='cohen')
