@@ -75,7 +75,10 @@ def participation_ratio(roi_matrix: np.ndarray) -> float:
         return float("nan")
 
     try:
-        # Compute PCA and extract explained variance (eigenvalues)
+        # Perform PCA on the neural activity matrix (conditions × voxels).
+        # PCA decomposes the covariance structure into orthogonal components,
+        # ordered by variance explained. Eigenvalues (explained_variance_) quantify
+        # how much variance each component captures.
         pca = PCA()
         pca.fit(cleaned_matrix)
         eigenvalues = pca.explained_variance_
@@ -84,7 +87,12 @@ def participation_ratio(roi_matrix: np.ndarray) -> float:
             logger.debug("PCA returned zero or empty eigenvalues")
             return float("nan")
 
-        # Compute participation ratio: (sum λ)² / sum(λ²)
+        # Compute participation ratio using the formula: PR = (Σλ)² / Σ(λ²)
+        # This formula measures effective dimensionality:
+        # - If all variance is in one dimension: λ = [V, 0, 0, ...] → PR = V²/V² = 1
+        # - If variance evenly distributed: λ = [V/n, V/n, ...] → PR = (V)²/(n*V²/n²) = n
+        # Essentially, PR quantifies how many dimensions are "actively participating"
+        # in representing the data, accounting for variance distribution evenness.
         sum_eigenvals = np.sum(eigenvalues)
         sum_squared_eigenvals = np.sum(eigenvalues ** 2)
 

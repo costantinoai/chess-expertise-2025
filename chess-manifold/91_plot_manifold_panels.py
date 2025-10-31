@@ -40,6 +40,8 @@ from common.plotting import (
     PLOT_PARAMS,
     save_axes_svgs,
     save_panel_svg,
+    save_axes_pdfs,
+    save_panel_pdf,
 )
 
 
@@ -455,9 +457,15 @@ plt.show()
 save_axes_svgs(fig1, FIGURES_DIR, 'manifold_bars')
 save_axes_svgs(fig2, FIGURES_DIR, 'manifold_matrix_pca')
 save_axes_svgs(fig3, FIGURES_DIR, 'manifold_pr_voxels')
+save_axes_pdfs(fig1, FIGURES_DIR, 'manifold_bars')
+save_axes_pdfs(fig2, FIGURES_DIR, 'manifold_matrix_pca')
+save_axes_pdfs(fig3, FIGURES_DIR, 'manifold_pr_voxels')
 
 save_panel_svg(fig1, FIGURES_DIR / 'panels' / 'manifold_bars_panel.svg')
 save_panel_svg(fig2, FIGURES_DIR / 'panels' / 'manifold_matrix_pca_panel.svg')
 save_panel_svg(fig3, FIGURES_DIR / 'panels' / 'manifold_pr_voxels_panel.svg')
+save_panel_pdf(fig1, FIGURES_DIR / 'panels' / 'manifold_bars_panel.pdf')
+save_panel_pdf(fig2, FIGURES_DIR / 'panels' / 'manifold_matrix_pca_panel.pdf')
+save_panel_pdf(fig3, FIGURES_DIR / 'panels' / 'manifold_pr_voxels_panel.pdf')
 
 log_script_end(logger)
