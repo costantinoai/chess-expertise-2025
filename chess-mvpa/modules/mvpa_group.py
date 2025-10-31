@@ -1,8 +1,14 @@
 """
-Shared MVPA group statistics routines (analysis-specific glue).
+Shared MVPA group statistics routines.
 
-Provides a single function to compute per-ROI group comparisons and
-within-group vs-chance tests for a given method (svm or rsa_corr).
+Provides focused functions for common MVPA group-level comparisons:
+  - Between-group tests (expert vs novice) with descriptive statistics
+  - Within-group tests (vs chance level) with descriptive statistics
+  - Data splitting helpers to avoid duplication
+
+Each function has a clear, single responsibility. Analysis scripts should
+explicitly show the workflow steps (loop over targets, perform tests, save results)
+rather than hiding complexity in orchestration functions.
 """
 
 from __future__ import annotations
@@ -11,108 +17,177 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from common import CONFIG
 from common.stats_utils import (
     per_roi_welch_and_fdr,
-    compute_group_mean_and_ci,
     per_roi_one_sample_vs_value,
 )
+from common.group_stats import get_descriptives_per_roi
 
 
-def compute_group_stats_for_method(
-    df_method: pd.DataFrame,
+def _compute_descriptives_per_roi(
+    data: np.ndarray,
+    confidence_level: float = 0.95,
+) -> List[Tuple[float, float, float]]:
+    """Compat shim: delegates to common.group_stats.get_descriptives_per_roi."""
+    return get_descriptives_per_roi(data, confidence_level=confidence_level)
+
+
+def compute_per_roi_group_comparison(
+    expert_data: np.ndarray,
+    novice_data: np.ndarray,
     roi_names: List[str],
-    method: str,
-    chance_map: Dict[str, float],
     alpha: float,
-) -> Dict[str, Dict[str, pd.DataFrame | float | List[Tuple[float, float, float]]]]:
+    confidence_level: float = 0.95,
+) -> Dict[str, object]:
     """
-    Compute per-ROI group stats for all targets within a method.
+    Compare experts vs novices per ROI with Welch's t-test (FDR corrected) and descriptives.
+
+    Performs Welch's two-sample t-test (does not assume equal variances) comparing
+    expert and novice groups for each ROI. FDR correction is applied across all ROIs.
+    Also computes descriptive statistics (mean and confidence intervals) for both
+    groups, which describe the comparison being tested.
 
     Parameters
     ----------
-    df_method : pd.DataFrame
-        Columns: subject, expert(bool), target, <ROI 1> ... <ROI N>
+    expert_data : ndarray, shape (n_experts, n_rois)
+        Expert group data; each row is a subject, each column is an ROI
+    novice_data : ndarray, shape (n_novices, n_rois)
+        Novice group data; same structure as expert_data
     roi_names : list of str
-        Display names for ROI columns in df_method
-    method : {'svm','rsa_corr'}
-        Analysis method; determines chance handling
-    chance_map : dict
-        Mapping target -> chance value (used if method == 'svm')
+        ROI labels (must match number of columns in data arrays)
     alpha : float
-        FDR alpha
+        FDR alpha threshold (e.g., 0.05)
+    confidence_level : float, default=0.95
+        Confidence level for descriptive intervals (e.g., 0.95 for 95% CI)
 
     Returns
     -------
     dict
-        target -> blocks dict with keys:
-          - welch_expert_vs_novice: DataFrame
-          - experts_vs_chance: DataFrame
-          - novices_vs_chance: DataFrame
-          - chance: float
-          - experts_desc: list[(mean, ci_low, ci_high)] per ROI
-          - novices_desc: list[(mean, ci_low, ci_high)] per ROI
+        Dictionary with keys:
+          - 'test_results': DataFrame with columns ROI_Name, ROI_id, t_stat,
+            p_val, p_fdr, reject_fdr (one row per ROI)
+          - 'expert_desc': list of (mean, ci_low, ci_high) tuples per ROI
+          - 'novice_desc': list of (mean, ci_low, ci_high) tuples per ROI
     """
-    targets = sorted(df_method["target"].dropna().unique())
-    results: Dict[str, Dict[str, object]] = {}
+    # Perform Welch's t-test with FDR correction
+    roi_ids = np.arange(1, len(roi_names) + 1)
+    welch_results = per_roi_welch_and_fdr(expert_data, novice_data, roi_ids, alpha=alpha)
+    welch_results.insert(0, "ROI_Name", roi_names)
 
-    for tgt in targets:
-        df_tgt = df_method[df_method["target"] == tgt].copy()
-        df_exp = df_tgt[df_tgt["expert"] == True].drop(columns=["subject", "expert", "target"])
-        df_nov = df_tgt[df_tgt["expert"] == False].drop(columns=["subject", "expert", "target"])
-        df_exp = df_exp[roi_names]
-        df_nov = df_nov[roi_names]
+    # Compute descriptive statistics for both groups
+    expert_desc = _compute_descriptives_per_roi(expert_data, confidence_level)
+    novice_desc = _compute_descriptives_per_roi(novice_data, confidence_level)
 
-        welch = per_roi_welch_and_fdr(
-            df_exp.values, df_nov.values, np.arange(1, len(roi_names) + 1), alpha=alpha
-        )
-        welch.insert(0, "ROI_Name", roi_names)
+    return {
+        'test_results': welch_results,
+        'expert_desc': expert_desc,
+        'novice_desc': novice_desc,
+    }
 
-        if method == 'svm':
-            chance = float(chance_map.get(tgt, np.nan))
-        else:
-            # RSA correlations: chance is 0
-            chance = float(CONFIG.get('CHANCE_LEVEL_RSA', 0.0))
 
-        vs_chance_exp = per_roi_one_sample_vs_value(
-            df_exp.values, roi_names, chance, alpha=alpha, alternative='greater'
-        )
-        vs_chance_nov = per_roi_one_sample_vs_value(
-            df_nov.values, roi_names, chance, alpha=alpha, alternative='greater'
-        )
+def compute_per_roi_vs_chance_tests(
+    expert_data: np.ndarray,
+    novice_data: np.ndarray,
+    roi_names: List[str],
+    chance_level: float,
+    alpha: float,
+    alternative: str = 'greater',
+    confidence_level: float = 0.95,
+) -> Tuple[Dict[str, object], Dict[str, object]]:
+    """
+    Test each group vs chance per ROI with one-sample t-tests (FDR corrected) and descriptives.
 
-        # Descriptive stats (mean and 95% CI)
-        exp_desc: List[Tuple[float, float, float]] = []
-        nov_desc: List[Tuple[float, float, float]] = []
-        for roi in roi_names:
-            x_exp = df_exp[roi].values
-            x_exp = x_exp[~np.isnan(x_exp)]
-            x_nov = df_nov[roi].values
-            x_nov = x_nov[~np.isnan(x_nov)]
+    Performs one-sample t-tests to assess whether each group's mean significantly
+    differs from a specified chance level. Common use cases:
+      - SVM decoding: test if accuracy > 0.5 (binary) or > 1/n_classes (multiclass)
+      - RSA correlations: test if correlation > 0 (no relationship)
 
-            if x_exp.size > 1:
-                exp_desc.append(compute_group_mean_and_ci(x_exp, confidence_level=0.95))
-            else:
-                exp_desc.append((np.nan, np.nan, np.nan))
+    FDR correction is applied separately within each group across all ROIs.
+    Also computes descriptive statistics (mean and confidence intervals) for each
+    group, which describe the values being tested against chance.
 
-            if x_nov.size > 1:
-                nov_desc.append(compute_group_mean_and_ci(x_nov, confidence_level=0.95))
-            else:
-                nov_desc.append((np.nan, np.nan, np.nan))
+    Parameters
+    ----------
+    expert_data : ndarray, shape (n_experts, n_rois)
+        Expert group data
+    novice_data : ndarray, shape (n_novices, n_rois)
+        Novice group data
+    roi_names : list of str
+        ROI labels
+    chance_level : float
+        Null hypothesis value (e.g., 0.5 for binary SVM, 0.0 for RSA)
+    alpha : float
+        FDR alpha threshold
+    alternative : {'greater', 'two-sided', 'less'}, default='greater'
+        Alternative hypothesis direction:
+          - 'greater': mean > chance (most common for decoding/RSA)
+          - 'two-sided': mean ≠ chance
+          - 'less': mean < chance
+    confidence_level : float, default=0.95
+        Confidence level for descriptive intervals (e.g., 0.95 for 95% CI)
 
-        results[tgt] = {
-            'welch_expert_vs_novice': welch,
-            'experts_vs_chance': vs_chance_exp,
-            'novices_vs_chance': vs_chance_nov,
-            'chance': chance,
-            'experts_desc': exp_desc,
-            'novices_desc': nov_desc,
-        }
+    Returns
+    -------
+    tuple of dicts
+        (experts_result, novices_result)
+        Each dict contains:
+          - 'test_results': DataFrame with columns ROI_Name, t_stat, p_val,
+            p_fdr, reject_fdr (one row per ROI)
+          - 'desc': list of (mean, ci_low, ci_high) tuples per ROI
+    """
+    # Perform one-sample t-tests with FDR correction
+    experts_vs_chance = per_roi_one_sample_vs_value(
+        expert_data, roi_names, chance_level, alpha=alpha, alternative=alternative
+    )
+    novices_vs_chance = per_roi_one_sample_vs_value(
+        novice_data, roi_names, chance_level, alpha=alpha, alternative=alternative
+    )
 
-    return results
+    # Compute descriptive statistics for both groups
+    expert_desc = _compute_descriptives_per_roi(expert_data, confidence_level)
+    novice_desc = _compute_descriptives_per_roi(novice_data, confidence_level)
+
+    return (
+        {'test_results': experts_vs_chance, 'desc': expert_desc},
+        {'test_results': novices_vs_chance, 'desc': novice_desc},
+    )
+
+
+def split_data_by_target_and_group(
+    df: pd.DataFrame,
+    target: str,
+    roi_names: List[str],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Extract expert and novice ROI data for a specific target (DRY helper).
+
+    This helper eliminates duplicated data-splitting logic. It filters the
+    dataframe for a specific target, separates experts from novices, and
+    returns their ROI data as numpy arrays ready for statistical tests.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Group dataframe with columns: subject, expert (bool), target, and ROI columns
+    target : str
+        Target name to filter (e.g., 'checkmate', 'categories')
+    roi_names : list of str
+        ROI column names to extract
+
+    Returns
+    -------
+    tuple of ndarray
+        (expert_data, novice_data)
+        Each array has shape (n_subjects, n_rois)
+    """
+    df_tgt = df[df['target'] == target].copy()
+    expert_data = df_tgt[df_tgt['expert'] == True][roi_names].values
+    novice_data = df_tgt[df_tgt['expert'] == False][roi_names].values
+    return expert_data, novice_data
 
 
 __all__ = [
-    'compute_group_stats_for_method',
+    'compute_per_roi_group_comparison',
+    'compute_per_roi_vs_chance_tests',
+    'split_data_by_target_and_group',
 ]
-

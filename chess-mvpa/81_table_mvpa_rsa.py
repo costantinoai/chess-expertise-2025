@@ -18,43 +18,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.bids_utils import load_roi_metadata
-from common.report_utils import generate_latex_table
+from common.report_utils import generate_latex_table, format_roi_stats_table
 from common import CONFIG
-
-
-def _build_table(blocks: dict, roi_info: pd.DataFrame) -> pd.DataFrame:
-    welch = blocks['welch_expert_vs_novice']
-    exp_desc = blocks['experts_desc']
-    nov_desc = blocks['novices_desc']
-
-    # Merge pretty names
-    df = welch.merge(roi_info[['roi_id', 'pretty_name']], left_on='ROI_Label', right_on='roi_id', how='left')
-    df['ROI'] = df['pretty_name'].str.replace('\n', ' ', regex=False)
-
-    # Means and CI
-    def _fmt_triplet(t):
-        m, lo, hi = t
-        if pd.isna(m) or pd.isna(lo) or pd.isna(hi):
-            return '--', '[--, --]'
-        return f"{m:.3f}", f"[{lo:.3f}, {hi:.3f}]"
-
-    exp_vals, exp_cis = zip(*(_fmt_triplet(t) for t in exp_desc))
-    nov_vals, nov_cis = zip(*(_fmt_triplet(t) for t in nov_desc))
-
-    # Difference CI from welch df
-    df_out = pd.DataFrame({
-        'ROI': df['ROI'],
-        'Expert_mean': list(exp_vals),
-        'Expert_CI': list(exp_cis),
-        'Novice_mean': list(nov_vals),
-        'Novice_CI': list(nov_cis),
-        'Delta_mean': df['mean_diff'].map(lambda v: '--' if pd.isna(v) else f"{v:.3f}"),
-        'Delta_CI': pd.Series(zip(df['ci95_low'], df['ci95_high'])).map(
-            lambda x: '[--, --]' if any(pd.isna(list(x))) else f"[{x[0]:.3f}, {x[1]:.3f}]"
-        ),
-        'pFDR': df['p_val_fdr'].map(lambda p: '--' if pd.isna(p) else f"{p:.3e}"),
-    })
-    return df_out
 
 
 RESULTS_BASE = Path(__file__).parent / 'results'
@@ -85,7 +50,12 @@ targets = sorted(index.get('rsa_corr', {}).keys())
 
 for tgt in targets:
     blocks = index['rsa_corr'][tgt]
-    df = _build_table(blocks, roi_info)
+    df = format_roi_stats_table(
+        blocks['welch_expert_vs_novice'],
+        blocks['experts_desc'],
+        blocks['novices_desc'],
+        roi_info,
+    )
     multicolumn = {
         'Experts': ['Expert_mean', 'Expert_CI'],
         'Novices': ['Novice_mean', 'Novice_CI'],

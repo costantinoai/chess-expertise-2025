@@ -19,48 +19,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.bids_utils import load_roi_metadata
-from common.report_utils import generate_latex_table
+from common.report_utils import generate_latex_table, format_roi_stats_table
 from common import CONFIG
-
-
-def _fmt(m, lo, hi, subtract: float) -> tuple[str, str]:
-    if any(pd.isna([m, lo, hi])):
-        return '--', '[--, --]'
-    return f"{(m - subtract):.3f}", f"[{(lo - subtract):.3f}, {(hi - subtract):.3f}]"
-
-
-def _build_table(blocks: dict, roi_info: pd.DataFrame) -> pd.DataFrame:
-    welch = blocks['welch_expert_vs_novice']
-    exp_desc = blocks['experts_desc']
-    nov_desc = blocks['novices_desc']
-    chance = float(blocks.get('chance', 0.0))
-
-    df = welch.merge(roi_info[['roi_id', 'pretty_name']], left_on='ROI_Label', right_on='roi_id', how='left')
-    df['ROI'] = df['pretty_name'].str.replace('\n', ' ', regex=False)
-
-    exp_vals = []
-    exp_cis = []
-    for t in exp_desc:
-        v, c = _fmt(*t, subtract=chance)
-        exp_vals.append(v)
-        exp_cis.append(c)
-
-    nov_vals = []
-    nov_cis = []
-    for t in nov_desc:
-        v, c = _fmt(*t, subtract=chance)
-        nov_vals.append(v)
-        nov_cis.append(c)
-
-    df_out = pd.DataFrame({
-        'ROI': df['ROI'],
-        'Expert_mean_minusChance': exp_vals,
-        'Expert_CI_minusChance': exp_cis,
-        'Novice_mean_minusChance': nov_vals,
-        'Novice_CI_minusChance': nov_cis,
-        'pFDR': df['p_val_fdr'].map(lambda p: '--' if pd.isna(p) else f"{p:.3e}"),
-    })
-    return df_out
 
 
 RESULTS_BASE = Path(__file__).parent / 'results'
@@ -91,7 +51,21 @@ targets = sorted(index.get('svm', {}).keys())
 
 for tgt in targets:
     blocks = index['svm'][tgt]
-    df = _build_table(blocks, roi_info)
+    chance = float(blocks.get('chance', 0.0))
+    df = format_roi_stats_table(
+        blocks['welch_expert_vs_novice'],
+        blocks['experts_desc'],
+        blocks['novices_desc'],
+        roi_info,
+        subtract_chance=chance,
+    )
+    # Rename columns to reflect chance subtraction
+    df = df.rename(columns={
+        'Expert_mean': 'Expert_mean_minusChance',
+        'Expert_CI': 'Expert_CI_minusChance',
+        'Novice_mean': 'Novice_mean_minusChance',
+        'Novice_CI': 'Novice_CI_minusChance',
+    })
     multicolumn = {
         'Experts (acc−chance)': ['Expert_mean_minusChance', 'Expert_CI_minusChance'],
         'Novices (acc−chance)': ['Novice_mean_minusChance', 'Novice_CI_minusChance'],

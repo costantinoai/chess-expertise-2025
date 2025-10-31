@@ -40,6 +40,8 @@ from common.plotting import (
     PLOT_PARAMS,
     save_axes_svgs,
     save_panel_svg,
+    save_axes_pdfs,
+    save_panel_pdf,
 )
 from modules.mvpa_plot_utils import extract_mvpa_bar_data
 
@@ -150,6 +152,8 @@ plt.figure(1).ax_dict["SVM_3_checkmate"].set(position=[0.044, 0.1236, 0.4626, 0.
 plt.show()
 
 save_axes_svgs(fig1, FIGURES_DIR, 'mvpa_svm')
+save_axes_pdfs(fig1, FIGURES_DIR, 'mvpa_svm')
 save_panel_svg(fig1, FIGURES_DIR / 'panels' / 'mvpa_svm_panel.svg')
+save_panel_pdf(fig1, FIGURES_DIR / 'panels' / 'mvpa_svm_panel.pdf')
 
 log_script_end(logger)
