@@ -2,21 +2,85 @@
 """
 Neurosynth RSA Correlation (Searchlight Experts>Novices z-map vs term maps)
 
-Pipeline (per model RDM pattern)
---------------------------------
-1) Find subject-level searchlight maps matching pattern
-2) Split files by group using participants.tsv (experts vs novices)
-3) Fisher z-transform subject maps
-4) Second-level GLM (nilearn) with intercept and group (+1/-1)
-5) Compute contrast 'group' as z-score map (Experts > Novices)
-6) Split z into Z+ and Z−
-7) Correlate with Neurosynth term maps (bootstrap CI, FDR)
-8) Save CSV, LaTeX; render glass brain and surface; bar/diff plots
+METHODS
+=======
 
-Notes
------
-- Inputs are local copies only; do not read /data/projects/...
-- This script follows CLAUDE.md conventions (no CLI args; analysis vs plotting separation)
+Rationale
+---------
+To interpret the functional significance of brain regions showing expertise-
+related differences in RSA searchlight analyses, we correlated group-contrast
+z-score maps with Neurosynth meta-analytic term maps. This data-driven
+approach identifies cognitive functions preferentially associated with regions
+where experts show stronger (or weaker) neural-model correlations compared to
+novices.
+
+Data
+----
+Subject-level RSA searchlight maps were previously computed by correlating
+whole-brain searchlight RDMs with theoretical model RDMs (check status,
+strategy, visual similarity). Each map is a 3D NIfTI volume with correlation
+coefficients at each voxel.
+
+Participants: N=40 (20 experts, 20 novices).
+Model RDMs: Check status, strategy, visual similarity.
+
+Neurosynth term maps: Meta-analytic association z-score maps for cognitive
+terms (e.g., "working memory", "visual attention", "semantic processing").
+Term maps were downloaded from the Neurosynth database and resampled to match
+the searchlight map resolution.
+
+Second-Level Group Analysis
+----------------------------
+For each model RDM pattern, we performed the following:
+
+1. **Fisher z-transformation**: Subject-level correlation maps were Fisher
+   z-transformed to stabilize variance for group-level inference.
+
+2. **Group GLM**: A second-level general linear model (GLM) was fitted with
+   two regressors: an intercept (group mean) and a group contrast (experts =
+   +1, novices = −1). Implementation: nilearn.glm.second_level.SecondLevelModel.
+
+3. **Group contrast map**: The group contrast was computed as a z-score map
+   representing Experts > Novices. Positive z-values indicate voxels where
+   experts show stronger RSA correlations; negative z-values indicate voxels
+   where novices show stronger correlations.
+
+4. **Sign-specific maps**: The group z-map was split into two separate maps:
+   Z+ (positive z-values, zeros elsewhere) and Z− (absolute negative z-values,
+   zeros elsewhere). This allows separate functional interpretation of regions
+   with expertise-enhanced vs expertise-reduced correlations.
+
+Neurosynth Term Correlation
+----------------------------
+For each sign-specific map (Z+, Z−), we computed spatial correlations with
+each Neurosynth term map. Only non-zero voxels in the z-map were included in
+the correlation (to focus on regions with group differences). Correlations
+were computed as Pearson r across voxel values.
+
+For each term, we also computed the difference in correlations (r_pos − r_neg)
+to identify terms that are differentially associated with expert-enhanced
+versus expert-reduced regions. Positive differences indicate terms more
+strongly associated with regions where experts show higher correlations.
+
+Statistical Assumptions and Limitations
+----------------------------------------
+- **Spatial independence**: Voxels are treated as independent observations for
+  correlation analysis. In reality, fMRI voxels exhibit spatial autocorrelation
+  due to smoothing and hemodynamic spread. Correlations are descriptive and
+  should be interpreted as effect size measures rather than statistical tests.
+- **Neurosynth circularity**: If the current study overlaps with Neurosynth
+  database studies, term maps may reflect the current dataset, inflating
+  correlations. The Neurosynth database is large (>10,000 studies), mitigating
+  this concern.
+
+Outputs
+-------
+All results are saved to results/<timestamp>_neurosynth_rsa/:
+- zmap_<pattern>.nii.gz: Group z-score map (Experts > Novices)
+- <pattern>_term_corr_positive.csv: Z+ term correlations (term, r)
+- <pattern>_term_corr_negative.csv: Z− term correlations (term, r)
+- <pattern>_term_corr_difference.csv: Correlation differences (term, r_pos, r_neg, r_diff)
+- 02_rsa_neurosynth.py: Copy of this script
 """
 
 import os
@@ -49,8 +113,6 @@ from modules.glm_utils import build_design_matrix
 # =====================
 # Configuration (local)
 # =====================
-N_BOOTSTRAPS = 10000
-PLOT_THRESH = 1e-5
 SMOOTHING_FWHM_MM = None
 
 # Patterns and pretty labels
@@ -63,9 +125,6 @@ PATTERNS = {
 
 # 1) Setup
 extra = {
-    'N_BOOTSTRAPS': N_BOOTSTRAPS,
-    'ALPHA_FDR': CONFIG['ALPHA_FDR'],
-    'PLOT_THRESH': PLOT_THRESH,
     'SMOOTHING_FWHM_MM': SMOOTHING_FWHM_MM,
 }
 config, output_dir, logger = setup_analysis(
@@ -75,65 +134,93 @@ config, output_dir, logger = setup_analysis(
     extra_config=extra,
 )
 
-# 2) Groups from participants.tsv
+# Load participant IDs grouped by expertise for splitting subject-level maps
 experts = get_subject_list('expert')
 novices = get_subject_list('novice')
 logger.info(f"Experts: {len(experts)}; Novices: {len(novices)}")
 
-# 3) Term maps
+# Load Neurosynth meta-analytic term maps (z-score maps for cognitive terms like
+# "working memory", "visual attention", etc.). These are whole-brain maps derived
+# from >10,000 studies, representing the probability of a term being mentioned
+# when a voxel is activated. We'll correlate our group contrast maps with these
+# to identify which cognitive functions are associated with expertise differences.
 term_dir = CONFIG['NEUROSYNTH_TERMS_DIR']
 term_maps = load_term_maps(term_dir)
 
-# 4) RSA searchlight directory
+# Subject-level RSA searchlight maps are stored in BIDS derivatives
 rsa_root = CONFIG['BIDS_RSA_SEARCHLIGHT']
 
+# Storage for combined results across all patterns (for multi-panel tables)
 all_pos = {}
 all_neg = {}
 all_diff = {}
 
-# 5) Process each pattern
+# Process each RSA model pattern (checkmate, strategy, visual similarity).
+# For each, we'll compute a group contrast z-map (Experts > Novices) and correlate
+# it with Neurosynth term maps to identify functional associations.
 for pattern, pretty in PATTERNS.items():
 
     logger.info(f"Processing pattern: {pattern} → {pretty}")
+
+    # Find subject-level searchlight correlation maps matching this pattern.
+    # Each file is a 3D NIfTI volume with correlation coefficients at each voxel.
     files = find_nifti_files(rsa_root, pattern=pattern)
     logger.info(f"Found {len(files)} matching subject maps for pattern '{pattern}'")
 
+    # Split files by expertise group based on subject IDs
     exp_files, nov_files = split_by_group(files, experts, novices)
     logger.info(f"  Experts: {len(exp_files)} maps; Novices: {len(nov_files)} maps")
 
-    # Load and Fisher z-transform subject maps
+    # Load subject maps and apply Fisher z-transformation to stabilize variance.
+    # Fisher z-transform: z = arctanh(r), which maps correlations [-1,1] to [-inf,+inf]
+    # and makes their sampling distribution approximately normal for group inference.
     z_exp = [fisher_z_transform(load_nifti(f)) for f in exp_files]
     z_nov = [fisher_z_transform(load_nifti(f)) for f in nov_files]
     z_all = z_exp + z_nov
 
-    # 5a) Second-level GLM
+    # Fit a second-level general linear model (GLM) to test for group differences.
+    # Design matrix has two columns: intercept (overall mean) and group contrast
+    # (experts=+1, novices=-1). This allows us to test: are experts' correlations
+    # higher than novices' at each voxel?
     design = build_design_matrix(len(z_exp), len(z_nov))
     slm = SecondLevelModel(smoothing_fwhm=SMOOTHING_FWHM_MM, n_jobs=-1)
     slm = slm.fit(z_all, design_matrix=design)
+
+    # Compute the group contrast as a z-score map. Positive z-values = voxels where
+    # experts show stronger RSA correlations; negative z-values = voxels where novices
+    # show stronger correlations. Z-scores quantify effect size in standard deviations.
     con_img = slm.compute_contrast('group', output_type='z_score')
     z_map = con_img.get_fdata()
 
-    # Save group z-score map for plotting script
+    # Save the group z-map for visualization in plotting scripts
     safe_base = pattern.replace(' ', '_')
     con_img.to_filename(str(output_dir / f"zmap_{safe_base}.nii.gz"))
 
-    # 5b) Correlations with term maps
+    # Split the z-map by sign to separately analyze regions with expert-enhanced
+    # vs expert-reduced correlations. Z+ contains positive z-values (zeros elsewhere);
+    # Z− contains absolute negative z-values (zeros elsewhere). This allows separate
+    # functional characterization of regions showing opposite expertise effects.
     z_pos, z_neg = split_zmap_by_sign(z_map)
+
+    # Correlate Z+ and Z− with each Neurosynth term map. For each term, compute
+    # Pearson correlation across voxels (excluding zeros). This identifies which
+    # cognitive functions are most strongly associated with regions showing
+    # expertise-related differences in RSA correlations.
     df_pos, df_neg, df_diff = compute_all_zmap_correlations(
-        z_pos, z_neg, term_maps, ref_img=con_img,
-        n_boot=N_BOOTSTRAPS, fdr_alpha=CONFIG['ALPHA_FDR'], ci_alpha=0.05, random_state=CONFIG['RANDOM_SEED']
+        z_pos, z_neg, term_maps, ref_img=con_img
     )
 
-    # Reorder by canonical term order
+    # Reorder rows by canonical term order for consistency across analyses
     df_pos = reorder_by_term(df_pos)
     df_neg = reorder_by_term(df_neg)
     df_diff = reorder_by_term(df_diff)
 
-    # Save outputs per pattern (plots/LaTeX handled in 02_plot)
+    # Save per-pattern results as CSVs
     df_pos.to_csv(output_dir / f"{safe_base}_term_corr_positive.csv", index=False)
     df_neg.to_csv(output_dir / f"{safe_base}_term_corr_negative.csv", index=False)
     df_diff.to_csv(output_dir / f"{safe_base}_term_corr_difference.csv", index=False)
-    # Keep for combined tables — handled in plotting script
+
+    # Store for combined multi-panel tables (generated in plotting scripts)
     key = pattern.split('_', 1)[1] if '_' in pattern else pattern
     all_pos[key] = df_pos
     all_neg[key] = df_neg

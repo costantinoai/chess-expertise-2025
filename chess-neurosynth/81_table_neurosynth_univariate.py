@@ -4,8 +4,8 @@ Neurosynth Univariate — LaTeX table generation
 
 Reads per-run correlation CSVs produced by 01_univariate_neurosynth.py and
 builds publication-ready LaTeX tables:
- - POS vs NEG correlations (multicolumn)
- - DIFF correlations (Δr with 95% CI)
+ - POS vs NEG correlations (simple r values)
+ - DIFF correlations (Δr = r_POS − r_NEG)
 """
 
 import os
@@ -18,10 +18,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.report_utils import generate_latex_table
-
-
-def _fmt_ci(df: pd.DataFrame) -> pd.Series:
-    return df.apply(lambda r: f"[{r['CI_low']:.3f}, {r['CI_high']:.3f}]", axis=1)
 
 
 RESULTS_BASE = Path(__file__).parent / 'results'
@@ -59,37 +55,33 @@ for pos in pos_files:
     df_neg = pd.read_csv(neg)
     df_diff = pd.read_csv(diff)
 
-    # POS vs NEG combined table
+    # POS vs NEG combined table (simplified: just r values, no CIs or p-values)
     df_comb = pd.DataFrame({
         'Term': df_pos['term'].str.title(),
         'r_POS': df_pos['r'].round(3),
-        '95%_CI_POS': _fmt_ci(df_pos),
-        'pFDR_POS': df_pos['p_fdr'].map(lambda x: f"{x:.3e}"),
         'r_NEG': df_neg['r'].round(3),
-        '95%_CI_NEG': _fmt_ci(df_neg),
-        'pFDR_NEG': df_neg['p_fdr'].map(lambda x: f"{x:.3e}"),
     })
     multicolumn = {
-        'POS': ['r_POS', '95%_CI_POS', 'pFDR_POS'],
-        'NEG': ['r_NEG', '95%_CI_NEG', 'pFDR_NEG'],
+        'Z+': ['r_POS'],
+        'Z−': ['r_NEG'],
     }
     tex1 = generate_latex_table(
         df=df_comb,
         output_path=tables_dir / f'{base}_pos_neg.tex',
-        caption=f'Neurosynth univariate correlations — {base} (POS and NEG).',
+        caption=f'Neurosynth univariate correlations — {base} (Z+ and Z−).',
         label=f'tab:neuro_uni_{base}_posneg',
-        column_format='lccc|ccc',
+        column_format='lc|c',
         multicolumn_headers=multicolumn,
         escape=False,
         logger=logger,
     )
 
-    # DIFF table
+    # DIFF table (Δr = r_POS − r_NEG)
     df_d = pd.DataFrame({
         'Term': df_diff['term'].str.title(),
+        'r_POS': df_diff['r_pos'].round(3),
+        'r_NEG': df_diff['r_neg'].round(3),
         'Δr': df_diff['r_diff'].round(3),
-        '95%_CI': _fmt_ci(df_diff),
-        'pFDR': df_diff['p_fdr'].map(lambda x: f"{x:.3e}"),
     })
     tex2 = generate_latex_table(
         df=df_d,

@@ -30,7 +30,7 @@ pylustrator.start()
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from nilearn import image, surface, datasets
+from nilearn import image
 
 from common.plotting import (
     apply_nature_rc,
@@ -40,6 +40,9 @@ from common.plotting import (
     COLORS_EXPERT_NOVICE,
     save_axes_svgs,
     save_panel_svg,
+    save_axes_pdfs,
+    save_panel_pdf,
+    compute_surface_symmetric_range,
 )
 from common.io_utils import find_latest_results_directory
 from common.logging_utils import setup_analysis_in_dir, log_script_end
@@ -99,27 +102,8 @@ def _load_triple(stem: str):
 
 fig = plt.figure(1)
 
-# Compute symmetric surface range shared across RSA maps
-try:
-    fsavg = datasets.fetch_surf_fsaverage()
-    def _absmax_surface(zimg):
-        texl = surface.vol_to_surf(zimg, fsavg.pial_left)
-        texr = surface.vol_to_surf(zimg, fsavg.pial_right)
-        return float(np.nanmax(np.abs(np.concatenate([texl, texr]))))
-    vmax_rsa = 0.0
-    for stem, _pretty in PATTERNS:
-        z_img = image.load_img(str(RESULTS_DIR / f"zmap_{stem}.nii.gz"))
-        vmax_rsa = max(vmax_rsa, _absmax_surface(z_img))
-    vmin_rsa = -vmax_rsa
-except Exception:
-    def _absmax_volume(zimg):
-        arr = zimg.get_fdata()
-        return float(np.nanmax(np.abs(arr)))
-    vmax_rsa = 0.0
-    for stem, _pretty in PATTERNS:
-        z_img = image.load_img(str(RESULTS_DIR / f"zmap_{stem}.nii.gz"))
-        vmax_rsa = max(vmax_rsa, _absmax_volume(z_img))
-    vmin_rsa = -vmax_rsa
+z_imgs = [image.load_img(str(RESULTS_DIR / f"zmap_{stem}.nii.gz")) for stem, _pretty in PATTERNS]
+vmin_rsa, vmax_rsa = compute_surface_symmetric_range(z_imgs)
 
 for idx, (stem, pretty) in enumerate(PATTERNS, start=1):
     try:
@@ -196,8 +180,10 @@ plt.figure(1).text(0.1156, 0.9501, 'Left hemisphere', transform=plt.figure(1).tr
 #% end: automatic generated code from pylustrator
 plt.show()
 
-# Save each axis separately first, then full panel
+# Save each axis separately first, then full panel (SVG + PDF)
 fig = plt.gcf()
 save_axes_svgs(fig, FIGURES_DIR, 'neurosynth_rsa')
+save_axes_pdfs(fig, FIGURES_DIR, 'neurosynth_rsa')
 save_panel_svg(fig, FIGURES_DIR / 'panels' / 'neurosynth_rsa_panel.svg')
+save_panel_pdf(fig, FIGURES_DIR / 'panels' / 'neurosynth_rsa_panel.pdf')
 log_script_end(logger)

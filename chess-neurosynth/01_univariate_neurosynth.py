@@ -2,18 +2,90 @@
 """
 Neurosynth Univariate Correlation (Group GLM T-maps vs term maps)
 
-Pipeline
---------
-1) Load group-level GLM T-maps from CONFIG['BIDS_SPM_GROUP']
-2) Convert T -> signed two-tailed Z (retain sign)
-3) Split into Z+ and Z−
-4) Correlate with Neurosynth term maps (bootstrap CI, FDR)
-5) Save CSV, LaTeX; render glass brain and surface; bar/diff plots
+METHODS
+=======
 
-Notes
------
-- Inputs are local copies only; do not read /data/projects/...
-- This script follows CLAUDE.md conventions (no CLI args; analysis vs plotting separation)
+Rationale
+---------
+To interpret the functional significance of brain regions showing expertise-
+related differences in univariate GLM contrasts, we correlated group-level
+t-statistic maps with Neurosynth meta-analytic term maps. This data-driven
+approach identifies cognitive functions preferentially associated with regions
+where experts show stronger (or weaker) task-related activations compared to
+novices.
+
+Data
+----
+Group-level statistical parametric maps (SPMs) were computed using second-
+level GLMs in SPM12. Each T-map represents a group contrast (e.g., Experts >
+Novices) with t-statistics at each voxel. T-maps are stored as NIfTI files in
+BIDS/derivatives/spm/GLM-smooth4/group/.
+
+Participants: N=40 (20 experts, 20 novices).
+Degrees of freedom: 38 (n_subjects − 2 for two-sample t-test).
+
+Neurosynth term maps: Meta-analytic association z-score maps for cognitive
+terms (e.g., "working memory", "visual attention", "semantic processing").
+Term maps were downloaded from the Neurosynth database and resampled to match
+the GLM map resolution.
+
+T-to-Z Conversion
+-----------------
+Group-level T-maps were converted to signed two-tailed z-scores while
+preserving the sign (direction) of the effect. For each voxel:
+
+1. Compute the two-tailed p-value from the t-statistic using the t-
+   distribution with 38 degrees of freedom.
+2. Convert the p-value to a two-tailed z-score using the inverse cumulative
+   standard normal distribution.
+3. Assign the sign of the original t-statistic to the z-score.
+
+This transformation standardizes effect magnitudes across contrasts and
+allows comparison with Neurosynth z-score maps, which are also two-tailed.
+
+Sign-Specific Map Splitting
+----------------------------
+The group z-map was split into two separate maps:
+- Z+ (positive z-values, zeros elsewhere): regions with stronger expert
+  activations
+- Z− (absolute negative z-values, zeros elsewhere): regions with stronger
+  novice activations
+
+This allows separate functional interpretation of regions with expertise-
+enhanced vs expertise-reduced activations.
+
+Neurosynth Term Correlation
+----------------------------
+For each sign-specific map (Z+, Z−), we computed spatial correlations with
+each Neurosynth term map. Only non-zero voxels in the z-map were included in
+the correlation (to focus on regions with group differences). Correlations
+were computed as Pearson r across voxel values.
+
+For each term, we also computed the difference in correlations (r_pos − r_neg)
+to identify terms that are differentially associated with expert-enhanced
+versus expert-reduced regions. Positive differences indicate terms more
+strongly associated with regions where experts show higher activations.
+
+Statistical Assumptions and Limitations
+----------------------------------------
+- **Spatial independence**: Voxels are treated as independent observations for
+  correlation analysis. In reality, fMRI voxels exhibit spatial autocorrelation
+  due to smoothing (FWHM=4mm) and hemodynamic spread. Correlations are
+  descriptive and should be interpreted as effect size measures rather than
+  statistical tests.
+- **Neurosynth circularity**: If the current study overlaps with Neurosynth
+  database studies, term maps may reflect the current dataset, inflating
+  correlations. The Neurosynth database is large (>10,000 studies), mitigating
+  this concern.
+
+Outputs
+-------
+All results are saved to results/<timestamp>_neurosynth_univariate/:
+- zmap_<contrast>.nii.gz: Signed z-score map (converted from T-map)
+- <contrast>_term_corr_positive.csv: Z+ term correlations (term, r)
+- <contrast>_term_corr_negative.csv: Z− term correlations (term, r)
+- <contrast>_term_corr_difference.csv: Correlation differences (term, r_pos, r_neg, r_diff)
+- 01_univariate_neurosynth.py: Copy of this script
 """
 
 import os
@@ -50,9 +122,7 @@ from modules.maps_utils import (
 # =====================
 # Configuration (local)
 # =====================
-DOF = 38                 # Degrees of freedom for group T-maps (set to manuscript value)
-N_BOOTSTRAPS = 10000
-PLOT_THRESH = 1e-5
+DOF = 38  # Degrees of freedom for group T-maps (n=40 subjects, 2 groups → df=38)
 
 
 """Analysis-only script: univariate neurosynth correlations.
@@ -63,9 +133,6 @@ Follows CLAUDE.md: no CLI/if-main. Configure and run sequentially.
 # 1) Setup logging and timestamped results directory
 extra = {
     'DOF': DOF,
-    'N_BOOTSTRAPS': N_BOOTSTRAPS,
-    'ALPHA_FDR': CONFIG['ALPHA_FDR'],
-    'PLOT_THRESH': PLOT_THRESH,
 }
 config, output_dir, logger = setup_analysis(
     analysis_name="neurosynth_univariate",
@@ -76,47 +143,60 @@ config, output_dir, logger = setup_analysis(
 
     # Analysis-only: do not create figures/tables here (plotting script handles it)
 
-# 2) Load term maps
+# Load Neurosynth meta-analytic term maps for functional interpretation.
+# Same as RSA script: these are z-score maps representing cognitive term associations.
 term_dir = CONFIG['NEUROSYNTH_TERMS_DIR']
 term_maps = load_term_maps(term_dir)
 logger.info(f"Loaded {len(term_maps)} term maps from {term_dir}")
 
-# 3) Discover group-level T maps (only GLM-smooth4/group)
+# Find group-level statistical parametric maps (SPMs) from SPM12 second-level GLMs.
+# These are T-maps representing group contrasts (e.g., Experts > Novices) computed
+# from first-level beta images. We analyze only the smoothed (4mm FWHM) GLM results.
 group_dir = CONFIG['BIDS_SPM_GROUP'] / 'GLM-smooth4' / 'group'
 t_files = find_group_tmaps(group_dir)
 logger.info(f"Found {len(t_files)} group T-map(s) for analysis in {group_dir}")
 
-# 4) Process each T-map: convert to Z, split by sign, save zmap, compute correlations
+# Process each T-map: convert T-statistics to z-scores, split by sign, and correlate
+# with Neurosynth term maps to identify cognitive functions associated with group differences.
 for t_path in t_files:
     if not t_path.name.startswith('spmT_'):
         continue
-    
+
+    # Extract a human-readable label from the filename (e.g., "Experts > Novices")
     run_label = extract_run_label(t_path)
     safe_base = run_label.replace(' > ', '-gt-').replace(' ', '_')
     logger.info(f"Processing: {run_label}")
 
-    # 4a) Load and convert to signed two-tailed z
+    # Load T-map and convert to signed two-tailed z-scores.
+    # T-to-z conversion: for each voxel, compute two-tailed p-value from t-statistic
+    # (df=38 for 40 subjects − 2 groups), convert p to z-score using inverse normal CDF,
+    # and preserve the sign of the original t-statistic. This standardizes effect sizes
+    # and makes them comparable to Neurosynth z-maps.
     t_img = image.load_img(str(t_path))
     t_data = t_img.get_fdata()
     z_map = t_to_two_tailed_z(t_data, dof=DOF)
+
+    # Split z-map by sign to separately characterize regions with expert-enhanced
+    # vs expert-reduced activations. Z+ = positive z-values; Z− = absolute negative z-values.
     z_pos, z_neg = split_zmap_by_sign(z_map)
 
-    # 4b) Save z-map (NIfTI) for plotting script
+    # Save z-map for visualization in plotting scripts
     z_img = image.new_img_like(t_img, z_map)
     z_img.to_filename(str(output_dir / f"zmap_{safe_base}.nii.gz"))
 
-    # 4c) Correlate z+ and z− vs each term map, with bootstrap/FDR
+    # Correlate Z+ and Z− with each Neurosynth term map across voxels.
+    # This identifies which cognitive functions are most strongly associated
+    # with regions showing expertise-related activation differences.
     df_pos, df_neg, df_diff = compute_all_zmap_correlations(
-        z_pos, z_neg, term_maps, ref_img=z_img,
-        n_boot=N_BOOTSTRAPS, fdr_alpha=CONFIG['ALPHA_FDR'], ci_alpha=0.05, random_state=CONFIG['RANDOM_SEED']
+        z_pos, z_neg, term_maps, ref_img=z_img
     )
 
-    # 4d) Reorder rows to canonical term order for consistent outputs
+    # Reorder rows by canonical term order for consistency
     df_pos = reorder_by_term(df_pos)
     df_neg = reorder_by_term(df_neg)
     df_diff = reorder_by_term(df_diff)
 
-    # 4e) Save CSV results (plotting/LaTeX handled in 03_plot_neurosynth.py)
+    # Save per-contrast results as CSVs
     df_pos.to_csv(output_dir / f"{safe_base}_term_corr_positive.csv", index=False)
     df_neg.to_csv(output_dir / f"{safe_base}_term_corr_negative.csv", index=False)
     df_diff.to_csv(output_dir / f"{safe_base}_term_corr_difference.csv", index=False)

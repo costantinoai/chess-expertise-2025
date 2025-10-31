@@ -21,11 +21,21 @@ def t_to_two_tailed_z(t_map: np.ndarray, dof: int) -> np.ndarray:
     """
     Convert a t-map to a signed two-tailed z-map, retaining original sign.
     """
+    # Take absolute value for two-tailed testing (we want magnitude, not direction yet)
     t_abs = np.abs(t_map)
+
+    # Compute two-tailed p-value: P(|T| > |t_obs|) = 2 * P(T > |t_obs|)
+    # sf() is the survival function: P(X > x) = 1 - CDF(x), more accurate for tail probabilities
     p_two = 2 * _t.sf(t_abs, df=int(dof))
+
+    # Convert two-tailed p-value back to z-score using inverse survival function.
+    # isf(p/2) gives the z-value where P(|Z| > z) = p (two-tailed)
+    # This standardizes effect sizes from t-distribution to standard normal distribution.
     z_abs = _norm.isf(p_two / 2)
+
+    # Restore original sign: positive t → positive z, negative t → negative z
     z = np.sign(t_map) * z_abs
-    z[t_abs == 0] = 0.0
+    z[t_abs == 0] = 0.0  # Handle exactly zero values explicitly
     return z
 
 
@@ -39,59 +49,45 @@ def split_zmap_by_sign(z_map: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return z_pos, z_neg
 
 
-def bootstrap_corr_diff(
-    term_vec: np.ndarray,
-    x_vec: np.ndarray,
-    y_vec: np.ndarray,
-    n_boot: int,
-    rng: np.random.Generator,
-    ci_alpha: float,
-) -> Tuple[float, float, float, float]:
-    """
-    Bootstrap Δr = r(term, x) − r(term, y) with percentile CI and two-sided p.
-    """
-    n = term_vec.shape[0]
-    seeds = rng.integers(0, 2**32 - 1, size=int(n_boot))
-    diffs = np.empty(int(n_boot), dtype=float)
-    for i, s in enumerate(seeds):
-        sub_rng = np.random.default_rng(int(s))
-        idx = sub_rng.integers(0, n, size=n)
-        r_pos = np.corrcoef(term_vec[idx], x_vec[idx])[0, 1]
-        r_neg = np.corrcoef(term_vec[idx], y_vec[idx])[0, 1]
-        diffs[i] = r_pos - r_neg
-
-    diffs.sort()
-    lo = float(np.percentile(diffs, 100 * ci_alpha / 2))
-    hi = float(np.percentile(diffs, 100 * (1 - ci_alpha / 2)))
-    mean_diff = float(np.mean(diffs))
-    # two-sided around 0
-    p_low = float(np.mean(diffs <= 0))
-    p_high = float(np.mean(diffs >= 0))
-    p_val = 2 * min(p_low, p_high)
-    return mean_diff, lo, hi, float(p_val)
-
-
 def compute_all_zmap_correlations(
     z_pos: np.ndarray,
     z_neg: np.ndarray,
     term_maps: Dict[str, str],
     ref_img,
-    n_boot: int = 10000,
-    fdr_alpha: float = 0.05,
-    ci_alpha: float = 0.05,
-    random_state: int = 42,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Correlate directional z-maps (pos/neg) with term maps and estimate Δr.
+    Correlate directional z-maps (pos/neg) with Neurosynth term maps.
 
-    Returns three DataFrames: df_pos, df_neg, df_diff with FDR columns.
+    For each term map, compute:
+    - r_pos: correlation between term map and Z+ (expert-enhanced regions)
+    - r_neg: correlation between term map and Z− (expert-reduced regions)
+    - r_diff: difference (r_pos - r_neg)
+
+    Parameters
+    ----------
+    z_pos : np.ndarray
+        3D array of positive z-values (zeros elsewhere)
+    z_neg : np.ndarray
+        3D array of absolute negative z-values (zeros elsewhere)
+    term_maps : dict
+        Dictionary mapping term names to file paths
+    ref_img : Nifti1Image
+        Reference image for resampling term maps
+
+    Returns
+    -------
+    df_pos : pd.DataFrame
+        Columns: term, r
+    df_neg : pd.DataFrame
+        Columns: term, r
+    df_diff : pd.DataFrame
+        Columns: term, r_pos, r_neg, r_diff
     """
-    rng = np.random.default_rng(int(random_state))
-
-    # Build flat GM mask in ref space
+    # Build gray matter mask to restrict analysis to brain voxels
     gm_mask = get_gray_matter_mask(ref_img)
     mask_flat = gm_mask.get_fdata().ravel().astype(bool)
 
+    # Flatten 3D maps to 1D vectors for correlation
     flat_pos = z_pos.ravel()
     flat_neg = z_neg.ravel()
 
@@ -100,35 +96,38 @@ def compute_all_zmap_correlations(
     rec_diff = []
 
     for term, path in term_maps.items():
-        term_img = image.resample_to_img(image.load_img(str(path)), ref_img, force_resample=True, copy_header=True)
+        # Load and resample term map to match reference image geometry
+        term_img = image.resample_to_img(
+            image.load_img(str(path)), ref_img,
+            force_resample=True, copy_header=True
+        )
         flat_t = term_img.get_fdata().ravel()
 
-        # Clean voxels across the three vectors
+        # Clean voxels: remove NaNs, zero-variance voxels, and apply gray matter mask.
+        # This ensures we only correlate across valid brain voxels with non-zero values.
         stacked = np.vstack([flat_pos, flat_neg, flat_t])
-        stacked_clean, keep = clean_voxels(stacked, brain_mask_flat=mask_flat, var_thresh=1e-5)
+        stacked_clean, keep = clean_voxels(
+            stacked, brain_mask_flat=mask_flat, var_thresh=1e-5
+        )
         x, y, t = stacked_clean
 
-        # POS
-        r_pos, p_pos, ci_lo_pos, ci_hi_pos = correlate_vectors_bootstrap(t, x, method='pearson', n_bootstraps=n_boot)
-        rec_pos.append((term, r_pos, ci_lo_pos, ci_hi_pos, p_pos))
+        # Compute Pearson correlations between term map and Z+/Z− maps
+        # np.corrcoef returns 2×2 correlation matrix; [0,1] extracts r between vectors
+        r_pos = float(np.corrcoef(t, x)[0, 1])
+        r_neg = float(np.corrcoef(t, y)[0, 1])
 
-        # NEG
-        r_neg, p_neg, ci_lo_neg, ci_hi_neg = correlate_vectors_bootstrap(t, y, method='pearson', n_bootstraps=n_boot)
-        rec_neg.append((term, r_neg, ci_lo_neg, ci_hi_neg, p_neg))
+        # Compute difference: r_pos - r_neg
+        # Positive r_diff means term is more associated with expert-enhanced regions
+        # Negative r_diff means term is more associated with expert-reduced regions
+        r_diff = r_pos - r_neg
 
-        # DIFF
-        diff, lo, hi, p_diff = bootstrap_corr_diff(t, x, y, n_boot=n_boot, rng=rng, ci_alpha=ci_alpha)
-        rec_diff.append((term, r_pos, r_neg, diff, lo, hi, p_diff))
+        rec_pos.append((term, r_pos))
+        rec_neg.append((term, r_neg))
+        rec_diff.append((term, r_pos, r_neg, r_diff))
 
-    df_pos = pd.DataFrame(rec_pos, columns=['term', 'r', 'CI_low', 'CI_high', 'p_raw'])
-    df_neg = pd.DataFrame(rec_neg, columns=['term', 'r', 'CI_low', 'CI_high', 'p_raw'])
-    df_diff = pd.DataFrame(rec_diff, columns=['term', 'r_pos', 'r_neg', 'r_diff', 'CI_low', 'CI_high', 'p_raw'])
-
-    # FDR per table
-    for df in (df_pos, df_neg, df_diff):
-        rej, p_fdr = apply_fdr_correction(df['p_raw'].values, alpha=fdr_alpha)
-        df['p_fdr'] = p_fdr
-        df['sig'] = rej
+    df_pos = pd.DataFrame(rec_pos, columns=['term', 'r'])
+    df_neg = pd.DataFrame(rec_neg, columns=['term', 'r'])
+    df_diff = pd.DataFrame(rec_diff, columns=['term', 'r_pos', 'r_neg', 'r_diff'])
 
     return df_pos, df_neg, df_diff
 

@@ -32,7 +32,7 @@ pylustrator.start()
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from nilearn import image, surface, datasets
+from nilearn import image
 
 from common.plotting import (
     apply_nature_rc,
@@ -42,6 +42,9 @@ from common.plotting import (
     COLORS_EXPERT_NOVICE,
     save_axes_svgs,
     save_panel_svg,
+    save_axes_pdfs,
+    save_panel_pdf,
+    compute_surface_symmetric_range,
 )
 from modules.plot_utils import (
     plot_correlations_on_ax,
@@ -115,28 +118,8 @@ plot_differences_on_ax(ax_A2, df_diff_all, title='ΔCorrelation (pos − neg) (A
 ax_B2 = plt.axes(); ax_B2.set_label('B2_Diff_Check_gt_NoCheck')
 plot_differences_on_ax(ax_B2, df_diff_chk, title='ΔCorrelation (pos − neg) (Check > No-Check)')
 
-# Compute symmetric surface range shared across univariate maps
-try:
-    fsavg = datasets.fetch_surf_fsaverage()
-    def _absmax_surface(zimg):
-        texl = surface.vol_to_surf(zimg, fsavg.pial_left)
-        texr = surface.vol_to_surf(zimg, fsavg.pial_right)
-        return float(np.nanmax(np.abs(np.concatenate([texl, texr]))))
-    vmax_univ = 0.0
-    for stem in [stem_all, stem_check]:
-        z_img = image.load_img(str(RESULTS_DIR / f"zmap_{stem}.nii.gz"))
-        vmax_univ = max(vmax_univ, _absmax_surface(z_img))
-    vmin_univ = -vmax_univ
-except Exception:
-    # Fallback: compute from volume values
-    def _absmax_volume(zimg):
-        arr = zimg.get_fdata()
-        return float(np.nanmax(np.abs(arr)))
-    vmax_univ = 0.0
-    for stem in [stem_all, stem_check]:
-        z_img = image.load_img(str(RESULTS_DIR / f"zmap_{stem}.nii.gz"))
-        vmax_univ = max(vmax_univ, _absmax_volume(z_img))
-    vmin_univ = -vmax_univ
+z_all = [image.load_img(str(RESULTS_DIR / f"zmap_{stem}.nii.gz")) for stem in [stem_all, stem_check]]
+vmin_univ, vmax_univ = compute_surface_symmetric_range(z_all)
 
 # Flat surfaces (left+right pair embedded)
 ax_C = plt.axes(); ax_C.set_label('C_Flat_All_gt_Rest')
@@ -188,9 +171,11 @@ plt.figure(1).text(0.7289, 0.5143, 'Checkmate > Non-checkmate', transform=plt.fi
 #% end: automatic generated code from pylustrator
 plt.show()
 
-# Save each axis separately first, then full panel
+# Save each axis separately first, then full panel (SVG + PDF)
 fig = plt.gcf()
 save_axes_svgs(fig, FIGURES_DIR, 'neurosynth_univariate')
+save_axes_pdfs(fig, FIGURES_DIR, 'neurosynth_univariate')
 save_panel_svg(fig, FIGURES_DIR / 'panels' / 'neurosynth_univariate_panel.svg')
+save_panel_pdf(fig, FIGURES_DIR / 'panels' / 'neurosynth_univariate_panel.pdf')
 
 log_script_end(logger)
