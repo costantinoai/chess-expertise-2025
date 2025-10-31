@@ -112,6 +112,8 @@ with open(RESULTS_DIR / "correlation_results.pkl", "rb") as f:
     correlation_results = pickle.load(f)
 expert_corrs = correlation_results["expert"]
 novice_corrs = correlation_results["novice"]
+exp_p_fdr_map = correlation_results.get("expert_p_fdr")
+nov_p_fdr_map = correlation_results.get("novice_p_fdr")
 
 stimuli_df = load_stimulus_metadata()
 strat_colors, strat_alphas = compute_stimulus_palette(stimuli_df)
@@ -279,11 +281,18 @@ ax_D = plt.axes(); ax_D.set_label('D_RSA_Models')
 # Extract and reorder correlations to MODEL_ORDER
 r_exp = [res[1] for res in expert_corrs]
 ci_exp = [(res[3], res[4]) for res in expert_corrs]
-p_exp = [res[2] for res in expert_corrs]
+# Prefer FDR-corrected p-values if available
+if isinstance(exp_p_fdr_map, dict):
+    p_exp = [exp_p_fdr_map.get(res[0], res[2]) for res in expert_corrs]
+else:
+    p_exp = [res[2] for res in expert_corrs]
 
 r_nov = [res[1] for res in novice_corrs]
 ci_nov = [(res[3], res[4]) for res in novice_corrs]
-p_nov = [res[2] for res in novice_corrs]
+if isinstance(nov_p_fdr_map, dict):
+    p_nov = [nov_p_fdr_map.get(res[0], res[2]) for res in novice_corrs]
+else:
+    p_nov = [res[2] for res in novice_corrs]
 
 column_labels = [res[0] for res in expert_corrs]
 idx_order = [column_labels.index(lbl) for lbl in MODEL_ORDER]

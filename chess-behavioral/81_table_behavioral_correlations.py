@@ -50,18 +50,22 @@ with open(RESULTS_DIR / 'correlation_results.pkl', 'rb') as f:
 expert = corr['expert']
 novice = corr['novice']
 model_columns = corr.get('model_columns', CONFIG.get('MODEL_COLUMNS', []))
+exp_p_fdr = corr.get('expert_p_fdr', {})
+nov_p_fdr = corr.get('novice_p_fdr', {})
 
 # Build DataFrame rows
 df = create_correlation_table(
     expert_results=expert,
     novice_results=novice,
     model_labels=MODEL_LABELS,
+    exp_p_fdr=exp_p_fdr,
+    nov_p_fdr=nov_p_fdr,
 )
 
 # Multicolumn headers mapping
 multicolumn = {
-    'Experts': ['r_Experts', '95%_CI_Experts', 'p_Experts'],
-    'Novices': ['r_Novices', '95%_CI_Novices', 'p_Novices'],
+    'Experts': ['r_Experts', '95%_CI_Experts', 'p_Experts', 'pFDR_Experts'],
+    'Novices': ['r_Novices', '95%_CI_Novices', 'p_Novices', 'pFDR_Novices'],
 }
 
 tables_dir.mkdir(parents=True, exist_ok=True)
@@ -70,7 +74,7 @@ tex_path = generate_latex_table(
     output_path=tables_dir / 'behavioral_rsa_correlations.tex',
     caption='Behavioral-model RSA correlations (Experts vs Novices).',
     label='tab:behavioral_rsa_correlations',
-    column_format='lccc|ccc',
+    column_format='lcccc|cccc',
     multicolumn_headers=multicolumn,
     escape=False,
     logger=logger,
@@ -82,4 +86,3 @@ logger.info(f"Saved CSV table: {csv_path}")
 
 log_script_end(logger)
 logger.info(f"LaTeX table written to: {tex_path}")
-
