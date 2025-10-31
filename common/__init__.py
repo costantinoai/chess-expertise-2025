@@ -49,6 +49,8 @@ from .plotting import (
     sanitize_label_to_filename,
     save_axes_svgs,
     save_panel_svg,
+    save_axes_pdfs,
+    save_panel_pdf,
     format_roi_labels_and_colors,
     # Titles
     set_axis_title,
@@ -131,6 +133,8 @@ __all__ = [
     'sanitize_label_to_filename',
     'save_axes_svgs',
     'save_panel_svg',
+    'save_axes_pdfs',
+    'save_panel_pdf',
     'format_roi_labels_and_colors',
     # Plotting - Titles
     'set_axis_title',
