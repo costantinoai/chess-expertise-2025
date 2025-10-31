@@ -25,8 +25,8 @@ function run_subject_glm(subPath, subName, selectedTasks, selectedRuns, ...
             continue;
         end
 
-        % Output path
-        outPath = fullfile(outRoot, 'GLM', subName, selectedTask);
+        % Output path (BIDS-like): <DERIVATIVES>/spm-glm/<smooth4|unsmoothed>/<sub-xx>/<task>
+        outPath = fullfile(outRoot, subName, selectedTask);
         if ~exist(outPath, 'dir'), mkdir(outPath); end
         fprintf('############################### \n# STEP: running %s - %s #\n############################### \n', subName, selectedTask)
 
@@ -107,7 +107,8 @@ function run_subject_glm(subPath, subName, selectedTasks, selectedRuns, ...
 
             % Optional smoothing
             if smoothBool
-                niiFileString = smoothNiftiFile(niiFileString, fullfile(tempDir, 'smoothed', subName));
+                % Smooth functional image at first level using 4 mm FWHM by default
+                niiFileString = smoothNiftiFile(niiFileString, fullfile(tempDir, 'smoothed', subName), [4 4 4]);
             else
                 fprintf('SMOOTH: smoothBool=false; skipping smoothing for this task.\n')
             end
@@ -201,4 +202,3 @@ function events = bids_events_to_conditions(tbl)
         events.durations{i} = tbl.duration(mask);
     end
 end
-

@@ -44,13 +44,12 @@ defaultBids  = '/data/projects/chess/data/BIDS';
 DERIVATIVES  = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
 BIDS_ROOT    = getenv_default('CHESS_BIDS_ROOT',        defaultBids);
 SPACE        = getenv_default('CHESS_GLM_SPACE', 'MNI');
-SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '6'));
+SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '4'));
 
-glmRoot = fullfile(DERIVATIVES, sprintf('fmriprep-SPM_smoothed-%d_GS-FD-HMP_brainmasked', SMOOTH_MM), ...
-                   SPACE, sprintf('fmriprep-SPM-%s', SPACE), 'GLM');
+% First-level GLM root (BIDS-like): derivatives/SPM/smooth<MM>
+glmRoot = fullfile(DERIVATIVES, 'SPM', sprintf('smooth%d', SMOOTH_MM));
 
-SMOOTH_SECOND_LEVEL = strcmp(getenv_default('CHESS_GLM_2ND_SMOOTH', '0'), '1');
-SECOND_FWHM = [6 6 6];
+% No second-level smoothing; group analyses run on first-level smoothed (4mm) contrasts
 
 CONTRAST_FILES = {'con_0001.nii', 'con_0002.nii'};
 
@@ -69,14 +68,11 @@ for c = 1:numel(CONTRAST_FILES)
     contrastFile = CONTRAST_FILES{c};
     [~, cbase, ~] = fileparts(contrastFile);
 
-    outDir = fullfile(glmRoot, ['2ndLevel_ExpVsNonExp_' cbase]);
-    if SMOOTH_SECOND_LEVEL
-        outDir = [outDir filesep 'smoothed']; %#ok<AGROW>
-    end
+    outDir = fullfile(glmRoot, 'group', ['ExpVsNonExp_' cbase]);
     if ~exist(outDir,'dir'), mkdir(outDir); end
 
-    expScans = collect_contrast_paths(glmRoot, experts, contrastFile, SMOOTH_SECOND_LEVEL, SECOND_FWHM);
-    novScans = collect_contrast_paths(glmRoot, novices, contrastFile, SMOOTH_SECOND_LEVEL, SECOND_FWHM);
+    expScans = collect_contrast_paths(glmRoot, experts, contrastFile, false);
+    novScans = collect_contrast_paths(glmRoot, novices, contrastFile, false);
 
     matlabbatch = {};
     matlabbatch{1}.spm.stats.factorial_design.dir = {outDir};

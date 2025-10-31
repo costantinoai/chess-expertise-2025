@@ -46,15 +46,12 @@ defaultBids  = '/data/projects/chess/data/BIDS';
 DERIVATIVES  = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
 BIDS_ROOT    = getenv_default('CHESS_BIDS_ROOT',        defaultBids);
 SPACE        = getenv_default('CHESS_GLM_SPACE', 'MNI');
-SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '6'));
+SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '4'));
 
-% First-level GLM root (same as in 01 script)
-glmRoot = fullfile(DERIVATIVES, sprintf('fmriprep-SPM_smoothed-%d_GS-FD-HMP_brainmasked', SMOOTH_MM), ...
-                   SPACE, sprintf('fmriprep-SPM-%s', SPACE), 'GLM');
+% First-level GLM root (BIDS-like): derivatives/SPM/smooth<MM>
+glmRoot = fullfile(DERIVATIVES, 'SPM', sprintf('smooth%d', SMOOTH_MM));
 
-% Second-level smoothing of subject contrast images (applied to con_*.nii)
-SMOOTH_SECOND_LEVEL = strcmp(getenv_default('CHESS_GLM_2ND_SMOOTH', '0'), '1');
-SECOND_FWHM = [6 6 6];
+% No second-level smoothing; group analyses run on first-level smoothed (4mm) contrasts
 
 % Contrasts to process
 CONTRAST_FILES = {'con_0001.nii', 'con_0002.nii'};
@@ -76,17 +73,13 @@ for c = 1:numel(CONTRAST_FILES)
     [~, cbase, ~] = fileparts(contrastFile);
 
     % Output folders
-    outExp = fullfile(glmRoot, ['2ndLevel_Experts_' cbase]);
-    outNov = fullfile(glmRoot, ['2ndLevel_NonExperts_' cbase]);
-    if SMOOTH_SECOND_LEVEL
-        outExp = [outExp filesep 'smoothed']; %#ok<AGROW>
-        outNov = [outNov filesep 'smoothed']; %#ok<AGROW>
-    end
+    outExp = fullfile(glmRoot, 'group', ['Experts_' cbase]);
+    outNov = fullfile(glmRoot, 'group', ['NonExperts_' cbase]);
     if ~exist(outExp,'dir'), mkdir(outExp); end
     if ~exist(outNov,'dir'), mkdir(outNov); end
 
     %% Experts 1-sample t-test
-    expertScans = collect_contrast_paths(glmRoot, experts, contrastFile, SMOOTH_SECOND_LEVEL, SECOND_FWHM);
+    expertScans = collect_contrast_paths(glmRoot, experts, contrastFile, false);
 
     matlabbatch = {};
     matlabbatch{1}.spm.stats.factorial_design.dir = {outExp};
@@ -114,7 +107,7 @@ for c = 1:numel(CONTRAST_FILES)
     fprintf('[INFO] Experts 1-sample done for %s\n', cbase);
 
     %% Novices 1-sample t-test
-    noviceScans = collect_contrast_paths(glmRoot, novices, contrastFile, SMOOTH_SECOND_LEVEL, SECOND_FWHM);
+    noviceScans = collect_contrast_paths(glmRoot, novices, contrastFile, false);
 
     matlabbatch = {};
     matlabbatch{1}.spm.stats.factorial_design.dir = {outNov};

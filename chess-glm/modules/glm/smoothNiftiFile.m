@@ -1,14 +1,17 @@
-function newFilePath = smoothNiftiFile(niiFile, outPath)
-    % smoothNiftiFile - Smooth a .nii file with 6mm FWHM and save to temp.
+function newFilePath = smoothNiftiFile(niiFile, outPath, fwhm)
+    % smoothNiftiFile - Smooth a .nii file with given FWHM and save to temp.
 
     [niiFolder, niiName, niiExt] = fileparts(niiFile);
     subAndTask = split(niiName, "_"); %#ok<NASGU>
 
-    if nargin < 2
+    if nargin < 2 || isempty(outPath)
         splitPath = strsplit(niiFile, '/');
         idx = find(contains(splitPath, 'BIDS'));
         bidsPath = strjoin(splitPath(1:idx), '/');
         outPath = fullfile(bidsPath, 'derivatives', 'SPM', 'smoothed');
+    end
+    if nargin < 3 || isempty(fwhm)
+        fwhm = [4 4 4]; % Default to 4 mm per manuscript
     end
 
     if exist(outPath, 'dir') ~= 7, mkdir(outPath); end
@@ -20,7 +23,7 @@ function newFilePath = smoothNiftiFile(niiFile, outPath)
         fprintf('SMOOTH: exists %s\n', newFilePath);
     else
         matlabbatch{1}.spm.spatial.smooth.data  = {niiFile};
-        matlabbatch{1}.spm.spatial.smooth.fwhm  = [6 6 6];
+        matlabbatch{1}.spm.spatial.smooth.fwhm  = fwhm;
         matlabbatch{1}.spm.spatial.smooth.dtype = 0;
         matlabbatch{1}.spm.spatial.smooth.im    = 0;
         matlabbatch{1}.spm.spatial.smooth.prefix= 'smooth_';
@@ -32,4 +35,3 @@ function newFilePath = smoothNiftiFile(niiFile, outPath)
         fprintf('SMOOTH: written %s\n', newFilePath);
     end
 end
-

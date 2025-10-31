@@ -55,14 +55,16 @@ defaultBids  = '/data/projects/chess/data/BIDS';
 DERIVATIVES  = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
 BIDS_ROOT    = getenv_default('CHESS_BIDS_ROOT',        defaultBids);
 
-% Space and smoothing
+% Space and smoothing (default 4 mm per manuscript)
 SPACE        = getenv_default('CHESS_GLM_SPACE', 'MNI');          % 'MNI' or 'T1w'
-SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '6')); % e.g., 6
+SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '4'));
 
-% fMRIPrep root and output root
+% fMRIPrep root and output roots (BIDS-like derivatives)
 fmriprepRoot = fullfile(DERIVATIVES, 'fmriprep');
-outRoot      = fullfile(DERIVATIVES, sprintf('fmriprep-SPM_smoothed-%d_GS-FD-HMP_brainmasked', SMOOTH_MM), ...
-                        SPACE, sprintf('fmriprep-SPM-%s', SPACE));
+glmBase      = fullfile(DERIVATIVES, 'SPM');
+% Separate output roots for unsmoothed and smoothed (4 mm) first-level GLMs
+outRootUns   = fullfile(glmBase, 'unsmoothed');
+outRootSm4   = fullfile(glmBase, sprintf('smooth%d', SMOOTH_MM));
 tempDir      = fullfile(DERIVATIVES, 'fmriprep-preSPM');
 
 % Subject selection and runs
@@ -70,11 +72,13 @@ selectedSubjectsList = '*';   % list of integers or '*'
 selectedRuns         = '*';   % integer or '*'
 
 % Task and autocontrasts (wildcard mapping)
-selectedTasks(1).name = 'exp';
-selectedTasks(1).contrasts = {'Check > No-Check', 'All > Rest'};
-selectedTasks(1).weights(1) = struct('C_WILDCARD___WILDCARD_', 1, 'NC_WILDCARD___WILDCARD_', -1);
-selectedTasks(1).weights(2) = struct('C_WILDCARD___WILDCARD_', 1, 'NC_WILDCARD___WILDCARD_', 1);
-selectedTasks(1).smoothBool = true; % smooth inputs before GLM
+baseTask(1).name = 'exp';
+baseTask(1).contrasts = {'Check > No-Check', 'All > Rest'};
+baseTask(1).weights(1) = struct('C_WILDCARD___WILDCARD_', 1, 'NC_WILDCARD___WILDCARD_', -1);
+baseTask(1).weights(2) = struct('C_WILDCARD___WILDCARD_', 1, 'NC_WILDCARD___WILDCARD_', 1);
+% Two passes: smoothed (4 mm) and unsmoothed
+selectedTasksSm = baseTask; selectedTasksSm(1).smoothBool = true;
+selectedTasksUn = baseTask; selectedTasksUn(1).smoothBool = false;
 
 % Confound regression pipeline
 % Options include: HMP-[6|12|24], GS-[1|2|4], CSF_WM-[2|4|8], aCompCor-[10|50],
@@ -87,7 +91,7 @@ thresholds = {};  % no overlays in 01_*
 
 fprintf('[INFO] fMRIPrep root: %s\n', fmriprepRoot);
 fprintf('[INFO] BIDS root:     %s\n', BIDS_ROOT);
-fprintf('[INFO] Output root:   %s\n', outRoot);
+fprintf('[INFO] GLM roots:     %s (unsmoothed), %s (smoothed %dmm)\n', outRootUns, outRootSm4, SMOOTH_MM);
 
 %% --------------------------- Paths for helpers ---------------------------
 thisDir = fileparts(mfilename('fullpath'));
@@ -104,13 +108,19 @@ canParallel = license('test','Distrib_Computing_Toolbox') == 1;
 
 if canParallel
     parfor i = 1:length(sub_paths)
-        run_subject_glm(sub_paths(i).folder, sub_paths(i).name, selectedTasks, selectedRuns, ...
-            fmriprepRoot, BIDS_ROOT, outRoot, tempDir, pipeline, SPACE, thresholds);
+        % Smoothed (4 mm) first-level GLM
+        run_subject_glm(sub_paths(i).folder, sub_paths(i).name, selectedTasksSm, selectedRuns, ...
+            fmriprepRoot, BIDS_ROOT, outRootSm4, tempDir, pipeline, SPACE, thresholds);
+        % UnsMoothed first-level GLM
+        run_subject_glm(sub_paths(i).folder, sub_paths(i).name, selectedTasksUn, selectedRuns, ...
+            fmriprepRoot, BIDS_ROOT, outRootUns, tempDir, pipeline, SPACE, thresholds);
     end
 else
     for i = 1:length(sub_paths)
-        run_subject_glm(sub_paths(i).folder, sub_paths(i).name, selectedTasks, selectedRuns, ...
-            fmriprepRoot, BIDS_ROOT, outRoot, tempDir, pipeline, SPACE, thresholds);
+        run_subject_glm(sub_paths(i).folder, sub_paths(i).name, selectedTasksSm, selectedRuns, ...
+            fmriprepRoot, BIDS_ROOT, outRootSm4, tempDir, pipeline, SPACE, thresholds);
+        run_subject_glm(sub_paths(i).folder, sub_paths(i).name, selectedTasksUn, selectedRuns, ...
+            fmriprepRoot, BIDS_ROOT, outRootUns, tempDir, pipeline, SPACE, thresholds);
     end
 end
 
@@ -128,4 +138,3 @@ function v = str2double_safe(s)
     v = str2double(s);
     if isnan(v), v = 0; end
 end
-
