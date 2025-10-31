@@ -31,7 +31,7 @@ def extract_mvpa_bar_data(
     roi_info : DataFrame
         ROI metadata table consumed by format_roi_labels_and_colors
     targets : list[str]
-        Target names to extract (e.g., ['visualStimuli','categories','checkmate'])
+        Target names to extract (e.g., ['visual_similarity','strategy','checkmate'])
     method : {'rsa_corr','svm'}
         Which method block to read from group_stats
     subtract_chance : bool, default=False

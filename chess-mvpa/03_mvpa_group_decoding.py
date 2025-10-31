@@ -20,8 +20,9 @@ Subject-level decoding accuracies were computed using linear support vector
 machines (SVMs) trained and tested on trial-wise beta estimates extracted
 from 22 bilateral cortical regions (Glasser multimodal parcellation). Subject-
 level analyses were performed separately for each classification target and
-each ROI. Results are stored as TSV files in BIDS/derivatives/mvpa/svm/, with
-one row per subject and one column per ROI.
+each ROI. Results are stored as TSV files in BIDS/derivatives/mvpa-decoding/,
+with one file per subject following BIDS-like naming:
+sub-XX_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv.
 
 Participants: N=40 (20 experts, 20 novices).
 Stimuli: 40 chess board positions (20 check, 20 non-check).
@@ -130,10 +131,7 @@ from modules.mvpa_group import (
 # Configuration
 # -----------------------------------------------------------------------------
 
-# Specify which MVPA run to analyze. If None, automatically use the most recent
-# Glasser-22 bilateral analysis (timestamped directories). This allows rerunning
-# the analysis on different preprocessing versions without code changes.
-MVPA_DIR_NAME = None
+# No configuration needed - MVPA decoding data location is defined in constants.py
 
 
 # -----------------------------------------------------------------------------
@@ -146,10 +144,12 @@ config, out_dir, logger = setup_analysis(
     script_file=__file__,
 )
 
-# Locate the subject-level MVPA results directory. Subject-level SVM decoding was
+# Locate the subject-level MVPA decoding results directory. Subject-level SVM decoding was
 # performed in MATLAB; this script reads those results and performs group statistics.
-mvpa_dir = resolve_latest_dir(CONFIG["BIDS_MVPA"], pattern="*_glasser_cortices_bilateral", specific_name=MVPA_DIR_NAME)
-logger.info(f"Using MVPA source: {mvpa_dir}")
+decoding_dir = CONFIG["BIDS_MVPA_DECODING"]
+if not decoding_dir.exists():
+    raise FileNotFoundError(f"Missing MVPA decoding directory: {decoding_dir}")
+logger.info(f"Using MVPA decoding source: {decoding_dir}")
 
 # Load participant list with expertise labels (expert=True/False) for group assignment
 participants, (n_exp, n_nov) = get_participants_with_expertise(
@@ -163,21 +163,15 @@ default_roi_names, _ = get_roi_names_and_colors(CONFIG["ROI_GLASSER_22"])
 
 artifact_index = {}
 
-# Process SVM decoding results (linear SVMs with L2 regularization, C=1.0)
-method = "svm"
-method_dir = mvpa_dir / method
-if not method_dir.exists():
-    raise FileNotFoundError(f"Missing method directory: {method_dir}")
-
 # Find all subject-level TSV files (one per subject, containing accuracies for all ROIs)
-files = find_subject_tsvs(method_dir)
-logger.info(f"[{method}] Found {len(files)} subject TSVs")
+files = find_subject_tsvs(decoding_dir)
+logger.info(f"Found {len(files)} subject TSVs in {decoding_dir.name}")
 
 # Load subject TSVs and consolidate into a single DataFrame with columns:
 # subject, expert (bool), target (classification task), and one column per ROI (accuracy).
 # Each row = one subject × one target combination.
 df = build_group_dataframe(files, participants, default_roi_names)
-roi_names = [c for c in df.columns if c not in ["subject", "expert", "target"]]
+roi_names = [c for c in df.columns if c not in ["participant_id", "expert", "target"]]
 
 # Determine chance-level accuracy for each classification target based on stimulus design.
 # Binary tasks (e.g., check vs non-check) have chance=0.5. Multi-class tasks have chance=1/n_classes.
@@ -233,9 +227,9 @@ for tgt in targets:
 # Save results as human-readable CSVs (one per target per test type) for inspection
 # and as pickle files for downstream plotting scripts.
 for tgt, blocks in method_results.items():
-    write_group_stats_outputs(out_dir, method, tgt, blocks)
+    write_group_stats_outputs(out_dir, "svm", tgt, blocks)
 
-artifact_index[method] = method_results
+artifact_index["svm"] = method_results
 
 with open(out_dir / "mvpa_group_stats.pkl", "wb") as f:
     pickle.dump(artifact_index, f)

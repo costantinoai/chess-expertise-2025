@@ -53,10 +53,10 @@ from modules.mvpa_plot_utils import extract_mvpa_bar_data
 RESULTS_DIR_NAME = None
 RESULTS_BASE = script_dir / "results"
 
-MAIN_TARGETS = ['visualStimuli', 'categories', 'checkmate']
+MAIN_TARGETS = ['visual_similarity', 'strategy', 'checkmate']
 SVM_TITLES = {
-    'visualStimuli': 'Visual Similarity Decoding',
-    'categories': 'Strategy Decoding',
+    'visual_similarity': 'Visual Similarity Decoding',
+    'strategy': 'Strategy Decoding',
     'checkmate': 'Checkmate Decoding',
 }
 
@@ -145,8 +145,8 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).ax_dict["SVM_1_visualStimuli"].set(position=[0.044, 0.7789, 0.4626, 0.1855])
-plt.figure(1).ax_dict["SVM_2_categories"].set(position=[0.044, 0.4513, 0.4626, 0.1855])
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].set(position=[0.044, 0.7789, 0.4626, 0.1855])
+plt.figure(1).ax_dict["SVM_2_strategy"].set(position=[0.044, 0.4513, 0.4626, 0.1855])
 plt.figure(1).ax_dict["SVM_3_checkmate"].set(position=[0.044, 0.1236, 0.4626, 0.1855])
 #% end: automatic generated code from pylustrator
 plt.show()

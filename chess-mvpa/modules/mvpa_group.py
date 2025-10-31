@@ -170,7 +170,7 @@ def split_data_by_target_and_group(
     df : pd.DataFrame
         Group dataframe with columns: subject, expert (bool), target, and ROI columns
     target : str
-        Target name to filter (e.g., 'checkmate', 'categories')
+        Target name to filter (e.g., 'checkmate', 'strategy')
     roi_names : list of str
         ROI column names to extract
 

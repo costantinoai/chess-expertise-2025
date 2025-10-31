@@ -2,17 +2,20 @@
 %% ROI-based Decoding and RSA (CoSMoMVPA)
 %%
 %% Purpose
-%% - Per-subject ROI decoding (SVM) and ROI RSA correlations for the 3 main
-%%   dimensions used throughout the repository:
+%% - Per-subject ROI decoding (SVM) and ROI RSA correlations for the main
+%%   dimensions (using all 40 boards):
 %%     1) checkmate (binary: checkmate vs non-checkmate)
-%%     2) visualStimuli (20-class: merged visual identity ignoring '(nomate)')
-%%     3) categories (multi-class across all 40 boards; keep original labels)
+%%     2) visual_similarity (20-class: merged visual identity ignoring '(nomate)')
+%%     3) strategy (multi-class across all 40 boards; keep original labels)
 %%
 %% Output
 %% - Subject-level TSV files saved under:
-%%     <BIDS_DERIVATIVES>/mvpa/<timestamp>_glasser_regions_bilateral/
-%%       ├── svm/sub-XX/mvpa_cv.tsv          (decoding accuracy per ROI per target)
-%%       └── rsa_corr/sub-XX/rsa_corr.tsv    (RSA r-values per ROI per model)
+%%     <BIDS_DERIVATIVES>/
+%%       ├── mvpa-decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv
+%%       └── mvpa-rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv
+%% - Each file contains multiple target rows (one row per target dimension)
+%% - Fine-grained targets (from supplementary/mvpa-finer) appear as additional rows
+%%   with "_half" suffix (using only 20 checkmate boards)
 %%
 %% Notes
 %% - This script preserves the original analysis logic from old-implementation
@@ -44,13 +47,11 @@ roiTSV = getenv_default('CHESS_ROI_TSV_22', ...
     fullfile(derivativesDir, 'rois', 'glasser22', 'region_info.tsv'));
 
 % Output root
-ts = datestr(now, 'yyyymmdd-HHMMSS');
-outRoot = fullfile(derivativesDir, 'mvpa', [ts, '_glasser_regions_bilateral']);
-outRootSVM = fullfile(outRoot, 'svm');
-outRootRSACorr = fullfile(outRoot, 'rsa_corr');
+outRootSVM = fullfile(derivativesDir, 'mvpa-decoding');
+outRootRSACorr = fullfile(derivativesDir, 'mvpa-rsa');
 mkdir_p(outRootSVM); mkdir_p(outRootRSACorr);
 
-fprintf('[INFO] Outputs will be written under: %s\n', outRoot);
+fprintf('[INFO] Outputs will be written under: %s and %s\n', outRootSVM, outRootRSACorr);
 
 %% --------------------------- Subject discovery ---------------------------
 subDirs = find_subjects(glmRoot, 'sub-*');
@@ -91,14 +92,14 @@ for s = 1:numel(subDirs)
     % --------------------------------------------------------------------
     % Parse label strings to regressors and model vectors
     % --------------------------------------------------------------------
-    [checkmateVec, categoriesVec, stimVec, visStimVec] = parse_label_regressors(ds);
+    [checkmateVec, strategyVec, stimVec, visSimilarityVec] = parse_label_regressors(ds);
 
     % Define regressor catalog reflecting original logic
     % targets: vector across all samples (all runs)
     regressors = struct();
     regressors.checkmate.targets = checkmateVec;   % 2-class
-    regressors.categories.targets = categoriesVec; % multi-class across 40 boards
-    regressors.visualStimuli.targets = visStimVec; % 20-class
+    regressors.strategy.targets = strategyVec; % multi-class across 40 boards
+    regressors.visual_similarity.targets = visSimilarityVec; % 20-class
 
     % Stimulus-based targets to average for RSA (full set)
     regressors.stimuli.targets = stimVec;
@@ -106,8 +107,8 @@ for s = 1:numel(subDirs)
     % RSA model RDMs computed on first run (chunk==1) subset
     firstRunMask = (ds.sa.chunks == 1);
     regressors.checkmate.rdm = compute_rdm(checkmateVec(firstRunMask), 'similarity');
-    regressors.categories.rdm = compute_rdm(categoriesVec(firstRunMask), 'similarity');
-    regressors.visualStimuli.rdm = compute_rdm(visStimVec(firstRunMask), 'similarity');
+    regressors.strategy.rdm = compute_rdm(strategyVec(firstRunMask), 'similarity');
+    regressors.visual_similarity.rdm = compute_rdm(visSimilarityVec(firstRunMask), 'similarity');
 
     % Prepare outputs
     subOutSVM = fullfile(outRootSVM, subName); mkdir_p(subOutSVM);
@@ -179,18 +180,23 @@ for s = 1:numel(subDirs)
     end
 
     % ---------------------- Save TSV outputs ----------------------
+    % BIDS-like naming: sub-XX_space-MNI152NLin2009cAsym_roi-glasser_<suffix>.tsv
     svm_tbl = array2table(svm_mat, 'VariableNames', matlab_safe_names(region_names));
     svm_tbl = addvars(svm_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    writetable(svm_tbl, fullfile(subOutSVM, 'mvpa_cv.tsv'), 'FileType','text', 'Delimiter','\t');
+    svmFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv', subName);
+    writetable(svm_tbl, fullfile(subOutSVM, svmFilename), 'FileType','text', 'Delimiter','\t');
 
     rsa_tbl = array2table(rsa_mat, 'VariableNames', matlab_safe_names(region_names));
     rsa_tbl = addvars(rsa_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    writetable(rsa_tbl, fullfile(subOutRSA, 'rsa_corr.tsv'), 'FileType','text', 'Delimiter','\t');
+    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv', subName);
+    writetable(rsa_tbl, fullfile(subOutRSA, rsaFilename), 'FileType','text', 'Delimiter','\t');
 
     fprintf('[INFO]   Saved SVM and RSA TSV files for %s\n', subName);
 end
 
-fprintf('\n[INFO] Done. Subject-level TSV files written to: %s\n', outRoot);
+fprintf('\n[INFO] Done. Subject-level TSV files written to:\n');
+fprintf('         Decoding: %s\n', outRootSVM);
+fprintf('         RSA:      %s\n', outRootRSACorr);
 
 %% ========================================================================
 %% Helper functions (kept local for portability)
@@ -218,19 +224,19 @@ function names = matlab_safe_names(cellstr_in)
     names = matlab.lang.makeValidName(cellstr_in, 'ReplacementStyle','delete');
 end
 
-function [checkmateVec, categoriesVec, stimVec, visStimVec] = parse_label_regressors(ds)
+function [checkmateVec, strategyVec, stimVec, visSimilarityVec] = parse_label_regressors(ds)
     labels = ds.sa.labels(:);
 
     % Checkmate C/NC → 2 levels encoded as 2/1
     cmLabels = regexp(labels, '(?<=\s)(C|NC)\d+', 'match', 'once');
     checkmateVec = cellfun(@(x) strcmpi(x(1), 'C') + 1, cmLabels);
 
-    % Categories: concatenated (C|NC)(\d+) mapped to dense integers (across all 40)
+    % Strategy: concatenated (C|NC)(\d+) mapped to dense integers (across all 40)
     catTokens = regexp(labels, '(?<=\s)(C|NC)(\d+)', 'tokens', 'once');
     concatCats = cellfun(@(x) [x{1}, x{2}], catTokens, 'UniformOutput', false);
     uniqCats = unique(concatCats, 'stable');
     catMap = containers.Map(uniqCats, 1:numel(uniqCats));
-    categoriesVec = cellfun(@(x) catMap(x), concatCats);
+    strategyVec = cellfun(@(x) catMap(x), concatCats);
 
     % Stimulus strings between '_' and '*', lowercased
     stimLabels = regexp(labels, '(?<=_).*?(?=\*)', 'match', 'once');
@@ -239,11 +245,11 @@ function [checkmateVec, categoriesVec, stimVec, visStimVec] = parse_label_regres
     stimMap = containers.Map(uStim, 1:numel(uStim));
     stimVec = cellfun(@(x) stimMap(x), lowerStim);
 
-    % Visual identity ignoring '(nomate)' → 20 classes
+    % Visual similarity: identity ignoring '(nomate)' → 20 classes
     cleanStim = erase(lowerStim, '(nomate)');
     uVis = unique(cleanStim, 'stable');
     visMap = containers.Map(uVis, 1:numel(uVis));
-    visStimVec = cellfun(@(x) visMap(x), cleanStim);
+    visSimilarityVec = cellfun(@(x) visMap(x), cleanStim);
 end
 
 function RDM = compute_rdm(vec, metric)

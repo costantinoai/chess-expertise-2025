@@ -53,10 +53,10 @@ from modules.mvpa_plot_utils import extract_mvpa_bar_data
 RESULTS_DIR_NAME = None
 RESULTS_BASE = script_dir / "results"
 
-MAIN_TARGETS = ['visualStimuli', 'categories', 'checkmate']
+MAIN_TARGETS = ['visual_similarity', 'strategy', 'checkmate']
 RSA_TITLES = {
-    'visualStimuli': 'Visual Similarity RSA',
-    'categories': 'Strategy RSA',
+    'visual_similarity': 'Visual Similarity RSA',
+    'strategy': 'Strategy RSA',
     'checkmate': 'Checkmate RSA',
 }
 
@@ -150,8 +150,8 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).ax_dict["RSA_1_visualStimuli"].set(position=[0.05595, 0.7798, 0.4479, 0.1829])
-plt.figure(1).ax_dict["RSA_2_categories"].set(position=[0.05595, 0.4436, 0.4479, 0.1829])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].set(position=[0.05595, 0.7798, 0.4479, 0.1829])
+plt.figure(1).ax_dict["RSA_2_strategy"].set(position=[0.05595, 0.4436, 0.4479, 0.1829])
 plt.figure(1).ax_dict["RSA_3_checkmate"].set(position=[0.05595, 0.1074, 0.4479, 0.1829])
 #% end: automatic generated code from pylustrator
 plt.show()

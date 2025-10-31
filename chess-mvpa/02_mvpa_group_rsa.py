@@ -21,8 +21,8 @@ neural representational dissimilarity matrices (RDMs) with theoretical model
 RDMs. Neural RDMs were constructed from trial-wise beta estimates within each
 of 22 bilateral cortical regions (Glasser multimodal parcellation). Subject-
 level correlations (Spearman or Pearson) are stored as TSV files in
-BIDS/derivatives/mvpa/rsa_corr/, with one row per subject and one column per
-ROI.
+BIDS/derivatives/mvpa-rsa/, with one file per subject following BIDS-like
+naming: sub-XX_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv.
 
 Participants: N=40 (20 experts, 20 novices).
 Stimuli: 40 chess board positions (20 check, 20 non-check).
@@ -128,9 +128,7 @@ from modules.mvpa_group import (
 # Configuration
 # -----------------------------------------------------------------------------
 
-# Specify which MVPA run to analyze. If None, automatically use the most recent
-# Glasser-22 bilateral analysis. Same infrastructure as decoding script.
-MVPA_DIR_NAME = None
+# No configuration needed - MVPA RSA data location is defined in constants.py
 
 
 # -----------------------------------------------------------------------------
@@ -147,8 +145,10 @@ config, out_dir, logger = setup_analysis(
 # were constructed from trial-wise beta patterns within each ROI, then correlated
 # (Spearman or Pearson) with theoretical model RDMs. This script tests whether
 # those correlations differ significantly from zero and between expertise groups.
-mvpa_dir = resolve_latest_dir(CONFIG["BIDS_MVPA"], pattern="*_glasser_cortices_bilateral", specific_name=MVPA_DIR_NAME)
-logger.info(f"Using MVPA source: {mvpa_dir}")
+rsa_dir = CONFIG["BIDS_MVPA_RSA"]
+if not rsa_dir.exists():
+    raise FileNotFoundError(f"Missing MVPA RSA directory: {rsa_dir}")
+logger.info(f"Using MVPA RSA source: {rsa_dir}")
 
 # Load participant list with expertise labels for group assignment
 participants, (n_exp, n_nov) = get_participants_with_expertise(
@@ -162,20 +162,14 @@ default_roi_names, _ = get_roi_names_and_colors(CONFIG["ROI_GLASSER_22"])
 
 artifact_index = {}
 
-# Process RSA correlation results (neural RDM vs model RDM correlations)
-method = "rsa_corr"
-method_dir = mvpa_dir / method
-if not method_dir.exists():
-    raise FileNotFoundError(f"Missing method directory: {method_dir}")
-
 # Find all subject-level TSV files containing correlation coefficients (one per subject)
-files = find_subject_tsvs(method_dir)
-logger.info(f"[{method}] Found {len(files)} subject TSVs")
+files = find_subject_tsvs(rsa_dir)
+logger.info(f"Found {len(files)} subject TSVs in {rsa_dir.name}")
 
 # Load and consolidate into a single DataFrame: subject, expert, target, and one column per ROI.
 # Each ROI column contains the correlation coefficient (r) between neural and model RDM.
 df = build_group_dataframe(files, participants, default_roi_names)
-roi_names = [c for c in df.columns if c not in ["subject", "expert", "target"]]
+roi_names = [c for c in df.columns if c not in ["participant_id", "expert", "target"]]
 
 # For RSA correlations, chance level is 0 (null hypothesis: no correlation).
 # Unlike decoding, there's no stimulus-dependent chance level; correlations can be
@@ -226,9 +220,9 @@ for tgt in targets:
 
 # Save results as human-readable CSVs and pickle files for plotting
 for tgt, blocks in method_results.items():
-    write_group_stats_outputs(out_dir, method, tgt, blocks)
+    write_group_stats_outputs(out_dir, "rsa_corr", tgt, blocks)
 
-artifact_index[method] = method_results
+artifact_index["rsa_corr"] = method_results
 
 with open(out_dir / "mvpa_group_stats.pkl", "wb") as f:
     pickle.dump(artifact_index, f)

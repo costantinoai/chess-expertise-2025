@@ -33,13 +33,13 @@ def load_subject_tsv(path: Path) -> pd.DataFrame:
     Load a subject-level TSV into a DataFrame with subject metadata.
 
     Adds columns:
-    - subject: 'XX' string
+    - participant_id: 'XX' string
     - target: preserved from file
 
     Returns
     -------
     pd.DataFrame
-        Columns: subject, target, ROI columns...
+        Columns: participant_id, target, ROI columns...
     """
     df = pd.read_csv(path, sep="\t")
     if "target" not in df.columns:
@@ -49,8 +49,8 @@ def load_subject_tsv(path: Path) -> pd.DataFrame:
         else:
             raise ValueError(f"TSV missing 'target' column: {path}")
 
-    subject = parse_subject_id_from_path(path)
-    df.insert(0, "subject", subject)
+    participant_id = parse_subject_id_from_path(path)
+    df.insert(0, "participant_id", participant_id)
     return df
 
 
@@ -74,7 +74,7 @@ def build_group_dataframe(
     Returns
     -------
     pd.DataFrame
-        Columns: subject, expert, target, ROI columns (roi_names order)
+        Columns: participant_id, expert, target, ROI columns (roi_names order)
     """
     rows: List[pd.DataFrame] = []
     expert_lookup: Dict[str, bool] = {sid: is_exp for sid, is_exp in participants_list}
@@ -85,13 +85,13 @@ def build_group_dataframe(
 
     for f in files:
         sub_df = load_subject_tsv(f)
-        sid = sub_df["subject"].iloc[0]
+        sid = sub_df["participant_id"].iloc[0]
         # participants.tsv uses 'sub-XX' IDs; TSVs store 'XX'. Normalize.
         key = to_sub_id(sid)
         sub_df.insert(1, "expert", bool(expert_lookup.get(key, False)))
 
         # Identify ROI columns present in file
-        present_roi_cols = [c for c in sub_df.columns if c not in ("subject", "expert", "target")]
+        present_roi_cols = [c for c in sub_df.columns if c not in ("participant_id", "expert", "target")]
 
         # CRITICAL FIX: Sanitize the MATLAB column names to match expected names
         # MATLAB outputs have characters like + and - that need to be removed
@@ -106,19 +106,19 @@ def build_group_dataframe(
             for col in roi_names_sanitized:
                 if col not in sub_df.columns:
                     sub_df[col] = np.nan
-            keep_cols = ["subject", "expert", "target"] + roi_names_sanitized
+            keep_cols = ["participant_id", "expert", "target"] + roi_names_sanitized
             sub_df = sub_df[keep_cols].rename(columns=rename_map)
-            sub_df = sub_df[["subject", "expert", "target"] + roi_names]
+            sub_df = sub_df[["participant_id", "expert", "target"] + roi_names]
         else:
             # Passthrough: keep whatever ROI columns exist; do not rename
             raise ValueError(
                 f"Low ROI name overlap for {f.name} (overlap={len(overlap)}/{len(roi_names)})."
             )
-            sub_df = sub_df[["subject", "expert", "target"] + present_roi_cols_sanitized]
+            sub_df = sub_df[["participant_id", "expert", "target"] + present_roi_cols_sanitized]
         rows.append(sub_df)
 
     if not rows:
-        return pd.DataFrame(columns=["subject", "expert", "target"] + roi_names)
+        return pd.DataFrame(columns=["participant_id", "expert", "target"] + roi_names)
     return pd.concat(rows, axis=0, ignore_index=True)
 
 
