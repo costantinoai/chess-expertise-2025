@@ -383,3 +383,52 @@ def plot_flat_hemisphere(
         fig.update_layout(**layout_kwargs)
     _save_plotly(fig, title or 'flat_surface', output_file)
     return fig
+
+
+def embed_figure_on_ax(ax, fig, title: str = ''):
+    """
+    Embed any figure (matplotlib or Plotly) into a matplotlib axis for pylustrator layouts.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axis to embed the figure into
+    fig : matplotlib.figure.Figure or plotly.graph_objects.Figure
+        The figure to embed
+    title : str, optional
+        Title to add above the embedded figure
+
+    Notes
+    -----
+    - Renders figure to in-memory PNG buffer
+    - Embeds the rasterized image in the provided axis
+    - Closes matplotlib figures after rendering
+    - No disk writes
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.image as mpimg
+    from io import BytesIO
+    from .helpers import set_axis_title
+
+    buf = BytesIO()
+
+    # Detect figure type and render appropriately
+    if hasattr(fig, 'savefig'):
+        # Matplotlib figure
+        fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+        plt.close(fig)
+    elif hasattr(fig, 'write_image'):
+        # Plotly figure
+        from plotly.io import to_image
+        img_bytes = to_image(fig, format='png', scale=2)
+        buf.write(img_bytes)
+    else:
+        raise TypeError(f"Unsupported figure type: {type(fig)}")
+
+    buf.seek(0)
+
+    # Embed in provided axis
+    ax.set_axis_off()
+    ax.imshow(mpimg.imread(buf))
+    if title:
+        set_axis_title(ax, title=title)

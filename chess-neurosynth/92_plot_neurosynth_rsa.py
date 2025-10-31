@@ -50,7 +50,7 @@ from common.plotting import plot_flat_pair
 from modules.plot_utils import (
     plot_correlations_on_ax,
     plot_differences_on_ax,
-    embed_flat_pair_on_ax,
+    embed_figure_on_ax,
 )
 
 
@@ -121,13 +121,19 @@ for idx, (stem, pretty) in enumerate(PATTERNS, start=1):
 
     # Flat surfaces (left+right pair embedded)
     ax_flat = plt.axes(); ax_flat.set_label(f'{idx}C_RSA_Flat_{stem}')
-    embed_flat_pair_on_ax(
-        ax_flat,
-        zmap_path=RESULTS_DIR / f"zmap_{stem}.nii.gz",
-        title=f'{pretty} (flat surfaces)',
-        tmp_stem=FIGURES_DIR / f'pylu_surface_{stem}',
-        vmin=vmin_rsa, vmax=vmax_rsa,
+    z_img_rsa = image.load_img(str(RESULTS_DIR / f"zmap_{stem}.nii.gz"))
+    surface_fig_rsa = plot_flat_pair(
+        data=z_img_rsa,
+        title='',
+        threshold=0,
+        output_file=None,
+        show_hemi_labels=False,
+        show_colorbar=False,
+        vmin=vmin_rsa,
+        vmax=vmax_rsa,
+        show_directions=True,
     )
+    embed_figure_on_ax(ax_flat, surface_fig_rsa, title=f'{pretty} (flat surfaces)')
 
 
 # Provide axis dictionary for pylustrator convenience

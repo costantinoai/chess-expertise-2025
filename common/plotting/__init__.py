@@ -83,6 +83,7 @@ from .surfaces import (
     plot_flat_pair,
     plot_flat_hemisphere,
     compute_surface_symmetric_range,
+    embed_figure_on_ax,
 )
 
 __all__ = [
@@ -140,4 +141,5 @@ __all__ = [
     'plot_flat_pair',
     'plot_flat_hemisphere',
     'compute_surface_symmetric_range',
+    'embed_figure_on_ax',
 ]

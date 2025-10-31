@@ -208,21 +208,8 @@ def plot_differences_on_ax(ax, df_diff: 'pd.DataFrame', title: str):
     set_axis_title(ax, title=title)
 
 
-def embed_flat_pair_on_ax(ax, zmap_path: Path, title: str, tmp_stem: Path, vmin=None, vmax=None):
-    """
-    Create a flat-surface PNG via plotly helper; embed into a Matplotlib axis.
-    """
-    from nilearn import image
-    import matplotlib.image as mpimg
-    z_img = image.load_img(str(zmap_path))
-    plot_flat_pair(z_img, title='', threshold=0, output_file=tmp_stem, vmin=vmin, vmax=vmax)
-    png_path = tmp_stem.with_suffix('.png')
-    ax.set_axis_off()
-    if png_path.exists():
-        img = mpimg.imread(png_path)
-        ax.imshow(img)
-    from common.plotting import set_axis_title
-    set_axis_title(ax, title=title)
+# Surface embedding helper (DRY) - scripts should call plot_flat_pair then embed_figure_on_ax
+from common.plotting import embed_figure_on_ax
 
 
 def plot_correlations(df_pos, df_neg, df_diff, run_id: str, out_fig: Path | str):

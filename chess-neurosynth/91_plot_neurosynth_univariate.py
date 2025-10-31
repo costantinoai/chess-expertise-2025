@@ -49,7 +49,7 @@ from common.plotting import (
 from modules.plot_utils import (
     plot_correlations_on_ax,
     plot_differences_on_ax,
-    embed_flat_pair_on_ax,
+    embed_figure_on_ax,
 )
 from common.io_utils import find_latest_results_directory
 from common.logging_utils import setup_analysis_in_dir, log_script_end
@@ -123,22 +123,34 @@ vmin_univ, vmax_univ = compute_surface_symmetric_range(z_all)
 
 # Flat surfaces (left+right pair embedded)
 ax_C = plt.axes(); ax_C.set_label('C_Flat_All_gt_Rest')
-embed_flat_pair_on_ax(
-    ax_C,
-    zmap_path=RESULTS_DIR / f"zmap_{stem_all}.nii.gz",
-    title='All > Rest (flat surfaces)',
-    tmp_stem=FIGURES_DIR / 'pylu_surface_all_rest',
-    vmin=vmin_univ, vmax=vmax_univ,
+z_img_all = image.load_img(str(RESULTS_DIR / f"zmap_{stem_all}.nii.gz"))
+surface_fig_all = plot_flat_pair(
+    data=z_img_all,
+    title='',
+    threshold=0,
+    output_file=None,
+    show_hemi_labels=False,
+    show_colorbar=False,
+    vmin=vmin_univ,
+    vmax=vmax_univ,
+    show_directions=True,
 )
+embed_figure_on_ax(ax_C, surface_fig_all, title='All > Rest (flat surfaces)')
 
 ax_D = plt.axes(); ax_D.set_label('D_Flat_Check_gt_NoCheck')
-embed_flat_pair_on_ax(
-    ax_D,
-    zmap_path=RESULTS_DIR / f"zmap_{stem_check}.nii.gz",
-    title='Check > No-Check (flat surfaces)',
-    tmp_stem=FIGURES_DIR / 'pylu_surface_check_nocheck',
-    vmin=vmin_univ, vmax=vmax_univ,
+z_img_check = image.load_img(str(RESULTS_DIR / f"zmap_{stem_check}.nii.gz"))
+surface_fig_check = plot_flat_pair(
+    data=z_img_check,
+    title='',
+    threshold=0,
+    output_file=None,
+    show_hemi_labels=False,
+    show_colorbar=False,
+    vmin=vmin_univ,
+    vmax=vmax_univ,
+    show_directions=True,
 )
+embed_figure_on_ax(ax_D, surface_fig_check, title='Check > No-Check (flat surfaces)')
 
 
 # Provide axis dictionary for pylustrator convenience
