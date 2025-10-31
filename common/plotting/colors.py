@@ -14,7 +14,7 @@ Provides:
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, to_rgb
 from typing import List, Tuple
 
 
@@ -72,17 +72,17 @@ CMAP_BRAIN = _make_brain_cmap()
 # Color Palettes
 # =============================================================================
 
-# Expert vs Novice (Tol palette - colorblind safe, pretty, distinct)
+# Expert vs Novice (colorblind safe)
 COLORS_EXPERT_NOVICE = {
-    'expert': '#4477AA',   # Blue (Tol bright palette)
-    'novice': '#EE6677',   # Red (Tol bright palette) - distinct from blue
+    'expert': '#228833',   # Green
+    'novice': '#aa3377',   # Purple
 }
 
-# Checkmate vs Non-Checkmate (Tol palette - colorblind safe, distinct from expert/novice)
+# Checkmate vs Non-Checkmate (colorblind safe, distinct from expert/novice)
 # Used for stimulus visualizations in behavioral RDMs, MDS, etc.
 COLORS_CHECKMATE_NONCHECKMATE = {
-    'checkmate': '#CCBB44',      # Yellow (Tol bright palette)
-    'non_checkmate': '#228833',  # Green (Tol bright palette)
+    'checkmate': '#fdb338',      # Orange
+    'non_checkmate': '#025196',  # Blue
 }
 
 # Wong Colorblind-Safe Palette (Reference)
@@ -166,3 +166,30 @@ def compute_stimulus_palette(stimuli_df: pd.DataFrame) -> Tuple[List[str], List[
         alphas.append(alpha)
 
     return colors, alphas
+
+
+# =============================================================================
+# Color utilities
+# =============================================================================
+
+def lighten_color(color: str | tuple, amount: float = 0.5) -> tuple:
+    """
+    Blend the input color with white to obtain a lighter tone.
+
+    Parameters
+    ----------
+    color : str or tuple
+        Matplotlib-friendly color specification (hex, name, or RGB tuple)
+    amount : float, default=0.5
+        Blend factor in [0, 1]. 0 → original color, 1 → pure white.
+
+    Returns
+    -------
+    tuple
+        Lightened RGB tuple (each channel in [0, 1])
+    """
+    amount = float(np.clip(amount, 0.0, 1.0))
+    base = np.array(to_rgb(color))
+    white = np.ones(3)
+    blended = base + (white - base) * amount
+    return tuple(blended)

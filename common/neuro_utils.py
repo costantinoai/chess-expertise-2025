@@ -13,6 +13,7 @@ Dependencies
 
 import numpy as np
 import nibabel as nib
+from nibabel.freesurfer import io as fsio
 from pathlib import Path
 from typing import List, Union, Tuple
 from .bids_utils import find_beta_images, load_roi_metadata
@@ -514,4 +515,265 @@ __all__ = [
     'get_gray_matter_mask',
     'fisher_z_transform',
     'clean_voxels',
+    'compute_roi_means',
+    'fill_atlas_with_values',
+    'compute_surface_roi_means',
+    'roi_values_to_surface_texture',
 ]
+
+def compute_roi_means(
+    data_3d: np.ndarray,
+    atlas_data: np.ndarray,
+    roi_labels: np.ndarray,
+    *,
+    allow_nan: bool = True,
+) -> np.ndarray:
+    """
+    Compute per-ROI mean values from a 3D image using an integer-labeled atlas.
+
+    Parameters
+    ----------
+    data_3d : np.ndarray
+        3D array of voxel values (e.g., contrast map or RSA r-map).
+    atlas_data : np.ndarray
+        3D integer array with same shape as data_3d; each non-zero value is an ROI id.
+    roi_labels : np.ndarray
+        1D array of ROI ids to extract (e.g., from load_atlas()).
+    allow_nan : bool, default=True
+        If True, compute NaN-safe means (np.nanmean). If False, use np.mean.
+
+    Returns
+    -------
+    np.ndarray
+        1D array of length len(roi_labels) with mean value per ROI. If an ROI
+        has no voxels in the atlas, returns np.nan for that entry.
+
+    Notes
+    -----
+    - Shapes of data_3d and atlas_data must match exactly.
+    - ROI ids in roi_labels must be present in atlas_data; missing ids yield NaN.
+    """
+    if data_3d.shape != atlas_data.shape:
+        raise ValueError(
+            f"data_3d shape {data_3d.shape} does not match atlas shape {atlas_data.shape}"
+        )
+
+    reducer = np.nanmean if allow_nan else np.mean
+
+    # Flatten once for efficient masking
+    data_flat = data_3d.reshape(-1)
+    atlas_flat = atlas_data.reshape(-1)
+
+    out = np.full(len(roi_labels), np.nan, dtype=float)
+    for i, roi_id in enumerate(roi_labels):
+        mask = (atlas_flat == int(roi_id))
+        if not np.any(mask):
+            out[i] = np.nan
+            continue
+        vals = data_flat[mask]
+        # Handle the edge-case of all-NaN voxels
+        if allow_nan:
+            if np.all(np.isnan(vals)):
+                out[i] = np.nan
+            else:
+                out[i] = float(reducer(vals))
+        else:
+            out[i] = float(reducer(vals))
+    return out
+
+
+def fill_atlas_with_values(
+    atlas_img: nib.Nifti1Image,
+    roi_labels: np.ndarray,
+    roi_values: np.ndarray,
+    *,
+    include_mask: np.ndarray | None = None,
+    outside_value: float | None = 0.0,
+) -> nib.Nifti1Image:
+    """
+    Create a NIfTI volume by assigning per-ROI values across an atlas image.
+
+    Parameters
+    ----------
+    atlas_img : nib.Nifti1Image
+        Integer-labeled atlas image; non-zero voxels correspond to ROI ids.
+    roi_labels : np.ndarray
+        1D array of ROI ids (ints) corresponding to roi_values.
+    roi_values : np.ndarray
+        1D array of values (floats), same length/order as roi_labels.
+    include_mask : np.ndarray of bool, optional
+        If provided, length must match roi_labels; only ROIs with True will be
+        assigned their value; others are set to outside_value or NaN.
+    outside_value : float or None, default=0.0
+        Value to assign to voxels not in included ROIs. If None, uses NaN.
+
+    Returns
+    -------
+    nib.Nifti1Image
+        New volume with per-ROI values assigned.
+    """
+    atlas_data = atlas_img.get_fdata().astype(int)
+    vol = np.full(atlas_data.shape, np.nan if outside_value is None else outside_value, dtype=float)
+
+    roi_labels = np.asarray(roi_labels).astype(int)
+    roi_values = np.asarray(roi_values).astype(float)
+    if roi_labels.shape[0] != roi_values.shape[0]:
+        raise ValueError("roi_labels and roi_values must have same length")
+
+    if include_mask is not None:
+        include_mask = np.asarray(include_mask).astype(bool)
+        if include_mask.shape[0] != roi_labels.shape[0]:
+            raise ValueError("include_mask must have same length as roi_labels")
+    else:
+        include_mask = np.ones_like(roi_labels, dtype=bool)
+
+    for roi_id, val, keep in zip(roi_labels, roi_values, include_mask):
+        if not keep:
+            continue
+        if roi_id == 0:
+            continue
+        mask = (atlas_data == int(roi_id))
+        if np.any(mask):
+            vol[mask] = float(val)
+
+    return nib.Nifti1Image(vol, atlas_img.affine, atlas_img.header)
+
+
+def compute_surface_roi_means_single_hemi(
+    texture: np.ndarray,
+    labels: np.ndarray,
+    roi_labels: np.ndarray,
+    *,
+    allow_nan: bool = True,
+) -> np.ndarray:
+    """
+    Compute per-ROI mean from surface texture for a single hemisphere.
+
+    Parameters
+    ----------
+    texture : np.ndarray
+        Per-vertex values for one hemisphere (1D array).
+    labels : np.ndarray
+        Per-vertex integer labels from FreeSurfer .annot file (read via fsio.read_annot).
+    roi_labels : np.ndarray
+        ROI label ids (integers) to aggregate over; should match annotation ids.
+    allow_nan : bool, default=True
+        Use NaN-safe mean (np.nanmean) if True.
+
+    Returns
+    -------
+    np.ndarray
+        Mean value per ROI (length len(roi_labels)).
+    """
+    reducer = np.nanmean if allow_nan else np.mean
+    out = np.full(len(roi_labels), np.nan, dtype=float)
+    for i, rid in enumerate(np.asarray(roi_labels).astype(int)):
+        mask = (labels == rid)
+        if not np.any(mask):
+            out[i] = np.nan
+            continue
+        vals = texture[mask]
+        if allow_nan and np.all(np.isnan(vals)):
+            out[i] = np.nan
+        else:
+            out[i] = float(reducer(vals))
+    return out
+
+
+def compute_surface_roi_means(
+    tex_left: np.ndarray,
+    labels_left: np.ndarray,
+    tex_right: np.ndarray,
+    labels_right: np.ndarray,
+    roi_labels: np.ndarray,
+    *,
+    allow_nan: bool = True,
+) -> np.ndarray:
+    """
+    Compute per-ROI mean from surface textures using fsaverage Glasser labels.
+
+    Parameters
+    ----------
+    tex_left, tex_right : np.ndarray
+        Per-vertex values for left and right hemispheres (1D arrays).
+    labels_left, labels_right : np.ndarray
+        Per-vertex integer labels from FreeSurfer .annot files (read via fsio.read_annot).
+    roi_labels : np.ndarray
+        ROI label ids (integers) to aggregate over; should match annotation ids.
+    allow_nan : bool, default=True
+        Use NaN-safe mean (np.nanmean) if True.
+
+    Returns
+    -------
+    np.ndarray
+        Mean value per ROI (length len(roi_labels)).
+    """
+    reducer = np.nanmean if allow_nan else np.mean
+    out = np.full(len(roi_labels), np.nan, dtype=float)
+    for i, rid in enumerate(np.asarray(roi_labels).astype(int)):
+        mask_l = (labels_left == rid)
+        mask_r = (labels_right == rid)
+        vals = []
+        if np.any(mask_l):
+            vals.append(tex_left[mask_l])
+        if np.any(mask_r):
+            vals.append(tex_right[mask_r])
+        if len(vals) == 0:
+            out[i] = np.nan
+            continue
+        allv = np.concatenate(vals)
+        if allow_nan and np.all(np.isnan(allv)):
+            out[i] = np.nan
+        else:
+            out[i] = float(reducer(allv))
+    return out
+
+
+def roi_values_to_surface_texture(
+    labels: np.ndarray,
+    roi_labels: np.ndarray,
+    roi_values: np.ndarray,
+    *,
+    include_mask: np.ndarray | None = None,
+    default_value: float = 0.0,
+) -> np.ndarray:
+    """
+    Build a per-vertex texture by assigning per-ROI values using an .annot labels array.
+
+    Parameters
+    ----------
+    labels : np.ndarray
+        Per-vertex integer labels from FreeSurfer .annot file.
+    roi_labels : np.ndarray
+        ROI ids corresponding to roi_values; must be integers matching labels.
+    roi_values : np.ndarray
+        Values to assign per ROI.
+    include_mask : np.ndarray of bool, optional
+        If provided, mask of length len(roi_labels) indicating which ROIs to draw.
+    default_value : float, default=0.0
+        Value for vertices not belonging to included ROIs.
+
+    Returns
+    -------
+    np.ndarray
+        Per-vertex texture array.
+    """
+    roi_labels = np.asarray(roi_labels).astype(int)
+    roi_values = np.asarray(roi_values).astype(float)
+    if roi_labels.shape[0] != roi_values.shape[0]:
+        raise ValueError("roi_labels and roi_values length mismatch")
+    if include_mask is not None:
+        include_mask = np.asarray(include_mask).astype(bool)
+        if include_mask.shape[0] != roi_labels.shape[0]:
+            raise ValueError("include_mask length mismatch")
+    else:
+        include_mask = np.ones_like(roi_labels, dtype=bool)
+
+    tex = np.full(labels.shape[0], float(default_value), dtype=float)
+    for rid, val, keep in zip(roi_labels, roi_values, include_mask):
+        if not keep:
+            continue
+        mask = (labels == int(rid))
+        if np.any(mask):
+            tex[mask] = float(val)
+    return tex

@@ -31,8 +31,8 @@ _NATURE_MAX_HEIGHT_MM = 170.0
 _FONT_SIZE_PANEL_LABEL = 8.0
 _FONT_SIZE_TITLE = 7.0
 _FONT_SIZE_LABEL = 6.0
-_FONT_SIZE_TICK = 6.0
-_FONT_SIZE_LEGEND = 5.5
+_FONT_SIZE_TICK = 5.0
+_FONT_SIZE_LEGEND = 5.0
 _FONT_SIZE_ANNOTATION = 5.0
 
 # =============================================================================

@@ -361,11 +361,11 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
     Load ROI metadata from ROI directory, supporting both legacy and new formats.
 
     Supported files (first found is used):
-    - roi_labels.tsv with columns: roi_id, roi_name, family, color
-    - region_info.tsv with columns: ROI_idx, roi_name, pretty_name, [family/group], color
+    - roi_labels.tsv with columns: roi_id, roi_name, family, color, [color_cb]
+    - region_info.tsv with columns: ROI_idx, roi_name, pretty_name, [family/group], color, [color_cb]
 
-    Returns a DataFrame standardized to columns: roi_id, roi_name, [pretty_name], family, color.
-    The pretty_name column is included if available in the source file.
+    Returns a DataFrame standardized to columns: roi_id, roi_name, [pretty_name], family, color, [color_cb].
+    The pretty_name and color_cb columns are included if available in the source file.
 
     Parameters
     ----------
@@ -375,7 +375,7 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        Standardized metadata with columns: roi_id, roi_name, [pretty_name], family, color
+        Standardized metadata with columns: roi_id, roi_name, [pretty_name], family, color, [color_cb]
 
     Raises
     ------
@@ -396,10 +396,12 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
                 f"Missing required columns in {roi_labels_path}: {missing}\n"
                 f"Expected: {required_cols}, Found: {list(df.columns)}"
             )
-        # Include pretty_name if available
+        # Build columns to return
         cols_to_return = required_cols.copy()
         if 'pretty_name' in df.columns:
             cols_to_return.insert(2, 'pretty_name')  # Insert after roi_name
+        if 'color_cb' in df.columns:
+            cols_to_return.append('color_cb')
         return df[cols_to_return]
 
     if region_info_path.exists():
@@ -442,12 +444,22 @@ def load_roi_metadata(roi_dir: Path) -> pd.DataFrame:
         else:
             df['family'] = 'ROI'
 
+        # Build final column list
+        cols_to_return = ['roi_id', 'roi_name']
+
         # Include pretty_name if available
         if has('pretty_name'):
             df['pretty_name'] = df_raw[get('pretty_name')]
-            return df[['roi_id', 'roi_name', 'pretty_name', 'family', 'color']]
-        else:
-            return df[['roi_id', 'roi_name', 'family', 'color']]
+            cols_to_return.append('pretty_name')
+
+        cols_to_return.extend(['family', 'color'])
+
+        # Include color_cb (colorblind-friendly) if available
+        if has('color_cb'):
+            df['color_cb'] = df_raw[get('color_cb')]
+            cols_to_return.append('color_cb')
+
+        return df[cols_to_return]
 
     raise FileNotFoundError(
         f"No ROI metadata found under {roi_dir}. Expected roi_labels.tsv or region_info.tsv"
@@ -477,7 +489,7 @@ def get_roi_names_dict(roi_metadata: pd.DataFrame) -> Dict[int, str]:
     return dict(zip(roi_metadata['roi_id'], roi_metadata['roi_name']))
 
 
-def get_roi_colors_dict(roi_metadata: pd.DataFrame) -> Dict[int, str]:
+def get_roi_colors_dict(roi_metadata: pd.DataFrame, use_colorblind: bool = True) -> Dict[int, str]:
     """
     Extract ROI ID to color mapping from metadata DataFrame.
 
@@ -485,6 +497,9 @@ def get_roi_colors_dict(roi_metadata: pd.DataFrame) -> Dict[int, str]:
     ----------
     roi_metadata : pd.DataFrame
         ROI metadata from load_roi_metadata()
+    use_colorblind : bool, default=True
+        If True and 'color_cb' column exists, use colorblind-friendly colors.
+        Otherwise, use standard 'color' column.
 
     Returns
     -------
@@ -495,12 +510,15 @@ def get_roi_colors_dict(roi_metadata: pd.DataFrame) -> Dict[int, str]:
     -------
     >>> roi_metadata = load_roi_metadata(ROI_ROOT / "glasser_22_coarse")
     >>> roi_colors = get_roi_colors_dict(roi_metadata)
-    >>> print(roi_colors[1])  # "#a6cee3"
+    >>> print(roi_colors[1])  # "#D45D00" (colorblind-friendly)
+    >>> roi_colors = get_roi_colors_dict(roi_metadata, use_colorblind=False)
+    >>> print(roi_colors[1])  # "#a6cee3" (standard)
     """
-    return dict(zip(roi_metadata['roi_id'], roi_metadata['color']))
+    color_col = 'color_cb' if (use_colorblind and 'color_cb' in roi_metadata.columns) else 'color'
+    return dict(zip(roi_metadata['roi_id'], roi_metadata[color_col]))
 
 
-def get_roi_family_colors(roi_metadata: pd.DataFrame) -> Dict[str, str]:
+def get_roi_family_colors(roi_metadata: pd.DataFrame, use_colorblind: bool = True) -> Dict[str, str]:
     """
     Extract unique family to color mapping from metadata DataFrame.
 
@@ -508,6 +526,9 @@ def get_roi_family_colors(roi_metadata: pd.DataFrame) -> Dict[str, str]:
     ----------
     roi_metadata : pd.DataFrame
         ROI metadata from load_roi_metadata()
+    use_colorblind : bool, default=True
+        If True and 'color_cb' column exists, use colorblind-friendly colors.
+        Otherwise, use standard 'color' column.
 
     Returns
     -------
@@ -518,11 +539,14 @@ def get_roi_family_colors(roi_metadata: pd.DataFrame) -> Dict[str, str]:
     -------
     >>> roi_metadata = load_roi_metadata(ROI_ROOT / "glasser_22_coarse")
     >>> family_colors = get_roi_family_colors(roi_metadata)
-    >>> print(family_colors["Early Visual"])  # "#a6cee3"
+    >>> print(family_colors["Early Visual"])  # "#D45D00" (colorblind-friendly)
+    >>> family_colors = get_roi_family_colors(roi_metadata, use_colorblind=False)
+    >>> print(family_colors["Early Visual"])  # "#a6cee3" (standard)
     """
     # Get unique family-color pairs
-    family_color_pairs = roi_metadata[['family', 'color']].drop_duplicates()
-    return dict(zip(family_color_pairs['family'], family_color_pairs['color']))
+    color_col = 'color_cb' if (use_colorblind and 'color_cb' in roi_metadata.columns) else 'color'
+    family_color_pairs = roi_metadata[['family', color_col]].drop_duplicates()
+    return dict(zip(family_color_pairs['family'], family_color_pairs[color_col]))
 
 
 def get_participants_with_expertise(participants_file=None, bids_root=None):

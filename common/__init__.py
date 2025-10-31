@@ -52,6 +52,9 @@ from .plotting import (
     format_roi_labels_and_colors,
     # Titles
     set_axis_title,
+    create_standalone_colorbar,
+    # Legends
+    create_roi_group_legend,
     # Bars
     plot_grouped_bars_with_ci,
     plot_grouped_bars_on_ax,
@@ -131,6 +134,8 @@ __all__ = [
     'format_roi_labels_and_colors',
     # Plotting - Titles
     'set_axis_title',
+    'create_standalone_colorbar',
+    'create_roi_group_legend',
     # Plotting - Bars
     'plot_grouped_bars_with_ci',
     'plot_grouped_bars_on_ax',

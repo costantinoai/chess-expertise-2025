@@ -134,6 +134,73 @@ def compute_group_mean_and_ci(
     return (mean, float(ci.low), float(ci.high))
 
 
+def compute_mean_ci_and_ttest_vs_value(
+    data: np.ndarray,
+    popmean: float = 0.0,
+    alternative: str = 'two-sided',
+    confidence_level: float = 0.95,
+):
+    """
+    Compute mean, CI, and one-sample t-test vs a value.
+
+    Parameters
+    ----------
+    data : array-like
+        Sample values (NaNs ignored)
+    popmean : float, default=0.0
+        Hypothesized mean for one-sample t-test
+    alternative : {'two-sided','greater','less'}, default='two-sided'
+        Alternative hypothesis direction
+    confidence_level : float, default=0.95
+        Confidence level for the mean CI (based on t critical value)
+
+    Returns
+    -------
+    (mean, ci_low, ci_high, t_stat, p_val)
+
+    Notes
+    -----
+    - CI computed around the sample mean (not around the difference), using t critical value
+    - p-value adjusted for one-tailed alternatives from the two-sided p-value
+    """
+    import numpy as _np
+    from scipy.stats import t as _t
+
+    x = _np.asarray(data, dtype=float)
+    x = x[_np.isfinite(x)]
+    if x.size == 0:
+        return (_np.nan, _np.nan, _np.nan, _np.nan, _np.nan)
+
+    n = x.size
+    mean = float(_np.mean(x))
+    if n < 2:
+        # Not enough samples to compute CI or t-test
+        return (mean, _np.nan, _np.nan, _np.nan, _np.nan)
+
+    sd = float(_np.std(x, ddof=1))
+    se = sd / _np.sqrt(n)
+    tcrit = float(_t.ppf(0.5 + confidence_level / 2.0, df=n - 1))
+    ci_low = mean - tcrit * se
+    ci_high = mean + tcrit * se
+
+    res = ttest_1samp(x, popmean=popmean)
+    t_stat = float(res.statistic)
+    p_two = float(res.pvalue)
+
+    if alternative == 'two-sided':
+        p_val = p_two
+    else:
+        half = p_two / 2.0
+        if alternative == 'greater':
+            p_val = half if t_stat > 0 else (1.0 - half)
+        elif alternative == 'less':
+            p_val = half if t_stat < 0 else (1.0 - half)
+        else:
+            raise ValueError(f"Invalid alternative: {alternative}")
+
+    return (mean, float(ci_low), float(ci_high), t_stat, float(p_val))
+
+
 def apply_fdr_correction(
     pvalues: np.ndarray,
     alpha: float = 0.05,
@@ -243,16 +310,45 @@ def correlate_vectors_bootstrap(
         1D arrays of equal length (NaNs handled by Pingouin).
     method : {'pearson','spearman'}, default 'pearson'
     n_bootstraps : int, default 10000
+        Number of bootstrap samples (only used for Pearson; Spearman does not support bootstrap in pingouin)
     alternative : str, default 'two-sided'
 
     Returns
     -------
     r : float, p : float, ci_low : float, ci_high : float
+        For Spearman, ci_low and ci_high are np.nan (pingouin does not support bootstrap CIs for Spearman)
+
+    Notes
+    -----
+    Pingouin's pg.corr() does not support bootstrap parameter for Spearman correlations.
+    When method='spearman', this function computes correlation and p-value but returns np.nan for CIs.
     """
     if pg is None:
         raise ImportError(
             "correlate_vectors_bootstrap requires 'pingouin'. Install it to compute bootstrap CIs."
         )
+
+    # Spearman does not support bootstrap in pingouin - compute without bootstrap
+    if method == 'spearman':
+        res = pg.corr(
+            x=x,
+            y=y,
+            method=method,
+            alternative=alternative,
+        )
+        # Validate expected columns strictly (no silent fallbacks)
+        required_cols = {'r', 'p-val'}
+        missing = required_cols - set(res.columns)
+        if missing:
+            raise RuntimeError(
+                f"pingouin.corr missing expected columns: {sorted(missing)}; got columns={list(res.columns)}"
+            )
+        r = float(res['r'].iloc[0])
+        p = float(res['p-val'].iloc[0])
+        # No bootstrap CIs available for Spearman in pingouin
+        return r, p, np.nan, np.nan
+
+    # Pearson with bootstrap CIs
     res = pg.corr(
         x=x,
         y=y,
@@ -310,6 +406,166 @@ def format_pvalue(p: float, threshold: float = 0.001) -> str:
     return _format_pvalue_plain(float(p), threshold=threshold)
 
 
+def partial_correlation_rdms(
+    rdm1: np.ndarray,
+    rdm2: np.ndarray,
+    covariate_rdms: list,
+    method: str = 'spearman'
+) -> dict:
+    """
+    Compute partial correlation between two RDMs controlling for covariate RDMs.
+
+    Uses pingouin.partial_corr on flattened RDM vectors (upper triangles).
+
+    Parameters
+    ----------
+    rdm1, rdm2 : np.ndarray
+        RDMs to correlate (2D square matrices)
+    covariate_rdms : list of np.ndarray
+        Covariate RDMs to control for
+    method : str, default='spearman'
+        'spearman' or 'pearson'
+
+    Returns
+    -------
+    dict : 'r' (correlation), 'p' (p-value), 'dof' (degrees of freedom)
+    """
+    if rdm1.shape != rdm2.shape or rdm1.shape[0] != rdm1.shape[1]:
+        raise ValueError("RDMs must be square matrices of the same shape")
+
+    for cov_rdm in covariate_rdms:
+        if cov_rdm.shape != rdm1.shape:
+            raise ValueError("All covariate RDMs must have the same shape")
+
+    if method not in ['spearman', 'pearson']:
+        raise ValueError(f"Method must be 'spearman' or 'pearson', got: {method}")
+
+    # Vectorize RDMs by extracting upper triangles (unique pairwise dissimilarities).
+    # For a 40×40 RDM, this gives 780 observations. We treat these as independent
+    # observations for correlation analysis (standard RSA practice, though entries
+    # sharing stimuli are technically dependent).
+    triu_indices = np.triu_indices(rdm1.shape[0], k=1)
+    data_dict = {
+        'x': rdm1[triu_indices],
+        'y': rdm2[triu_indices]
+    }
+    for i, cov_rdm in enumerate(covariate_rdms):
+        data_dict[f'cov{i}'] = cov_rdm[triu_indices]
+
+    df = pd.DataFrame(data_dict)
+    covar_cols = [f'cov{i}' for i in range(len(covariate_rdms))]
+
+    # Compute partial correlation using pingouin. This implements the standard
+    # partial correlation procedure: regress x on covariates (extract residuals),
+    # regress y on covariates (extract residuals), then correlate the two residual
+    # vectors. This isolates the unique relationship between x and y after removing
+    # shared variance with covariates.
+    result = pg.partial_corr(
+        data=df,
+        x='x',
+        y='y',
+        covar=covar_cols if len(covar_cols) > 1 else covar_cols[0],
+        method=method
+    )
+
+    return {
+        'r': float(result['r'].iloc[0]),
+        'p': float(result['p-val'].iloc[0]),
+        'dof': int(result['dof'].iloc[0]) if 'dof' in result.columns else np.nan
+    }
+
+
+def variance_partitioning_rdms(
+    target_rdm: np.ndarray,
+    predictor_rdms_dict: dict
+) -> pd.DataFrame:
+    """
+    Decompose target RDM variance using nested linear regression (matching old implementation).
+
+    Parameters
+    ----------
+    target_rdm : np.ndarray
+        Target RDM (2D square matrix)
+    predictor_rdms_dict : dict
+        Dictionary mapping predictor names to RDM arrays
+
+    Returns
+    -------
+    pd.DataFrame : Single-row DataFrame with variance components
+    """
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score
+
+    if not predictor_rdms_dict:
+        raise ValueError("predictor_rdms_dict cannot be empty")
+    if target_rdm.shape[0] != target_rdm.shape[1]:
+        raise ValueError("target_rdm must be a square matrix")
+
+    for name, rdm in predictor_rdms_dict.items():
+        if rdm.shape != target_rdm.shape:
+            raise ValueError(f"Predictor RDM '{name}' shape doesn't match target")
+
+    # Vectorize RDMs to 1D arrays (upper triangles). Treat each pairwise dissimilarity
+    # as an observation. For 40×40 RDMs, we get 780 observations per RDM.
+    triu_indices = np.triu_indices(target_rdm.shape[0], k=1)
+    y = target_rdm[triu_indices]
+
+    predictor_names = list(predictor_rdms_dict.keys())
+    X = np.column_stack([
+        predictor_rdms_dict[name][triu_indices]
+        for name in predictor_names
+    ])
+
+    # Fit full regression model: target ~ all predictors
+    # This gives total variance explained when all predictors are included together.
+    full_model = LinearRegression().fit(X, y)
+    r2_full = r2_score(y, full_model.predict(X))
+
+    # Hierarchical variance decomposition: compute unique contribution of each predictor
+    # by comparing full model R² vs reduced model R² (model without that predictor).
+    # Unique variance for predictor k = R²_full - R²_reduced(without k)
+    # This measures how much variance is uniquely explained by predictor k that cannot
+    # be explained by the other predictors.
+    unique_variances = {}
+    single_r2s = {}
+
+    for i, pred_name in enumerate(predictor_names):
+        reduced_indices = [j for j in range(len(predictor_names)) if j != i]
+
+        if reduced_indices:
+            # Fit reduced model without predictor i
+            X_reduced = X[:, reduced_indices]
+            reduced_model = LinearRegression().fit(X_reduced, y)
+            r2_reduced = r2_score(y, reduced_model.predict(X_reduced))
+        else:
+            # If only one predictor, reduced model explains zero variance
+            r2_reduced = 0.0
+
+        unique_variances[pred_name] = max(r2_full - r2_reduced, 0.0)
+
+        # Also fit single-predictor model to report marginal R² (predictor alone)
+        X_single = X[:, i:i+1]
+        single_model = LinearRegression().fit(X_single, y)
+        single_r2s[pred_name] = r2_score(y, single_model.predict(X_single))
+
+    # Shared variance: variance explained jointly by multiple predictors that cannot
+    # be attributed to any single predictor uniquely. Computed as:
+    # R²_shared = R²_full - sum(unique variances)
+    total_unique = sum(unique_variances.values())
+    shared = max(r2_full - total_unique, 0.0)
+
+    # Residual variance: unexplained variance after accounting for all predictors
+    residual = max(1.0 - r2_full, 0.0)
+
+    result = {'r2_full': r2_full, 'shared': shared, 'residual': residual}
+    for pred_name, unique_r2 in unique_variances.items():
+        result[f'unique_{pred_name}'] = unique_r2
+    for pred_name, single_r2 in single_r2s.items():
+        result[f'{pred_name}_only_r2'] = single_r2
+
+    return pd.DataFrame([result])
+
+
 __all__ = [
     'welch_ttest',
     'compute_group_mean_and_ci',
@@ -317,6 +573,8 @@ __all__ = [
     'compute_cohens_d',
     'format_pvalue',
     'correlate_vectors_bootstrap',
+    'partial_correlation_rdms',
+    'variance_partitioning_rdms',
 ]
 
 
@@ -443,6 +701,8 @@ def per_roi_welch_and_fdr(
                 'p_val': np.nan,
                 'dof': np.nan,
                 'cohen_d': np.nan,
+                'cohen_d_ci_low': np.nan,
+                'cohen_d_ci_high': np.nan,
                 'mean_diff': np.nan,
                 'ci95_low': np.nan,
                 'ci95_high': np.nan,
@@ -468,6 +728,14 @@ def per_roi_welch_and_fdr(
 
         # Cohen's d (pingouin)
         cohen_d = compute_effsize(expert_clean, novice_clean, eftype='cohen')
+        # Approximate 95% CI for Cohen's d (Hedges & Olkin variance)
+        n1, n2 = expert_clean.size, novice_clean.size
+        denom = max(n1 + n2 - 2, 1)
+        var_d = ((n1 + n2) / (n1 * n2)) + (cohen_d ** 2) / (2 * denom)
+        se_d = np.sqrt(var_d) if var_d >= 0 else np.nan
+        z_crit = 1.96
+        d_ci_low = float(cohen_d - z_crit * se_d) if np.isfinite(se_d) else np.nan
+        d_ci_high = float(cohen_d + z_crit * se_d) if np.isfinite(se_d) else np.nan
 
         results.append({
             'ROI_Label': int(roi_label),
@@ -475,6 +743,8 @@ def per_roi_welch_and_fdr(
             'p_val': p_val,
             'dof': float(dof),
             'cohen_d': float(cohen_d),
+            'cohen_d_ci_low': d_ci_low,
+            'cohen_d_ci_high': d_ci_high,
             'mean_diff': mean_diff,
             'ci95_low': ci_low,
             'ci95_high': ci_high,

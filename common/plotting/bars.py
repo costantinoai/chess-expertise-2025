@@ -304,8 +304,8 @@ def _add_significance_stars(
 def plot_grouped_bars_on_ax(
     ax, x_positions: np.ndarray,
     group1_values: List[float],
-    group1_cis: List[Tuple[float, float]],
-    group1_color: Union[str, List[str]],
+    group1_cis: Optional[List[Tuple[float, float]]] = None,
+    group1_color: Union[str, List[str]] = '#999999',
     group2_values: Optional[List[float]] = None,
     group2_cis: Optional[List[Tuple[float, float]]] = None,
     group2_color: Optional[Union[str, List[str]]] = None,
@@ -314,8 +314,11 @@ def plot_grouped_bars_on_ax(
     group1_pvals: Optional[List[float]] = None,
     group2_pvals: Optional[List[float]] = None,
     comparison_pvals: Optional[List[float]] = None,
-    ylim: Optional[Tuple[float, float]] = None,  # NEW: shared y-range
+    ylim: Optional[Tuple[float, float]] = None,
     bar_width_multiplier: float = 1.0,
+    show_errorbars: bool = True,
+    add_value_labels: bool = False,
+    value_label_format: str = '.2f',
     params: dict = None
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
@@ -351,6 +354,12 @@ def plot_grouped_bars_on_ax(
         Y-axis limits (ymin, ymax). NEW parameter for shared ranges across panels.
     bar_width_multiplier : float, default=1.0
         Multiplier for bar width. Use 2.0 for single-group plots to make bars wider.
+    show_errorbars : bool, default=True
+        If True, show error bars. If False, skip error bars (useful for simple bar plots).
+    add_value_labels : bool, default=False
+        If True, add numeric value labels on top of bars.
+    value_label_format : str, default='.2f'
+        Format string for value labels (e.g., '.2f' for 2 decimal places).
     params : dict, optional
         Plotting parameters
 
@@ -403,7 +412,9 @@ def plot_grouped_bars_on_ax(
             f"number of x_positions ({n_items})"
         )
 
-    # Convert CIs to yerr format
+    # Convert CIs to yerr format (or create dummy zero-width error bars)
+    if group1_cis is None:
+        group1_cis = [(v, v) for v in group1_values]
     g1_yerr = _convert_ci_to_yerr(group1_cis, group1_values)
 
     # Bar width in data coordinates (EXACTLY matching main branch)
@@ -413,13 +424,15 @@ def plot_grouped_bars_on_ax(
 
     if is_grouped:
         # === GROUPED MODE: Two groups side-by-side ===
+        if group2_cis is None:
+            group2_cis = [(v, v) for v in group2_values]
         g2_yerr = _convert_ci_to_yerr(group2_cis, group2_values)
 
         # Determine if hatching is needed (only when colors are the same)
         use_hatch = _should_use_hatching(group1_color, group2_color)
 
         # Group 1 bars (solid) - EXACTLY matching main branch
-        ax.bar(x_positions - bw/2, group1_values,
+        bars1 = ax.bar(x_positions - bw/2, group1_values,
                width=bw, color=group1_color,
                edgecolor=params['bar_edgecolor'],
                linewidth=params['bar_linewidth'],
@@ -427,13 +440,14 @@ def plot_grouped_bars_on_ax(
                label=group1_label)
 
         # Group 1 error bars - EXACTLY matching main branch
-        ax.errorbar(x_positions - bw/2, group1_values, yerr=g1_yerr,
-                    fmt='none', ecolor='black',
-                    elinewidth=params['errorbar_linewidth'],
-                    capsize=params['errorbar_capsize'], zorder=2)
+        if show_errorbars:
+            ax.errorbar(x_positions - bw/2, group1_values, yerr=g1_yerr,
+                        fmt='none', ecolor='black',
+                        elinewidth=params['errorbar_linewidth'],
+                        capsize=params['errorbar_capsize'], zorder=2)
 
         # Group 2 bars (hatched only if colors are the same) - EXACTLY matching main branch
-        ax.bar(x_positions + bw/2, group2_values,
+        bars2 = ax.bar(x_positions + bw/2, group2_values,
                width=bw, color=group2_color,
                edgecolor=params['bar_edgecolor'],
                linewidth=params['bar_linewidth'],
@@ -442,10 +456,30 @@ def plot_grouped_bars_on_ax(
                label=group2_label)
 
         # Group 2 error bars - EXACTLY matching main branch
-        ax.errorbar(x_positions + bw/2, group2_values, yerr=g2_yerr,
-                    fmt='none', ecolor='black',
-                    elinewidth=params['errorbar_linewidth'],
-                    capsize=params['errorbar_capsize'], zorder=2)
+        if show_errorbars:
+            ax.errorbar(x_positions + bw/2, group2_values, yerr=g2_yerr,
+                        fmt='none', ecolor='black',
+                        elinewidth=params['errorbar_linewidth'],
+                        capsize=params['errorbar_capsize'], zorder=2)
+
+        # Add value labels if requested
+        if add_value_labels:
+            for bar, val in zip(bars1, group1_values):
+                if not np.isnan(val):
+                    height = bar.get_height()
+                    offset = 0.04 if height >= 0 else -0.04
+                    va = 'bottom' if height >= 0 else 'top'
+                    ax.text(bar.get_x() + bar.get_width() / 2, height + offset,
+                            f'{val:{value_label_format}}',
+                            ha='center', va=va, fontsize=params['font_size_tick'] - 1)
+            for bar, val in zip(bars2, group2_values):
+                if not np.isnan(val):
+                    height = bar.get_height()
+                    offset = 0.04 if height >= 0 else -0.04
+                    va = 'bottom' if height >= 0 else 'top'
+                    ax.text(bar.get_x() + bar.get_width() / 2, height + offset,
+                            f'{val:{value_label_format}}',
+                            ha='center', va=va, fontsize=params['font_size_tick'] - 1)
 
         # Within-group significance stars - EXACTLY matching main branch
         if group1_pvals is not None:
@@ -490,7 +524,7 @@ def plot_grouped_bars_on_ax(
     else:
         # === SINGLE-GROUP MODE: One set of bars ===
         # Bars (centered, wider if multiplier > 1) - EXACTLY matching main branch
-        ax.bar(x_positions, group1_values,
+        bars = ax.bar(x_positions, group1_values,
                width=bw, color=group1_color,
                edgecolor=params['bar_edgecolor'],
                linewidth=params['bar_linewidth'],
@@ -498,10 +532,22 @@ def plot_grouped_bars_on_ax(
                label=group1_label)
 
         # Error bars - EXACTLY matching main branch
-        ax.errorbar(x_positions, group1_values, yerr=g1_yerr,
-                    fmt='none', ecolor='black',
-                    elinewidth=params['errorbar_linewidth'],
-                    capsize=params['errorbar_capsize'], zorder=2)
+        if show_errorbars:
+            ax.errorbar(x_positions, group1_values, yerr=g1_yerr,
+                        fmt='none', ecolor='black',
+                        elinewidth=params['errorbar_linewidth'],
+                        capsize=params['errorbar_capsize'], zorder=2)
+
+        # Add value labels if requested
+        if add_value_labels:
+            for bar, val in zip(bars, group1_values):
+                if not np.isnan(val):
+                    height = bar.get_height()
+                    offset = 0.04 if height >= 0 else -0.04
+                    va = 'bottom' if height >= 0 else 'top'
+                    ax.text(bar.get_x() + bar.get_width() / 2, height + offset,
+                            f'{val:{value_label_format}}',
+                            ha='center', va=va, fontsize=params['font_size_tick'] - 1)
 
         # Significance stars - EXACTLY matching main branch
         if group1_pvals is not None:

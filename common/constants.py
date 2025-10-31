@@ -50,6 +50,10 @@ CONFIG = {
     'ROI_GLASSER_180': _EXTERNAL_DATA_ROOT / "rois" / "glasser180",
     'ROI_GLASSER_22_ATLAS': _EXTERNAL_DATA_ROOT / "rois" / "glasser22" / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii",
     'ROI_GLASSER_180_ATLAS': _EXTERNAL_DATA_ROOT / "rois" / "glasser180" / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii",
+    # Surface (fsaverage) annotation files for Glasser parcellation
+    'ROI_GLASSER_180_SURFACE': _EXTERNAL_DATA_ROOT / "rois" / "glasser180-surface",
+    'ROI_GLASSER_180_ANNOT_L': _EXTERNAL_DATA_ROOT / "rois" / "glasser180-surface" / "lh.HCPMMP1.annot",
+    'ROI_GLASSER_180_ANNOT_R': _EXTERNAL_DATA_ROOT / "rois" / "glasser180-surface" / "rh.HCPMMP1.annot",
 
     # BIDS paths (external root)
     'BIDS_ROOT':  _EXTERNAL_DATA_ROOT / "BIDS",
@@ -65,7 +69,8 @@ CONFIG = {
     'BIDS_MVPA':  _EXTERNAL_DATA_ROOT / "BIDS" / "derivatives" / "mvpa",
     'BIDS_RSA_SEARCHLIGHT':  _EXTERNAL_DATA_ROOT / "BIDS" / "derivatives" / "rsa_searchlight",
     'BIDS_BEHAVIORAL':  _EXTERNAL_DATA_ROOT / "BIDS" / "derivatives" / "chess-behavioural",
-    'BIDS_EYETRACK':  _EXTERNAL_DATA_ROOT / "BIDS" / "derivatives" / "bidsmreye",
+    # Eye-tracking derivatives (canonical location)
+    'BIDS_EYETRACK':      _EXTERNAL_DATA_ROOT / "BIDS" / "derivatives" / "eye-tracking",
 
     # Neurosynth / SPM group maps
     'NEUROSYNTH_TERMS_DIR': _EXTERNAL_DATA_ROOT / "neurosynth" / "terms",
@@ -109,6 +114,8 @@ CONFIG = {
 
     # MVPA directory pattern(s)
     'MVPA_PATTERN_CORTICES': '*_glasser_cortices_bilateral',
+    # Fine dimensions (checkmate-only stimuli) — still Glasser-22 atlas
+    'MVPA_PATTERN_CM_ONLY': '*_glasser_regions_bilateral_fine',
 
     # MVPA targets registry (canonical keys → metadata)
     'MVPA_TARGETS': {

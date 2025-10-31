@@ -461,6 +461,71 @@ def save_panel_svg(fig, output_file: Path | str, dpi: int = 450) -> Path:
     return output_file
 
 
+def save_axes_pdfs(fig, out_dir: Path | str, prefix: str,
+                   expand_xy: tuple = (1.02, 1.08),
+                   dpi: int = 450) -> List[Path]:
+    """
+    Save each axes in a Matplotlib figure as a separate PDF using tight bboxes.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+
+    saved: List[Path] = []
+    for idx, ax in enumerate(fig.axes, start=1):
+        label = getattr(ax, 'get_label', lambda: f'ax{idx}')()
+        safe = sanitize_label_to_filename(label or f'ax{idx}')
+        out_path = out_dir / f"{prefix}__{safe}.pdf"
+        bbox = ax.get_tightbbox(renderer).expanded(expand_xy[0], expand_xy[1])
+        bbox_in = bbox.transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(out_path, format='pdf', bbox_inches=bbox_in, dpi=dpi)
+        saved.append(out_path)
+    return saved
+
+
+def save_panel_pdf(fig, output_file: Path | str, dpi: int = 450) -> Path:
+    """Save full arranged panel as PDF with tight bbox and return path."""
+    output_file = Path(output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_file, format='pdf', bbox_inches='tight', dpi=dpi)
+    return output_file
+
+def save_axes_pngs(fig, out_dir: Path | str, prefix: str,
+                   expand_xy: tuple = (1.02, 1.08),
+                   dpi: int = 450) -> List[Path]:
+    """
+    Save each axes in a Matplotlib figure as a separate PNG using tight bboxes.
+
+    Mirrors save_axes_svgs but writes PNG files for quick previews or raster submissions.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+
+    saved: List[Path] = []
+    for idx, ax in enumerate(fig.axes, start=1):
+        label = getattr(ax, 'get_label', lambda: f'ax{idx}')()
+        safe = sanitize_label_to_filename(label or f'ax{idx}')
+        out_path = out_dir / f"{prefix}__{safe}.png"
+        bbox = ax.get_tightbbox(renderer).expanded(expand_xy[0], expand_xy[1])
+        bbox_in = bbox.transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(out_path, format='png', bbox_inches=bbox_in, dpi=dpi)
+        saved.append(out_path)
+    return saved
+
+
+def save_panel_png(fig, output_file: Path | str, dpi: int = 450) -> Path:
+    """Save full arranged panel as PNG with tight bbox and return path."""
+    output_file = Path(output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_file, format='png', bbox_inches='tight', dpi=dpi)
+    return output_file
+
+
 # =============================================================================
 # Titles
 # =============================================================================
@@ -542,3 +607,131 @@ def set_axis_title(
         fontweight='normal',
         ha='center', va='bottom'
     )
+
+
+def create_standalone_colorbar(
+    cmap,
+    vmin: float = 0.0,
+    vmax: float = 1.0,
+    orientation: str = 'horizontal',
+    label: Optional[str] = None,
+    output_path: Optional[Path] = None,
+    params: dict | None = None,
+) -> plt.Figure:
+    """
+    Create a standalone colorbar figure with 3 ticks (vmin, center, vmax).
+
+    Parameters
+    ----------
+    cmap : str or matplotlib.colors.Colormap
+        Colormap to use.
+    vmin : float, default=0.0
+        Minimum value for colorbar.
+    vmax : float, default=1.0
+        Maximum value for colorbar.
+    orientation : str, default='horizontal'
+        Orientation: 'horizontal' or 'vertical'.
+    label : str, optional
+        Label for the colorbar.
+    output_path : Path, optional
+        If provided, save figure to this path.
+    params : dict, optional
+        Plotting parameters.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The generated figure containing only the colorbar.
+
+    Notes
+    -----
+    - Colorbars have consistent dimensions (3.0 × 0.5 inches) regardless of orientation
+    - 3 ticks are always shown: vmin, center (midpoint), and vmax
+    - Tick labels are automatically formatted based on value magnitude
+    """
+    from .style import PLOT_PARAMS, apply_nature_rc
+
+    if params is None:
+        params = PLOT_PARAMS
+    apply_nature_rc(params)
+
+    import matplotlib.colors as mcolors
+    from matplotlib.cm import ScalarMappable
+
+    # Create figure with exactly matching dimensions (just rotated)
+    if orientation == 'horizontal':
+        fig_w = 3.0  # inches
+        fig_h = 0.5  # inches
+    else:  # vertical
+        fig_w = 0.5  # inches (must match horizontal height exactly)
+        fig_h = 3.0  # inches
+
+    fig = plt.figure(figsize=(fig_w, fig_h))
+
+    # Centered axis with identical physical thickness for both orientations
+    bar_fraction = 0.24  # fraction of the short dimension occupied by the colorbar
+    margin_along_axis = 0.12  # padding along the long axis for labels/ticks
+    margin_per_side = (1.0 - bar_fraction) / 2.0
+
+    if orientation == 'horizontal':
+        ax = fig.add_axes([
+            margin_along_axis,
+            margin_per_side,
+            1.0 - 2.0 * margin_along_axis,
+            bar_fraction,
+        ])
+    else:
+        ax = fig.add_axes([
+            margin_per_side,
+            margin_along_axis,
+            bar_fraction,
+            1.0 - 2.0 * margin_along_axis,
+        ])
+    ax.set_facecolor('none')
+
+    # Create colorbar
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+
+    cbar = plt.colorbar(
+        sm,
+        cax=ax,
+        orientation=orientation,
+    )
+
+    # Set 3 ticks: vmin, center, vmax
+    center = (vmin + vmax) / 2.0
+    ticks = [vmin, center, vmax]
+    cbar.set_ticks(ticks)
+
+    # Format tick labels with appropriate precision
+    def format_tick(val):
+        if abs(val) < 0.01 and val != 0:
+            return f"{val:.2e}"
+        elif abs(val) >= 1000:
+            return f"{val:.0f}"
+        elif abs(val) >= 10:
+            return f"{val:.1f}"
+        else:
+            return f"{val:.2f}"
+
+    cbar.set_ticklabels([format_tick(t) for t in ticks])
+
+    # Style
+    cbar.ax.tick_params(labelsize=params['font_size_tick'])
+
+    if label:
+        if orientation == 'horizontal':
+            cbar.set_label(label, fontsize=params['font_size_label'])
+        else:
+            cbar.set_label(label, fontsize=params['font_size_label'], rotation=270, labelpad=15)
+
+    # Set colorbar outline width
+    cbar.outline.set_linewidth(params['plot_linewidth'])
+
+    # Note: tight_layout() causes issues with colorbar-only figures, so we skip it
+
+    if output_path is not None:
+        save_figure(fig, Path(output_path))
+    return fig

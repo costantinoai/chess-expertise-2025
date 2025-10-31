@@ -383,15 +383,6 @@ def create_correlation_table(
     return pd.DataFrame(df_rows)
 
 
-__all__ = [
-    'create_figure_summary',
-    'format_correlation_summary',
-    'generate_latex_table',
-    'create_correlation_table',
-    'save_results_metadata',
-]
-
-
 def save_latex_table(
     latex_code: str,
     output_path: Path
@@ -404,6 +395,95 @@ def save_latex_table(
     return output_path
 
 
+def format_roi_stats_table(
+    welch_df: pd.DataFrame,
+    exp_desc: List[Tuple[float, float, float]],
+    nov_desc: List[Tuple[float, float, float]],
+    roi_info: pd.DataFrame,
+    subtract_chance: float = 0.0,
+) -> pd.DataFrame:
+    """
+    Format ROI-level group statistics into a standardized table.
+
+    Combines Welch t-test results with per-group descriptives (mean, CI) and
+    ROI metadata (pretty names) into a publication-ready DataFrame with
+    columns: ROI, Expert_mean, Expert_CI, Novice_mean, Novice_CI, Delta_mean,
+    Delta_CI, pFDR.
+
+    Parameters
+    ----------
+    welch_df : pd.DataFrame
+        Welch t-test results with columns: ROI_Label, mean_diff, ci95_low,
+        ci95_high, p_val_fdr
+    exp_desc : list of tuple
+        Expert group descriptives: [(mean, ci_low, ci_high), ...] per ROI
+    nov_desc : list of tuple
+        Novice group descriptives: [(mean, ci_low, ci_high), ...] per ROI
+    roi_info : pd.DataFrame
+        ROI metadata with columns: roi_id, pretty_name (from load_roi_metadata)
+    subtract_chance : float, default=0.0
+        Value to subtract from means and CIs (e.g., for SVM decoding accuracy)
+
+    Returns
+    -------
+    pd.DataFrame
+        Formatted table with columns: ROI, Expert_mean, Expert_CI,
+        Novice_mean, Novice_CI, Delta_mean, Delta_CI, pFDR
+
+    Notes
+    -----
+    - Used by table generation scripts (81_*) across MVPA and supplementary analyses
+    - Handles NaN values gracefully (displays as '--')
+    - CI formatting: [low, high] with 3 decimal places
+    - p-values in scientific notation (3 sig figs)
+
+    Example
+    -------
+    >>> welch = per_roi_welch_and_fdr(expert_data, novice_data, roi_labels)
+    >>> exp_desc = get_descriptives_per_roi(expert_data)
+    >>> nov_desc = get_descriptives_per_roi(novice_data)
+    >>> roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
+    >>> df = format_roi_stats_table(welch, exp_desc, nov_desc, roi_info)
+    """
+    # Merge pretty names from ROI metadata
+    df = welch_df.merge(
+        roi_info[['roi_id', 'pretty_name']],
+        left_on='ROI_Label',
+        right_on='roi_id',
+        how='left'
+    )
+    df['ROI'] = df['pretty_name'].str.replace('\\n', ' ', regex=False)
+
+    # Helper to format (mean, ci_low, ci_high) triplets
+    def _fmt_triplet(t):
+        m, lo, hi = t
+        if pd.isna(m) or pd.isna(lo) or pd.isna(hi):
+            return '--', '[--, --]'
+        m_adj = m - subtract_chance
+        lo_adj = lo - subtract_chance
+        hi_adj = hi - subtract_chance
+        return f"{m_adj:.3f}", f"[{lo_adj:.3f}, {hi_adj:.3f}]"
+
+    # Format expert and novice descriptives
+    exp_vals, exp_cis = zip(*(_fmt_triplet(t) for t in exp_desc)) if exp_desc else ([], [])
+    nov_vals, nov_cis = zip(*(_fmt_triplet(t) for t in nov_desc)) if nov_desc else ([], [])
+
+    # Build output DataFrame
+    df_out = pd.DataFrame({
+        'ROI': df['ROI'],
+        'Expert_mean': list(exp_vals),
+        'Expert_CI': list(exp_cis),
+        'Novice_mean': list(nov_vals),
+        'Novice_CI': list(nov_cis),
+        'Delta_mean': df['mean_diff'].map(lambda v: '--' if pd.isna(v) else f"{v:.3f}"),
+        'Delta_CI': pd.Series(zip(df['ci95_low'], df['ci95_high'])).map(
+            lambda x: '[--, --]' if any(pd.isna(list(x))) else f"[{x[0]:.3f}, {x[1]:.3f}]"
+        ),
+        'pFDR': df['p_val_fdr'].map(lambda p: '--' if pd.isna(p) else f"{p:.3e}"),
+    })
+    return df_out
+
+
 __all__ = [
     'create_figure_summary',
     'format_correlation_summary',
@@ -411,6 +491,7 @@ __all__ = [
     'create_correlation_table',
     'save_latex_table',
     'save_results_metadata',
+    'format_roi_stats_table',
 ]
 
 

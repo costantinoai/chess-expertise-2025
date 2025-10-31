@@ -11,7 +11,8 @@ analyses, ensuring consistent methodology.
 """
 
 import numpy as np
-from typing import Tuple, List, Optional
+import pandas as pd
+from typing import Tuple, List, Optional, Dict
 from .stats_utils import correlate_vectors_bootstrap
 
 
@@ -257,6 +258,46 @@ def correlate_rdm_with_models(
     return results, model_rdms
 
 
+def compute_pairwise_rdm_correlations(
+    rdm_dict: Dict[str, np.ndarray],
+    method: str = 'spearman'
+) -> pd.DataFrame:
+    """
+    Compute pairwise correlations between multiple RDMs.
+
+    Parameters
+    ----------
+    rdm_dict : dict[str, np.ndarray]
+        Mapping from RDM name to square matrix (same size for all entries)
+    method : str, default='spearman'
+        Correlation method passed to ``pandas.DataFrame.corr``
+
+    Returns
+    -------
+    pd.DataFrame
+        Symmetric correlation matrix indexed by RDM names
+    """
+    if not rdm_dict:
+        raise ValueError("rdm_dict must contain at least one RDM")
+
+    names = list(rdm_dict.keys())
+    first_shape = rdm_dict[names[0]].shape
+    if len(first_shape) != 2 or first_shape[0] != first_shape[1]:
+        raise ValueError(f"RDM '{names[0]}' is not a square matrix")
+
+    n_stim = first_shape[0]
+    tri_indices = np.triu_indices(n_stim, k=1)
+
+    vectors = {}
+    for name, rdm in rdm_dict.items():
+        if rdm.shape != first_shape:
+            raise ValueError(f"RDM '{name}' shape {rdm.shape} does not match {first_shape}")
+        vectors[name] = rdm[tri_indices]
+
+    df = pd.DataFrame(vectors)
+    return df.corr(method=method)
+
+
 def compute_pairwise_rdm_reliability(rdms_list: List[np.ndarray], method: str = 'spearman') -> Tuple[float, float]:
     """
     Compute split-half reliability of RDMs.
@@ -327,5 +368,6 @@ __all__ = [
     'create_model_rdm',
     'correlate_rdms',
     'correlate_rdm_with_models',
+    'compute_pairwise_rdm_correlations',
     'compute_pairwise_rdm_reliability',
 ]

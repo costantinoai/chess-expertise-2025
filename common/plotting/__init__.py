@@ -28,6 +28,7 @@ from .colors import (
     COLORS_CHECKMATE_NONCHECKMATE,
     COLORS_WONG,
     compute_stimulus_palette,
+    lighten_color,
 )
 
 # Helpers
@@ -48,7 +49,10 @@ from .helpers import (
 # Titles (pylustrator handles layout; only titles retained)
 from .helpers import (
     set_axis_title,
+    create_standalone_colorbar,
 )
+
+from .legends import create_roi_group_legend
 
 # Bar plots
 from .bars import (
@@ -76,6 +80,7 @@ from .scatter import (
 from .surfaces import (
     plot_flat_pair,
     plot_flat_hemisphere,
+    compute_surface_symmetric_range,
 )
 
 __all__ = [
@@ -91,6 +96,7 @@ __all__ = [
     'COLORS_CHECKMATE_NONCHECKMATE',
     'COLORS_WONG',
     'compute_stimulus_palette',
+    'lighten_color',
 
     # Helpers
     'compute_symmetric_range',
@@ -107,6 +113,8 @@ __all__ = [
 
     # Titles
     'set_axis_title',
+    'create_standalone_colorbar',
+    'create_roi_group_legend',
 
     # Bars
     'plot_grouped_bars_with_ci',
@@ -127,4 +135,5 @@ __all__ = [
     # Surfaces
     'plot_flat_pair',
     'plot_flat_hemisphere',
+    'compute_surface_symmetric_range',
 ]

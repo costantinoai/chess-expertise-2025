@@ -17,7 +17,7 @@ Notes
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Iterable, Tuple
 
 import numpy as np
 from nilearn import plotting, surface, datasets
@@ -61,13 +61,11 @@ def _save_plotly(fig, title: str, output_file: Path | str | None):
     # HTML (fail fast on error)
     html_path = output_file.with_suffix('.html')
     fig.write_html(str(html_path))
-    # Optional static export via kaleido (PDF/PNG)
+    # Optional static export via kaleido (PDF-only; no PNG)
     skip_static = os.environ.get('SKIP_PLOTLY_STATIC_EXPORT', '').strip().lower() in {'1', 'true', 'yes'}
     if not skip_static:
         pdf_path = output_file.with_suffix('.pdf')
         fig.write_image(str(pdf_path))
-        png_path = output_file.with_suffix('.png')
-        fig.write_image(str(png_path))
 
 
 def _flat_meshes():
@@ -76,6 +74,43 @@ def _flat_meshes():
     flat_left = getattr(fsavg, 'flat_left', None)
     flat_right = getattr(fsavg, 'flat_right', None)
     return flat_left, flat_right, fsavg.pial_left, fsavg.pial_right
+
+
+def compute_surface_symmetric_range(imgs: Iterable) -> Tuple[float, float]:
+    """
+    Compute symmetric vmin/vmax for a collection of volume images using
+    surface projections onto fsaverage pial meshes.
+
+    Falls back to volume absolute max if surface projection fails.
+
+    Parameters
+    ----------
+    imgs : iterable of NIfTI-like images
+
+    Returns
+    -------
+    (vmin, vmax) : tuple of floats
+        Symmetric range (-absmax, absmax)
+    """
+    try:
+        fsavg = datasets.fetch_surf_fsaverage()
+        pial_left, pial_right = fsavg.pial_left, fsavg.pial_right
+        vmax = 0.0
+        for zimg in imgs:
+            try:
+                texl = surface.vol_to_surf(zimg, pial_left)
+                texr = surface.vol_to_surf(zimg, pial_right)
+                vmax = max(vmax, float(np.nanmax(np.abs(np.concatenate([texl, texr])))))
+            except Exception:
+                arr = zimg.get_fdata()
+                vmax = max(vmax, float(np.nanmax(np.abs(arr))))
+        return (-vmax, vmax)
+    except Exception:
+        vmax = 0.0
+        for zimg in imgs:
+            arr = zimg.get_fdata()
+            vmax = max(vmax, float(np.nanmax(np.abs(arr))))
+        return (-vmax, vmax)
 
 
 def _plot_hemisphere_flat(fig, mesh_flat, mesh_pial, texture, hemi: str,
@@ -120,7 +155,7 @@ def _plot_hemisphere_flat(fig, mesh_flat, mesh_pial, texture, hemi: str,
 
 
 def plot_flat_pair(
-    img,
+    data,
     title: str,
     threshold: float | None = None,
     output_file: Path | str | None = None,
@@ -157,10 +192,24 @@ def plot_flat_pair(
     """
     flat_left, flat_right, pial_left, pial_right = _flat_meshes()
 
-    tex_l = surface.vol_to_surf(img, pial_left)
-    tex_r = surface.vol_to_surf(img, pial_right)
+    # Determine textures from input (NIfTI volume, dict, or tuple/list)
+    tex_l: np.ndarray
+    tex_r: np.ndarray
+    if isinstance(data, dict) and 'left' in data and 'right' in data:
+        tex_l = np.asarray(data['left'])
+        tex_r = np.asarray(data['right'])
+    elif isinstance(data, (list, tuple)) and len(data) == 2:
+        tex_l = np.asarray(data[0])
+        tex_r = np.asarray(data[1])
+    else:
+        # Assume NIfTI-like image
+        img = data
+        tex_l = surface.vol_to_surf(img, pial_left)
+        tex_r = surface.vol_to_surf(img, pial_right)
+
+    # Symmetric color scale if not provided
     if vmin is None or vmax is None:
-        vmax_local = float(np.nanmax(np.abs(np.concatenate([tex_l, tex_r])))) if tex_l.size and tex_r.size else float(np.nanmax(np.abs(tex_l)))
+        vmax_local = float(np.nanmax(np.abs(np.concatenate([tex_l, tex_r]))))
         vmin_local = -vmax_local
     else:
         vmax_local = float(vmax)
