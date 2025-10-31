@@ -139,7 +139,7 @@ def find_beta_images(subject_id, bids_deriv_path=None, pattern='beta_*.nii'):
     subject_id : str
         Subject ID (e.g., 'sub-01')
     bids_deriv_path : str or Path, optional
-        Path to BIDS derivatives folder. If None, uses BIDS_GLM_UNSMOOTHED.
+        Path to GLM derivatives root. If None, uses CONFIG['SPM_GLM_UNSMOOTHED'].
     pattern : str, default='beta_*.nii'
         Glob pattern for beta images
 
@@ -161,7 +161,7 @@ def find_beta_images(subject_id, bids_deriv_path=None, pattern='beta_*.nii'):
     >>> print(f"Found {len(beta_paths)} beta images")
     """
     if bids_deriv_path is None:
-        bids_deriv_path = CONFIG['BIDS_GLM_UNSMOOTHED']
+        bids_deriv_path = CONFIG['SPM_GLM_UNSMOOTHED']
 
     subject_dir = Path(bids_deriv_path) / subject_id
 
@@ -186,7 +186,7 @@ def find_contrast_images(subject_id, bids_deriv_path=None, pattern='con_*.nii'):
     subject_id : str
         Subject ID (e.g., 'sub-01')
     bids_deriv_path : str or Path, optional
-        Path to BIDS derivatives folder. If None, uses BIDS_GLM_UNSMOOTHED.
+        Path to GLM derivatives root. If None, uses CONFIG['SPM_GLM_UNSMOOTHED'].
     pattern : str, default='con_*.nii'
         Glob pattern for contrast images
 
@@ -200,7 +200,7 @@ def find_contrast_images(subject_id, bids_deriv_path=None, pattern='con_*.nii'):
     >>> con_paths = find_contrast_images('sub-01')
     """
     if bids_deriv_path is None:
-        bids_deriv_path = CONFIG['BIDS_GLM_UNSMOOTHED']
+        bids_deriv_path = CONFIG['SPM_GLM_UNSMOOTHED']
 
     subject_dir = Path(bids_deriv_path) / subject_id
 
@@ -703,7 +703,7 @@ def validate_bids_paths():
         CONFIG['BIDS_ROOT'],
         CONFIG['BIDS_DERIVATIVES'],
         CONFIG['BIDS_PARTICIPANTS'],
-        CONFIG['BIDS_GLM_UNSMOOTHED'],
+        CONFIG['SPM_GLM_DIR'],
     ]
 
     missing_paths = [p for p in required_paths if not p.exists()]

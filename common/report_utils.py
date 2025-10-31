@@ -13,7 +13,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-from .formatters import format_pvalue_latex, format_ci as fmt_ci
+from .formatters import format_pvalue_latex, format_ci
 import logging
 
 
@@ -156,6 +156,8 @@ def format_correlation_summary(
     model_labels_map: Optional[Dict[str, str]] = None,
     ci_brackets: bool = True,
     p_sci: bool = True,
+    exp_p_fdr: Optional[Dict[str, float]] = None,
+    nov_p_fdr: Optional[Dict[str, float]] = None,
 ) -> pd.DataFrame:
     """
     Create a standardized correlation summary DataFrame for export.
@@ -178,8 +180,8 @@ def format_correlation_summary(
     Returns
     -------
     pd.DataFrame
-        Columns: Model, r_Experts, 95%_CI_Experts, p_Experts,
-                 r_Novices, 95%_CI_Novices, p_Novices
+        Columns: Model, r_Experts, 95%_CI_Experts, p_Experts, pFDR_Experts,
+                 r_Novices, 95%_CI_Novices, p_Novices, pFDR_Novices
         Ordered by model_columns
     """
     # Convert results to dict by model name for quick lookup
@@ -204,6 +206,13 @@ def format_correlation_summary(
             '95%_CI_Novices': f"[{nci_l:.3f}, {nci_u:.3f}]" if ci_brackets else None,
             'p_Novices': f"{npv:.3e}" if p_sci else f"{npv:.3f}",
         }
+        # Optional FDR-corrected p-values
+        if isinstance(exp_p_fdr, dict) and key in exp_p_fdr:
+            pexp_fdr = exp_p_fdr[key]
+            row['pFDR_Experts'] = f"{pexp_fdr:.3e}" if p_sci else f"{pexp_fdr:.3f}"
+        if isinstance(nov_p_fdr, dict) and key in nov_p_fdr:
+            pnov_fdr = nov_p_fdr[key]
+            row['pFDR_Novices'] = f"{pnov_fdr:.3e}" if p_sci else f"{pnov_fdr:.3f}"
         rows.append(row)
 
     df = pd.DataFrame(rows)
@@ -333,7 +342,9 @@ def create_correlation_table(
     novice_results: List[Tuple[str, float, float, float, float]],
     model_labels: Optional[Dict[str, str]] = None,
     caption: str = "Behavioral RDM correlations with model RDMs",
-    label: str = "tab:behavioral_correlations"
+    label: str = "tab:behavioral_correlations",
+    exp_p_fdr: Optional[Dict[str, float]] = None,
+    nov_p_fdr: Optional[Dict[str, float]] = None,
 ) -> pd.DataFrame:
     """
     Create a correlation summary DataFrame for expert vs novice results.
@@ -370,15 +381,20 @@ def create_correlation_table(
         label_pretty = model_labels.get(key, key.capitalize()) if model_labels else key
         er, ep, ecl, ech = exp_res[1:]
         nr, npv, ncl, nch = nov_res[1:]
-        df_rows.append({
+        row = {
             'Model': label_pretty,
             'r_Experts': f"{er:.3f}",
-            '95%_CI_Experts': fmt_ci(ecl, ech, precision=3, latex=False),
+            '95%_CI_Experts': format_ci(ecl, ech, precision=3, latex=False),
             'p_Experts': f"{ep:.3e}",
             'r_Novices': f"{nr:.3f}",
-            '95%_CI_Novices': fmt_ci(ncl, nch, precision=3, latex=False),
+            '95%_CI_Novices': format_ci(ncl, nch, precision=3, latex=False),
             'p_Novices': f"{npv:.3e}",
-        })
+        }
+        if isinstance(exp_p_fdr, dict) and key in exp_p_fdr:
+            row['pFDR_Experts'] = f"{exp_p_fdr[key]:.3e}"
+        if isinstance(nov_p_fdr, dict) and key in nov_p_fdr:
+            row['pFDR_Novices'] = f"{nov_p_fdr[key]:.3e}"
+        df_rows.append(row)
 
     return pd.DataFrame(df_rows)
 

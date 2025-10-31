@@ -12,7 +12,6 @@ from scipy.stats import ttest_ind, ttest_1samp
 from statsmodels.stats.multitest import multipletests
 from pingouin import compute_effsize
 import pingouin as pg
-from .formatters import format_pvalue_plain as _format_pvalue_plain
 
 
 def welch_ttest(
@@ -169,29 +168,28 @@ def compute_mean_ci_and_ttest_vs_value(
     - CI computed around the sample mean (not around the difference), using t critical value
     - p-value adjusted for one-tailed alternatives from the two-sided p-value
     """
-    import numpy as _np
-    from scipy.stats import t as _t
+    from scipy.stats import t
 
-    x = _np.asarray(data, dtype=float)
-    x = x[_np.isfinite(x)]
+    x = np.asarray(data, dtype=float)
+    x = x[np.isfinite(x)]
     if x.size == 0:
-        return (_np.nan, _np.nan, _np.nan, _np.nan, _np.nan)
+        return (np.nan, np.nan, np.nan, np.nan, np.nan)
 
     n = x.size
-    mean = float(_np.mean(x))
+    mean = float(np.mean(x))
     if n < 2:
         # Not enough samples to compute CI or t-test
-        return (mean, _np.nan, _np.nan, _np.nan, _np.nan)
+        return (mean, np.nan, np.nan, np.nan, np.nan)
 
-    sd = float(_np.std(x, ddof=1))
-    se = sd / _np.sqrt(n)
-    tcrit = float(_t.ppf(0.5 + confidence_level / 2.0, df=n - 1))
+    sd = float(np.std(x, ddof=1))
+    se = sd / np.sqrt(n)
+    tcrit = float(t.ppf(0.5 + confidence_level / 2.0, df=n - 1))
     ci_low = mean - tcrit * se
     ci_high = mean + tcrit * se
 
-    res = ttest_1samp(x, popmean=popmean)
-    t_stat = float(res.statistic)
-    p_two = float(res.pvalue)
+    ttest_result = ttest_1samp(x, popmean=popmean)
+    t_stat = float(ttest_result.statistic)
+    p_two = float(ttest_result.pvalue)
 
     if alternative == 'two-sided':
         p_val = p_two
@@ -336,7 +334,7 @@ def correlate_vectors_bootstrap(
 
     # Spearman does not support bootstrap in pingouin - compute without bootstrap
     if method == 'spearman':
-        res = pg.corr(
+        corr_result = pg.corr(
             x=x,
             y=y,
             method=method,
@@ -344,18 +342,18 @@ def correlate_vectors_bootstrap(
         )
         # Validate expected columns strictly (no silent fallbacks)
         required_cols = {'r', 'p-val'}
-        missing = required_cols - set(res.columns)
+        missing = required_cols - set(corr_result.columns)
         if missing:
             raise RuntimeError(
-                f"pingouin.corr missing expected columns: {sorted(missing)}; got columns={list(res.columns)}"
+                f"pingouin.corr missing expected columns: {sorted(missing)}; got columns={list(corr_result.columns)}"
             )
-        r = float(res['r'].iloc[0])
-        p = float(res['p-val'].iloc[0])
+        r = float(corr_result['r'].iloc[0])
+        p = float(corr_result['p-val'].iloc[0])
         # No bootstrap CIs available for Spearman in pingouin
         return r, p, np.nan, np.nan
 
     # Pearson with bootstrap CIs
-    res = pg.corr(
+    corr_result = pg.corr(
         x=x,
         y=y,
         method=method,
@@ -366,14 +364,14 @@ def correlate_vectors_bootstrap(
     )
     # Validate expected columns strictly (no silent fallbacks)
     required_cols = {'r', 'p-val', 'CI95%'}
-    missing = required_cols - set(res.columns)
+    missing = required_cols - set(corr_result.columns)
     if missing:
         raise RuntimeError(
-            f"pingouin.corr missing expected columns: {sorted(missing)}; got columns={list(res.columns)}"
+            f"pingouin.corr missing expected columns: {sorted(missing)}; got columns={list(corr_result.columns)}"
         )
-    r = float(res['r'].iloc[0])
-    p = float(res['p-val'].iloc[0])
-    v = res['CI95%'].iloc[0]
+    r = float(corr_result['r'].iloc[0])
+    p = float(corr_result['p-val'].iloc[0])
+    v = corr_result['CI95%'].iloc[0]
     if not (hasattr(v, '__len__') and len(v) == 2):
         raise RuntimeError("pingouin.corr returned CI95% not parseable as (low, high)")
     try:
@@ -383,33 +381,6 @@ def correlate_vectors_bootstrap(
     return r, p, ci_low, ci_high
 
 
-def format_pvalue(p: float, threshold: float = 0.001) -> str:
-    """
-    Format p-value for display in tables or plots.
-
-    Parameters
-    ----------
-    p : float
-        P-value to format
-    threshold : float, default=0.001
-        Threshold below which to display as "< threshold"
-
-    Returns
-    -------
-    formatted : str
-        Formatted p-value string
-
-    Example
-    -------
-    >>> format_pvalue(0.0001)
-    '< 0.001'
-    >>> format_pvalue(0.0234)
-    '0.023'
-    >>> format_pvalue(0.456)
-    '0.456'
-    """
-    # Delegate to centralized formatter for consistency
-    return _format_pvalue_plain(float(p), threshold=threshold)
 
 
 def partial_correlation_rdms(
@@ -835,9 +806,9 @@ def per_roi_one_sample_vs_value(
         x = x[~np.isnan(x)]
         if x.size < 2:
             continue
-        res = ttest_1samp(x, popmean=value)
-        t_stats[i] = float(res.statistic)
-        p_two_sided[i] = float(res.pvalue)
+        ttest_result = ttest_1samp(x, popmean=value)
+        t_stats[i] = float(ttest_result.statistic)
+        p_two_sided[i] = float(ttest_result.pvalue)
 
     # Tail adjustment
     if alternative == 'two-sided':

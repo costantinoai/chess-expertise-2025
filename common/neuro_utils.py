@@ -15,8 +15,11 @@ import numpy as np
 import nibabel as nib
 from nibabel.freesurfer import io as fsio
 from pathlib import Path
-from typing import List, Union, Tuple
-from .bids_utils import find_beta_images, load_roi_metadata
+from typing import List, Union, Tuple, Dict, Optional
+from .bids_utils import load_roi_metadata
+from .spm_utils import _get_beta_filename, _get_spm_dir
+import scipy.io as sio
+import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -150,49 +153,6 @@ def extract_roi_data(beta_imgs, roi_mask):
         data_matrix[i, :] = beta_data[roi_mask]
 
     return data_matrix
-
-
-def load_glm_betas(subject_id, bids_glm_path, n_betas=None):
-    """
-    Load beta images for a subject from GLM directory.
-
-    Parameters
-    ----------
-    subject_id : str
-        Subject ID (e.g., 'sub-01')
-    bids_glm_path : str or Path
-        Path to BIDS GLM derivatives folder
-    n_betas : int, optional
-        Number of beta images to load. If None, loads all beta_*.nii files.
-
-    Returns
-    -------
-    list of nibabel.nifti1.Nifti1Image
-        List of beta images
-
-    Raises
-    ------
-    FileNotFoundError
-        If subject directory or beta images not found
-
-    Example
-    -------
-    >>> from common import CONFIG
-    >>> betas = load_glm_betas('sub-01', CONFIG['BIDS_GLM_UNSMOOTHED'], n_betas=40)
-    >>> len(betas)
-    40
-    """
-    # Discover beta files via BIDS utilities for consistency
-    beta_files = find_beta_images(subject_id, bids_deriv_path=bids_glm_path, pattern='beta_*.nii')
-
-    # Limit to n_betas if specified
-    if n_betas is not None:
-        beta_files = beta_files[:n_betas]
-
-    # Load beta images
-    beta_imgs = [load_nifti(f) for f in beta_files]
-
-    return beta_imgs
 
 
 def mask_brain_data(data, mask):
@@ -359,8 +319,7 @@ def compute_roi_size(mask, affine=None):
 
     if affine is not None:
         # Compute voxel volume robustly from affine (handles rotations/shears)
-        import numpy as _np
-        voxel_volume = abs(_np.linalg.det(affine[:3, :3]))
+        voxel_volume = abs(np.linalg.det(affine[:3, :3]))
         result['volume_mm3'] = float(n_voxels * voxel_volume)
 
     return result
@@ -501,11 +460,124 @@ def clean_voxels(
     return data[:, keep_mask], keep_mask
 
 
+def map_glasser_roi_to_harvard_oxford(
+    roi_label: int,
+    glasser_atlas_img: nib.Nifti1Image,
+    threshold: float = 0.25,
+) -> str:
+    """
+    Map a Glasser atlas ROI to its Harvard-Oxford anatomical label via center of mass.
+
+    This function computes the center of mass of a Glasser ROI in MNI space, then
+    looks up the corresponding Harvard-Oxford cortical atlas label at that coordinate.
+    This provides familiar anatomical terminology to complement Glasser's fine-grained
+    parcellation.
+
+    Procedure:
+    1. Extract all voxels belonging to the specified Glasser ROI
+    2. Compute center of mass in voxel space
+    3. Transform center of mass to MNI coordinates
+    4. Look up Harvard-Oxford label at that MNI coordinate
+
+    Parameters
+    ----------
+    roi_label : int
+        Glasser ROI label/index to map (from atlas intensity values)
+    glasser_atlas_img : nibabel.Nifti1Image
+        Glasser atlas image in MNI space
+    threshold : float, default=0.25
+        Probability threshold for Harvard-Oxford atlas (0-1). Standard values are
+        0.25 (default, more inclusive) or 0.50 (more conservative).
+
+    Returns
+    -------
+    str
+        Harvard-Oxford anatomical label at the ROI's center of mass, or:
+        - "No ROI voxels" if ROI label not found in atlas
+        - "Invalid CoM" if center of mass computation fails
+        - "Unlabeled" if center of mass falls outside Harvard-Oxford parcellation
+        - "Unknown label X" if label index is out of range
+
+    Notes
+    -----
+    - Uses nilearn.datasets.fetch_atlas_harvard_oxford to retrieve the atlas
+    - Harvard-Oxford labels are based on probabilistic maps thresholded at the
+      specified probability (default 25%)
+    - The center of mass provides a single representative coordinate for each ROI,
+      which is then mapped to the nearest Harvard-Oxford region
+
+    Examples
+    --------
+    >>> glasser_img = nib.load('Glasser_MNI_atlas.nii.gz')
+    >>> ho_label = map_glasser_roi_to_harvard_oxford(roi_label=42, glasser_atlas_img=glasser_img)
+    >>> print(f"Glasser ROI 42 maps to: {ho_label}")
+    Glasser ROI 42 maps to: Inferior Parietal Lobule
+
+    References
+    ----------
+    - Glasser et al. (2016). A multi-modal parcellation of human cerebral cortex.
+      Nature, 536(7615), 171-178.
+    - Harvard-Oxford atlases: https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/Atlases
+    """
+    from nilearn.datasets import fetch_atlas_harvard_oxford
+    from nilearn.image import coord_transform
+    from scipy.ndimage import center_of_mass
+
+    try:
+        # Step 1: Extract Glasser ROI voxels
+        glasser_data = glasser_atlas_img.get_fdata()
+        roi_mask = (glasser_data == roi_label)
+
+        if not np.any(roi_mask):
+            return "No ROI voxels"
+
+        # Step 2: Compute center of mass in voxel space
+        com_voxel = center_of_mass(roi_mask)
+
+        if np.any(np.isnan(com_voxel)):
+            return "Invalid CoM"
+
+        # Step 3: Convert center of mass to MNI space
+        com_mni = coord_transform(*com_voxel, glasser_atlas_img.affine)
+
+        # Step 4: Fetch Harvard-Oxford atlas
+        threshold_pct = int(threshold * 100)
+        atlas_ho = fetch_atlas_harvard_oxford(f'cort-maxprob-thr{threshold_pct}-2mm')
+        # atlas_ho.maps is already a Nifti1Image object, not a file path
+        atlas_img_ho = atlas_ho.maps
+        atlas_data_ho = atlas_img_ho.get_fdata()
+        atlas_labels_ho = atlas_ho.labels
+
+        # Step 5: Convert MNI coordinate to voxel space of Harvard-Oxford atlas
+        inv_affine_ho = np.linalg.inv(atlas_img_ho.affine)
+        com_voxel_ho = coord_transform(*com_mni, inv_affine_ho)
+
+        # Round and clip to valid voxel indices
+        x, y, z = [int(round(v)) for v in com_voxel_ho]
+        x = np.clip(x, 0, atlas_data_ho.shape[0] - 1)
+        y = np.clip(y, 0, atlas_data_ho.shape[1] - 1)
+        z = np.clip(z, 0, atlas_data_ho.shape[2] - 1)
+
+        # Step 6: Look up Harvard-Oxford label at this voxel
+        label_idx = int(atlas_data_ho[x, y, z])
+
+        if label_idx == 0:
+            return "Unlabeled"
+
+        if label_idx >= len(atlas_labels_ho):
+            return f"Unknown label {label_idx}"
+
+        return atlas_labels_ho[label_idx]
+
+    except Exception as e:
+        logger.warning(f"Failed to map Glasser ROI {roi_label} to Harvard-Oxford: {e}")
+        return f"Error: {str(e)}"
+
+
 __all__ = [
     'load_nifti',
     'load_roi_mask',
     'extract_roi_data',
-    'load_glm_betas',
     'mask_brain_data',
     'save_brain_map',
     'reconstruct_brain_map',
@@ -519,6 +591,7 @@ __all__ = [
     'fill_atlas_with_values',
     'compute_surface_roi_means',
     'roi_values_to_surface_texture',
+    'map_glasser_roi_to_harvard_oxford',
 ]
 
 def compute_roi_means(

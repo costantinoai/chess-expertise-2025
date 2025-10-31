@@ -160,6 +160,7 @@ __all__ = [
     'split_by_group',
     'discover_files_by_group',
     'find_subject_tsvs',
+    
 ]
 
 
@@ -227,6 +228,9 @@ def copy_script_to_results(
         logger.info(f"Copied script to: {dest_path}")
 
     return dest_path
+
+
+    
 
 
 def get_all_results_directories(

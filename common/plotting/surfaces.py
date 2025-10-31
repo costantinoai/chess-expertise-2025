@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Iterable, Tuple
+import logging
 
 import numpy as np
 from nilearn import plotting, surface, datasets
@@ -27,6 +28,8 @@ from plotly.subplots import make_subplots
 from .colors import CMAP_BRAIN
 from .style import PLOT_PARAMS
 from typing import List, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def _mpl_to_plotly_scale(cmap, n: int = 256) -> List[Tuple[float, str]]:
@@ -48,10 +51,11 @@ def _mpl_to_plotly_scale(cmap, n: int = 256) -> List[Tuple[float, str]]:
 
 def _save_plotly(fig, title: str, output_file: Path | str | None):
     """
-    Save Plotly figure to HTML and PDF (requires kaleido); silently skip on error.
+    Save Plotly figure to HTML and optionally PDF (requires kaleido).
 
-    - Always writes a sidecar HTML for interactive inspection if output_file provided
-    - Tries to export PDF using kaleido unless disabled via env var SKIP_PLOTLY_STATIC_EXPORT
+    - Writes an interactive HTML when `output_file` is provided (raises on write errors)
+    - Attempts a PDF export using kaleido unless disabled via env var
+      `SKIP_PLOTLY_STATIC_EXPORT`.
     """
     if output_file is None:
         return
@@ -69,10 +73,18 @@ def _save_plotly(fig, title: str, output_file: Path | str | None):
 
 
 def _flat_meshes():
-    """Fetch fsaverage meshes; return (flat_left, flat_right, pial_left, pial_right)."""
+    """Fetch fsaverage meshes; return (flat_left, flat_right, pial_left, pial_right).
+
+    Notes
+    -----
+    If flat meshes are unavailable in the local nilearn dataset, falls back to
+    pial meshes and logs this event (no silent fallback).
+    """
     fsavg = datasets.fetch_surf_fsaverage(mesh='fsaverage')
     flat_left = getattr(fsavg, 'flat_left', None)
     flat_right = getattr(fsavg, 'flat_right', None)
+    if flat_left is None or flat_right is None:
+        logger.debug("Flat meshes not found in fsaverage; falling back to pial meshes")
     return flat_left, flat_right, fsavg.pial_left, fsavg.pial_right
 
 

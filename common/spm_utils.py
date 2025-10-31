@@ -35,7 +35,7 @@ def load_spm_beta_images(
     subject_id : str
         Subject code (e.g., '03')
     glm_dir : Path
-        Base directory containing GLM results (e.g., BIDS_GLM_UNSMOOTHED)
+        Base directory containing GLM results (e.g., CONFIG['SPM_GLM_UNSMOOTHED'])
     spm_filename : str, default='SPM.mat'
         Name of the SPM file
 
@@ -54,7 +54,7 @@ def load_spm_beta_images(
     Example
     -------
     >>> from common import CONFIG
-    >>> betas = load_spm_beta_images('sub-03', CONFIG['BIDS_GLM_UNSMOOTHED'])
+    >>> betas = load_spm_beta_images('sub-03', CONFIG['SPM_GLM_UNSMOOTHED'])
     >>> print(list(betas.keys()))  # ['C1', 'C2', ..., 'C40']
     """
     # Normalize path input to support str/Path
@@ -165,7 +165,7 @@ def extract_roi_voxel_matrices(
     >>> atlas_data = atlas_img.get_fdata().astype(int)
     >>> roi_labels = np.unique(atlas_data)[1:]  # Exclude 0
     >>> from common import CONFIG
-    >>> roi_mats = extract_roi_voxel_matrices('sub-03', atlas_data, roi_labels, CONFIG['BIDS_GLM_UNSMOOTHED'])
+    >>> roi_mats = extract_roi_voxel_matrices('sub-03', atlas_data, roi_labels, CONFIG['SPM_GLM_UNSMOOTHED'])
     >>> print(roi_mats[1].shape)  # (40, n_voxels)
     """
     logger.info(f"[Subject {subject_id}] Extracting ROI voxel matrices...")
