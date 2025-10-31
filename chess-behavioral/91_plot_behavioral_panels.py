@@ -52,6 +52,8 @@ from common.plotting import (
     PLOT_PARAMS,
     save_axes_svgs,
     save_panel_svg,
+    save_axes_pdfs,
+    save_panel_pdf,
 )
 
 
@@ -350,12 +352,10 @@ plt.figure(1).ax_dict["A4_DirPref_Novices"].set(position=[0.05331, 0.5035, 0.153
 plt.figure(1).ax_dict["A4_DirPref_Novices"].set_position([0.079160, 0.376982, 0.219633, 0.236670])
 plt.figure(1).ax_dict["A4_DirPref_Novices"].texts[0].set(position=(0.5, 1.067))
 plt.figure(1).ax_dict["A4_DirPref_Novices"].texts[1].set(position=(0.5, 1.016))
-plt.figure(1).ax_dict["B1_MDS_Experts"].set(position=[0.4266, 0.7453, 0.2268, 0.1913])
-plt.figure(1).ax_dict["B1_MDS_Experts"].set_position([0.620516, 0.679364, 0.329878, 0.240765])
+plt.figure(1).ax_dict["B1_MDS_Experts"].set(position=[0.6537, 0.6794, 0.2967, 0.2408])
 plt.figure(1).ax_dict["B1_MDS_Experts"].texts[0].set(position=(0.5, 1.069))
 plt.figure(1).ax_dict["B1_MDS_Experts"].texts[1].set(position=(0.5, 1.018))
-plt.figure(1).ax_dict["B2_MDS_Novices"].set(position=[0.4266, 0.5036, 0.2268, 0.1913])
-plt.figure(1).ax_dict["B2_MDS_Novices"].set_position([0.620516, 0.375105, 0.329878, 0.240765])
+plt.figure(1).ax_dict["B2_MDS_Novices"].set(position=[0.6537, 0.3751, 0.2967, 0.2408])
 plt.figure(1).ax_dict["B2_MDS_Novices"].texts[0].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["B2_MDS_Novices"].texts[1].set(position=(0.5, 1.018))
 plt.figure(1).ax_dict["C1_Choice_Experts"].set(position=[0.04475, 0.2642, 0.204, 0.1883], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], xlim=(-1., 41.), yticks=[0., 100., 200., 300., 400.], yticklabels=['0', '100', '200', '300', '400'], ylim=(0., 450.))
@@ -389,6 +389,8 @@ plt.show()
 # Save each axis separately first, then full panel
 fig = plt.gcf()
 save_axes_svgs(fig, FIGURES_DIR, 'behavioral')
+save_axes_pdfs(fig, FIGURES_DIR, 'behavioral')
 save_panel_svg(fig, FIGURES_DIR / 'panels' / 'behavioral_rsa_panel.svg')
+save_panel_pdf(fig, FIGURES_DIR / 'panels' / 'behavioral_rsa_panel.pdf')
 
 log_script_end(logger)

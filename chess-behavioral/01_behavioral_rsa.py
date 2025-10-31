@@ -86,7 +86,7 @@ config, output_dir, logger = setup_analysis(
 
 
 def analyze_group(
-    group_pairwise: pd.DataFrame, 
+    group_pairwise: pd.DataFrame,
     category_df: pd.DataFrame,
     expertise_label: str
 ) -> tuple:
@@ -125,21 +125,31 @@ def analyze_group(
     logger.info(f"Analyzing {expertise_label} group...")
     logger.info(f"  {len(group_pairwise)} unique pairwise comparisons")
 
-    # Compute behavioral RDM from aggregated pairwise data
+    # Convert aggregated pairwise preference counts into a symmetric dissimilarity matrix.
+    # For each pair (i,j), dissimilarity reflects how inconsistent preferences were:
+    # - Low dissimilarity: participants consistently preferred one stimulus over the other
+    # - High dissimilarity: preferences were random or split
+    # The RDM is symmetric because we don't care about direction, only consistency.
     group_rdm = compute_symmetric_rdm(group_pairwise)
     logger.info("  Computed behavioral RDM")
 
-    # Compute directional DSM from aggregated pairwise data
+    # Also create a directional dissimilarity matrix that preserves which stimulus was preferred.
+    # DSM(i,j) = proportion of times i was preferred over j. This is asymmetric: DSM(i,j) ≠ DSM(j,i).
+    # Useful for understanding directional preference biases (e.g., always prefer check positions).
     group_dsm = compute_directional_dsm(group_pairwise)
     logger.info("  Computed directional DSM")
 
-    # Correlate with model RDMs
+    # Test whether behavioral preferences align with theoretical models of similarity.
+    # For each model (check status, strategy, visual appearance), compute Pearson correlation
+    # between behavioral RDM and model RDM. Bootstrap resampling (10,000 iterations; percentile
+    # method via pingouin) provides 95% confidence intervals and parametric p-values, testing
+    # whether the correlation significantly differs from zero.
     model_columns = CONFIG['MODEL_COLUMNS']
     correlation_results, model_rdms = correlate_with_all_models(
         group_rdm, category_df, model_columns
     )
 
-    # Log correlation results
+    # Log results for each model
     logger.info(f"\n  Correlation Results ({expertise_label}):")
     for col, r, p, ci_l, ci_u in correlation_results:
         logger.info(f"    {col}: r={r:.3f}, p={p:.3e}, 95%CI=[{ci_l:.3f}, {ci_u:.3f}]")
@@ -161,27 +171,34 @@ logger.info(f"Loaded {n_experts} experts and {n_novices} novices")
 
 logger.info("Loading trial data and creating pairwise comparisons...")
 
-# Initialize storage for pairwise dataframes
-experts_pairwise_dfs = []  # List of pairwise DataFrames (one per expert)
-novices_pairwise_dfs = []  # List of pairwise DataFrames (one per novice)
+# We'll store individual pairwise DataFrames (one per participant) before aggregating.
+# This preserves the complete data structure needed for bootstrap resampling later.
+experts_pairwise_dfs = []
+novices_pairwise_dfs = []
 
-# Process each participant sequentially
+# Process each participant individually
 for subject_id, is_expert in participants_list:
     logger.info(f"  Processing {subject_id} (expert={is_expert})...")
 
-    # Load trial data from BIDS events.tsv files
-    # Returns DataFrame with columns: stim_id, preference, sub_id, run, run_trial_n, etc.
+    # Read BIDS events.tsv files containing trial-by-trial task data.
+    # The 1-back task presents stimuli sequentially; participants indicate which of the
+    # two most recent boards they prefer. We extract these preferences as trial records.
     trial_df = load_participant_trial_data(subject_id, is_expert, CONFIG['BIDS_ROOT'])
 
     if trial_df is None:
         logger.warning(f"  Skipping {subject_id} (no valid data)")
         continue
 
-    # Convert trial data to pairwise comparisons (preference of i vs j) and store
+    # Convert trial-level preferences into pairwise comparison format.
+    # Each trial where participant prefers stimulus A over stimulus B becomes a record:
+    # (better=A, worse=B). This is the fundamental unit for RSA analysis.
+    pairwise_df = create_pairwise_df(trial_df)
+
+    # Store by group for later aggregation
     if is_expert:
-        experts_pairwise_dfs.append(create_pairwise_df(trial_df))
+        experts_pairwise_dfs.append(pairwise_df)
     else:
-        novices_pairwise_dfs.append(create_pairwise_df(trial_df))
+        novices_pairwise_dfs.append(pairwise_df)
 
 logger.info(
     f"Collected pairwise data from {len(experts_pairwise_dfs)} experts and {len(novices_pairwise_dfs)} novices"
@@ -192,11 +209,13 @@ logger.info(
 # ============================================================================
 logger.info("Aggregating pairwise preferences across participants...")
 
-# Aggregate expert pairwise data (sum count of preferences for each unique pair)
+# Instead of computing individual RDMs and averaging (which loses information),
+# we aggregate raw counts across participants. For each unique pair (i,j), sum the
+# number of times i was preferred over j across all participants in the group.
+# This preserves all information and avoids aggregation artifacts.
 expert_pairwise = aggregate_pairwise_counts(experts_pairwise_dfs)
 logger.info(f"  Experts: {len(expert_pairwise)} unique stimulus pairs")
 
-# Aggregate novice pairwise data (sum count of preferences for each unique pair)
 novice_pairwise = aggregate_pairwise_counts(novices_pairwise_dfs)
 logger.info(f"  Novices: {len(novice_pairwise)} unique stimulus pairs")
 
@@ -232,7 +251,11 @@ np.save(output_dir / "expert_directional_dsm.npy", expert_dsm)
 np.save(output_dir / "novice_directional_dsm.npy", novice_dsm)
 logger.info("  Saved behavioral RDMs and DSMs")
 
-# Also compute and save 2D MDS embeddings (for plotting-only scripts)
+# Compute 2D multidimensional scaling (MDS) embeddings for visualization.
+# MDS finds a low-dimensional (2D here) representation that preserves pairwise dissimilarities
+# as closely as possible. This allows us to visualize the 40×40 RDM as a 2D scatter plot,
+# where distance between points approximates dissimilarity. Useful for identifying clusters
+# and visually comparing expert vs novice representational spaces.
 from sklearn.manifold import MDS
 mds = MDS(n_components=2, dissimilarity="precomputed", random_state=CONFIG['RANDOM_SEED'])
 logger.info("Computing 2D MDS embeddings for Experts and Novices (for plotting)...")
@@ -251,7 +274,9 @@ with open(output_dir / "pairwise_data.pkl", "wb") as f:
     pickle.dump(pairwise_data, f)
 logger.info("  Saved pairwise comparison data")
 
-# Save model RDMs and correlation results
+# Package model RDMs and correlation results for downstream plotting/tables.
+# Model RDMs are saved as a dictionary (model_name -> 40×40 matrix) for easy lookup.
+# Correlation results include all statistics: r, p-value, and 95% confidence intervals.
 model_rdms_dict = {
     col: rdm for (col, _, _, _, _), rdm in zip(expert_correlations, expert_model_rdms)
 }
@@ -267,11 +292,13 @@ with open(output_dir / "correlation_results.pkl", "wb") as f:
     pickle.dump(correlation_results, f)
 logger.info("  Saved model RDMs and correlation results")
 
-# Create and save summary table (CSV for easy viewing)
+# Create a human-readable summary table comparing expert and novice correlations.
+# This CSV file provides a quick overview without needing to load pickle files.
+# Table includes: model names, expert r/p/CI, novice r/p/CI, formatted for readability.
 from common.report_utils import format_correlation_summary
 
 model_columns = CONFIG['MODEL_COLUMNS']
-labels_map = MODEL_LABELS  # pretty labels map (may include newlines)
+labels_map = MODEL_LABELS
 summary_df = format_correlation_summary(
     expert_correlations,
     novice_correlations,

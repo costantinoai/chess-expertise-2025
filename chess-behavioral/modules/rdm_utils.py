@@ -206,14 +206,14 @@ def compute_symmetric_rdm(pairwise_df: pd.DataFrame) -> np.ndarray:
 
     # Get all unique stimulus IDs
     all_stimuli = sorted(set(pairwise_df["better"]).union(set(pairwise_df["worse"])))
-    n_stimuli = max(all_stimuli)  # Assuming IDs from 1 to n
+    n_stimuli = int(max(all_stimuli))  # Assuming IDs from 1 to n
 
     # Initialize count matrix (0-indexed, so subtract 1 from stimulus IDs)
     count_matrix = np.zeros((n_stimuli, n_stimuli), dtype=int)
 
     # Fill count matrix from pairwise counts
     for (i, j), count in counts_dict.items():
-        count_matrix[i - 1, j - 1] = count
+        count_matrix[int(i) - 1, int(j) - 1] = count
 
     # Compute symmetric RDM as absolute difference
     # RDM[i,j] = |count(i>j) - count(j>i)|
