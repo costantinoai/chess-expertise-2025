@@ -20,14 +20,16 @@ repo_root = Path(__file__).resolve().parent.parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-# Import pylustrator BEFORE creating any Matplotlib figures
-import pylustrator
-pylustrator.start()
+# Import CONFIG first to check pylustrator flag
+from common import CONFIG
+
+# Conditionally start pylustrator BEFORE creating any figures
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    import pylustrator
+    pylustrator.start()
 
 import matplotlib.pyplot as plt
 from nibabel.freesurfer import io as fsio
-
-from common import CONFIG
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.bids_utils import load_roi_metadata

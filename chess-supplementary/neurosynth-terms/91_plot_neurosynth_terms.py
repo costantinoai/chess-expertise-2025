@@ -18,14 +18,16 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 script_dir = Path(__file__).parent
 
-# Import pylustrator BEFORE creating any Matplotlib figures
-import pylustrator
-pylustrator.start()
+# Import CONFIG first to check pylustrator flag
+from common import CONFIG
+
+# Conditionally start pylustrator BEFORE creating any figures
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    import pylustrator
+    pylustrator.start()
 
 import matplotlib.pyplot as plt
 from nilearn import image, plotting
-
-from common import CONFIG
 from common.plotting import (
     apply_nature_rc,
     plot_flat_pair,
