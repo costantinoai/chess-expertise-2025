@@ -137,16 +137,6 @@ from modules.models import build_feature_matrix
 from common.group_stats import get_descriptives_per_roi
 
 # =============================================================================
-# Configuration
-# =============================================================================
-
-ATLAS_PATH = CONFIG["ROI_GLASSER_22_ATLAS"]
-ROI_INFO_PATH = CONFIG["ROI_GLASSER_22"] / "region_info.tsv"
-GLM_BASE_PATH = CONFIG["BIDS_GLM_UNSMOOTHED"]
-PARTICIPANTS_PATH = CONFIG["BIDS_PARTICIPANTS"]
-ALPHA = CONFIG["ALPHA"]
-
-# =============================================================================
 # Setup
 # =============================================================================
 
@@ -164,9 +154,9 @@ config, output_dir, logger = setup_analysis(
 # (names, hemisphere assignments), and participant information (IDs, expertise labels).
 # The atlas defines 22 bilateral cortical regions selected for chess-related processing.
 atlas_data, roi_labels, roi_info, participants = load_atlas_and_metadata(
-    atlas_path=ATLAS_PATH,
-    roi_info_path=ROI_INFO_PATH,
-    participants_path=PARTICIPANTS_PATH,
+    atlas_path=CONFIG["ROI_GLASSER_22_ATLAS"],
+    roi_info_path=CONFIG["ROI_GLASSER_22"] / "region_info.tsv",
+    participants_path=CONFIG["BIDS_PARTICIPANTS"],
     load_atlas_func=load_atlas,
 )
 
@@ -199,7 +189,7 @@ for subject_id in all_subjects:
         subject_id=subject_id,
         atlas_data=atlas_data,
         roi_labels=roi_labels,
-        base_path=GLM_BASE_PATH,
+        base_path=CONFIG["SPM_GLM_UNSMOOTHED"],
     )
     # Store as long-format table: one row per subject-ROI combination
     for roi_idx, roi_label in enumerate(roi_labels):
@@ -242,7 +232,7 @@ summary_stats.to_csv(output_dir / "pr_summary_stats.csv", index=False)
 # correction across the 22 ROIs to control for multiple comparisons.
 # Hypothesis: experts and novices differ in representational dimensionality.
 stats_results = compare_groups_welch_fdr(
-    pr_df=pr_df, participants_df=participants, roi_labels=roi_labels, alpha=ALPHA
+    pr_df=pr_df, participants_df=participants, roi_labels=roi_labels, alpha=CONFIG["ALPHA"]
 )
 
 # Identify and log which ROIs show significant expertise differences after FDR correction
@@ -424,9 +414,9 @@ results = {
         "pca2d": cls_test_pca2d,
     },
     "config": {
-        "atlas_path": str(ATLAS_PATH),
-        "glm_path": str(GLM_BASE_PATH),
-        "alpha": ALPHA,
+        "atlas_path": str(CONFIG["ROI_GLASSER_22_ATLAS"]),
+        "glm_path": str(CONFIG["SPM_GLM_UNSMOOTHED"]),
+        "alpha": CONFIG["ALPHA"],
         "n_experts": int(group_summary["n_expert"]),
         "n_novices": int(group_summary["n_novice"]),
         "n_rois": len(roi_labels),
