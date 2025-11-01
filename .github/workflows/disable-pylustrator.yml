@@ -1,0 +1,41 @@
+name: Disable Pylustrator for Production
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'common/constants.py'
+
+jobs:
+  disable-pylustrator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Check and disable ENABLE_PYLUSTRATOR
+        id: check
+        run: |
+          # Check if ENABLE_PYLUSTRATOR is set to True
+          if grep -q "'ENABLE_PYLUSTRATOR': True" common/constants.py; then
+            echo "Pylustrator is enabled, disabling for production..."
+            sed -i "s/'ENABLE_PYLUSTRATOR': True/'ENABLE_PYLUSTRATOR': False/" common/constants.py
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Pylustrator already disabled"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push if changed
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add common/constants.py
+          git commit -m "chore: disable ENABLE_PYLUSTRATOR for production [skip ci]"
+          git push
