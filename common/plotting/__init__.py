@@ -84,6 +84,8 @@ from .surfaces import (
     plot_flat_hemisphere,
     compute_surface_symmetric_range,
     embed_figure_on_ax,
+    plot_pial_hemisphere,
+    plot_pial_views_triplet,
 )
 
 __all__ = [
@@ -142,4 +144,6 @@ __all__ = [
     'plot_flat_hemisphere',
     'compute_surface_symmetric_range',
     'embed_figure_on_ax',
+    'plot_pial_hemisphere',
+    'plot_pial_views_triplet',
 ]

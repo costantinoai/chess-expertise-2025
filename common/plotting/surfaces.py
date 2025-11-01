@@ -6,6 +6,7 @@ Surface plotting primitives (flat hemispheres) for Nature-compliant figures.
 Provides:
 - plot_flat_pair(): Left/Right flat surfaces using Plotly engine
 - plot_flat_hemisphere(): Single flat hemisphere using Plotly engine
+- plot_pial_hemisphere(): Single pial hemisphere (e.g., lateral view) using Plotly engine
 
 Notes
 -----
@@ -86,6 +87,15 @@ def _flat_meshes():
     if flat_left is None or flat_right is None:
         logger.debug("Flat meshes not found in fsaverage; falling back to pial meshes")
     return flat_left, flat_right, fsavg.pial_left, fsavg.pial_right
+
+
+def _pial_meshes():
+    """Fetch fsaverage pial meshes; return (pial_left, pial_right).
+
+    Raises on failure — no silent fallbacks.
+    """
+    fsavg = datasets.fetch_surf_fsaverage(mesh='fsaverage')
+    return fsavg.pial_left, fsavg.pial_right
 
 
 def compute_surface_symmetric_range(imgs: Iterable) -> Tuple[float, float]:
@@ -444,3 +454,243 @@ def embed_figure_on_ax(ax, fig, title: str = ''):
     ax.imshow(mpimg.imread(buf))
     if title:
         set_axis_title(ax, title=title)
+
+
+def plot_pial_hemisphere(
+    data,
+    hemi: str = 'left',
+    view: str = 'lateral',
+    *,
+    title: str | None = None,
+    threshold: float | None = None,
+    show_colorbar: bool = False,
+    vmin: float | None = None,
+    vmax: float | None = None,
+):
+    """
+    Single-hemisphere pial surface plot using Plotly engine.
+
+    Parameters
+    ----------
+    data : NIfTI-like image or array-like
+        Either a 3D NIfTI image (volume) to sample onto the pial surface or a
+        1D per-vertex texture for the requested hemisphere. If an array is
+        provided, its length must match the fsaverage pial vertex count.
+        Alternatively, accepts a dict with key 'left' or 'right'.
+    hemi : {'left','right'}
+        Hemisphere to display (default: 'left').
+    view : str
+        Surface view (e.g., 'lateral', 'medial', 'ventral', 'dorsal').
+    title : str, optional
+        Title for the figure (unused when embedding; kept for completeness).
+    threshold : float or None
+        Values below threshold are masked.
+    show_colorbar : bool
+        Whether to display a colorbar for this hemisphere.
+    vmin, vmax : float or None
+        Color scale limits. If None, computed from the texture range (symmetric).
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Plotly figure with a single pial hemisphere scene.
+    """
+    if hemi not in {'left', 'right'}:
+        raise ValueError("hemi must be 'left' or 'right'")
+
+    pial_left, pial_right = _pial_meshes()
+    mesh = pial_left if hemi == 'left' else pial_right
+
+    # Determine texture based on input type
+    tex = None
+    if isinstance(data, dict) and hemi in data:
+        tex = np.asarray(data[hemi])
+    elif isinstance(data, (list, tuple)) and len(data) == 2:
+        tex = np.asarray(data[0] if hemi == 'left' else data[1])
+    else:
+        # Assume NIfTI-like image; sample to surface
+        tex = surface.vol_to_surf(data, mesh)
+
+    # Symmetric color scale if not provided
+    if vmin is None or vmax is None:
+        vmax_local = float(np.nanmax(np.abs(tex))) if np.any(np.isfinite(tex)) else 1.0
+        vmin_local = -vmax_local
+    else:
+        vmax_local = float(vmax)
+        vmin_local = float(vmin)
+
+    # Create single scene with surf stat map
+    sub = plotting.plot_surf_stat_map(
+        mesh,
+        tex,
+        hemi=hemi,
+        view=view,
+        colorbar=show_colorbar,
+        threshold=threshold,
+        cmap=CMAP_BRAIN,
+        engine='plotly',
+        vmin=vmin_local if vmax_local > 0 else None,
+        vmax=vmax_local if vmax_local > 0 else None,
+        title=None,
+    )
+
+    fig = sub.figure
+
+    # Style colorbar if present
+    for tr in fig.data:
+        if show_colorbar and hasattr(tr, 'colorbar') and tr.colorbar is not None:
+            tr.colorbar.thickness = 16
+            tr.colorbar.tickfont = dict(size=14, family=PLOT_PARAMS['font_family'])
+
+    # Hide axes; set a reasonable camera
+    cam = dict(eye=dict(x=0.0, y=0.0, z=2.1), up=dict(x=0.0, y=1.0, z=0.0))
+    fig.update_scenes(dict(
+        xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False),
+        aspectmode='data', camera=cam
+    ))
+
+    for trace in fig.data:
+        if hasattr(trace, 'lighting'):
+            trace.lighting = dict(ambient=0.2, diffuse=.7, specular=0.1, roughness=1, fresnel=0.0)
+        if hasattr(trace, 'lightposition'):
+            trace.lightposition = dict(x=0, y=0, z=1000)
+
+    # Compact margins; embedding will handle final size
+    fig.update_layout(margin=dict(t=0, l=0, r=0, b=0))
+    if title:
+        fig.update_layout(title=dict(text=title, x=0.5, font=dict(size=int(PLOT_PARAMS['font_size_title']), family=PLOT_PARAMS['font_family'])))
+
+    return fig
+
+
+def plot_pial_views_triplet(
+    data,
+    *,
+    hemi: str = 'left',
+    views: Tuple[str, ...] = ('lateral', 'medial', 'ventral'),
+    title: str | None = None,
+    threshold: float | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
+) -> 'plotly.graph_objects.Figure':
+    """
+    Create a multi-row (len(views) × 1) pial surface figure (single hemisphere)
+    for the given views.
+
+    Parameters
+    ----------
+    data : NIfTI-like image, 1D texture array, or dict {'left': array}
+        Data to render. If a 1D array is provided, it is interpreted as the
+        per-vertex texture for the requested hemisphere. If a volume is given,
+        it is sampled to the pial surface. Dict allows explicit hemisphere.
+    hemi : {'left','right'}
+        Hemisphere to display.
+    views : tuple of str
+        View names, typically 2 or 3 (e.g., ('lateral','medial') or
+        ('lateral','medial','ventral')).
+    title : str, optional
+        Optional figure title (unused when embedding; kept for completeness).
+    threshold : float, optional
+        Threshold below which values are masked.
+    vmin, vmax : float, optional
+        Color scale limits. If None, computed from data (symmetric around 0).
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Plotly Figure with three scenes stacked vertically.
+    """
+    from plotly.subplots import make_subplots
+
+    if hemi not in {'left', 'right'}:
+        raise ValueError("hemi must be 'left' or 'right'")
+    n_rows = len(views)
+    if n_rows not in (2, 3):
+        raise ValueError("views must contain 2 or 3 view names")
+
+    pial_left, pial_right = _pial_meshes()
+    mesh = pial_left if hemi == 'left' else pial_right
+
+    # Determine texture from input
+    if isinstance(data, dict) and hemi in data:
+        tex = np.asarray(data[hemi])
+    elif hasattr(data, 'shape') and data.ndim == 1:
+        tex = np.asarray(data)
+    else:
+        tex = surface.vol_to_surf(data, mesh)
+
+    # Determine color range
+    if vmin is None or vmax is None:
+        vmax_local = float(np.nanmax(np.abs(tex))) if np.any(np.isfinite(tex)) else 1.0
+        vmin_local = -vmax_local
+    else:
+        vmax_local = float(vmax)
+        vmin_local = float(vmin)
+
+    fig = make_subplots(
+        rows=n_rows,
+        cols=1,
+        specs=[[{"type": "scene"}] for _ in range(n_rows)],
+        vertical_spacing=0.02,
+    )
+
+    # Add one scene per view
+    scene_cameras = {}
+    for i, view in enumerate(views, start=1):
+        sub = plotting.plot_surf_stat_map(
+            mesh,
+            tex,
+            hemi=hemi,
+            view=view,
+            colorbar=False,
+            threshold=threshold,
+            cmap=CMAP_BRAIN,
+            engine='plotly',
+            vmin=vmin_local if vmax_local > 0 else None,
+            vmax=vmax_local if vmax_local > 0 else None,
+            title=None,
+        )
+        for tr in sub.figure.data:
+            fig.add_trace(tr, row=i, col=1)
+        # Capture camera from the generated subplot (respect nilearn's view orientation)
+        try:
+            cam_view = sub.figure.layout.scene.camera  # type: ignore[attr-defined]
+            if cam_view is not None:
+                scene_cameras[i] = cam_view
+        except Exception:
+            pass
+
+    # Style scenes and traces
+    for i, view in enumerate(views, start=1):
+        scene_kwargs = dict(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            zaxis=dict(visible=False),
+            aspectmode='data',
+        )
+        cam = scene_cameras.get(i)
+        if cam is not None:
+            # Optionally tweak medial view to be slightly more zoomed out to match lateral
+            if view == 'medial' and isinstance(cam, dict) and isinstance(cam.get('eye'), dict):
+                eye = cam['eye']
+                def _scale(v, s=1.25):
+                    try:
+                        return float(v) * s
+                    except Exception:
+                        return v
+                eye = dict(x=_scale(eye.get('x')), y=_scale(eye.get('y')), z=_scale(eye.get('z')))
+                cam = dict(cam)
+                cam['eye'] = eye
+            scene_kwargs['camera'] = cam  # type: ignore[index]
+        fig.update_scenes(scene_kwargs, row=i, col=1)
+    for trace in fig.data:
+        if hasattr(trace, 'lighting'):
+            trace.lighting = dict(ambient=0.2, diffuse=.7, specular=0.1, roughness=1, fresnel=0.0)
+        if hasattr(trace, 'lightposition'):
+            trace.lightposition = dict(x=0, y=0, z=1000)
+
+    layout_kwargs = dict(margin=dict(t=0, l=0, r=0, b=0), showlegend=False)
+    if title:
+        layout_kwargs['title'] = dict(text=title, x=0.5, font=dict(size=int(PLOT_PARAMS['font_size_title']), family=PLOT_PARAMS['font_family']))
+    fig.update_layout(**layout_kwargs)
+    return fig

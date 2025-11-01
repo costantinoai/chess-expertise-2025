@@ -73,6 +73,7 @@ from .plotting import (
     # Surfaces
     plot_flat_pair,
     plot_flat_hemisphere,
+    plot_pial_hemisphere,
 )
 
 # Logging and setup
@@ -156,6 +157,7 @@ __all__ = [
     # Plotting - Surfaces
     'plot_flat_pair',
     'plot_flat_hemisphere',
+    'plot_pial_hemisphere',
     # Logging and setup
     'setup_analysis',
     'setup_analysis_in_dir',
