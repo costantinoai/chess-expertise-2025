@@ -119,7 +119,7 @@ SMOOTHING_FWHM_MM = None
 PATTERNS = {
     'searchlight_checkmate': "Checkmate | RSA searchlight",
     'searchlight_strategy': "Strategy | RSA searchlight",
-    'searchlight_visualSimilarity': "Visual Similarity | RSA searchlight",
+    'searchlight_visual_similarity': "Visual Similarity | RSA searchlight",
 }
 
 

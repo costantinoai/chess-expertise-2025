@@ -7,6 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from nilearn import plotting, surface, datasets
@@ -135,6 +136,27 @@ def plot_surface_map(img, title: str, threshold: float | None, output_file: Path
 # =============================================================================
 # On-axis helpers used by pylustrator scripts
 # =============================================================================
+
+def load_term_corr_triple(results_dir: Path, stem: str):
+    """
+    Load the trio of term-correlation CSV files (positive, negative, difference).
+
+    Parameters
+    ----------
+    results_dir : Path
+        Directory containing exported correlation CSVs
+    stem : str
+        Filename stem, e.g., 'spmT_exp-gt-nonexp_all-gt-rest'
+
+    Returns
+    -------
+    (df_pos, df_neg, df_diff) : tuple of pandas.DataFrame
+        DataFrames for positive, negative, and difference correlations
+    """
+    pos = pd.read_csv(results_dir / f"{stem}_term_corr_positive.csv")
+    neg = pd.read_csv(results_dir / f"{stem}_term_corr_negative.csv")
+    diff = pd.read_csv(results_dir / f"{stem}_term_corr_difference.csv")
+    return pos, neg, diff
 
 def zero_cis(values):
     """Return zero-width CIs for a list of values, as (v, v) pairs."""
@@ -291,74 +313,6 @@ def plot_difference(df_diff, run_id: str, out_fig: Path | str):
         output_path=Path(out_fig),
         show_legend=True,
     )
-
-
-def _plot_hemisphere_flat(
-    fig, flat_mesh, pial_mesh, texture, hemi: str,
-    vmin: float, vmax: float, threshold: float | None,
-    row: int, col: int, show_colorbar: bool = False
-) -> tuple:
-    """
-    Helper function to plot a single hemisphere on a flat surface.
-
-    Parameters
-    ----------
-    fig : plotly figure
-        The figure to add traces to
-    flat_mesh : surface mesh
-        The flat surface mesh (preferred)
-    pial_mesh : surface mesh
-        The pial surface mesh (fallback)
-    texture : array
-        The texture data to plot
-    hemi : str
-        Hemisphere ('left' or 'right')
-    vmin, vmax : float
-        Color scale limits
-    threshold : float or None
-        Threshold for displaying values
-    row, col : int
-        Subplot position
-    show_colorbar : bool
-        Whether to show colorbar
-
-    Returns
-    -------
-    tmin, tmax : float
-        Min and max texture values for colorbar
-    """
-    # Use flat mesh if available, otherwise fallback to pial
-    mesh = flat_mesh if flat_mesh is not None else pial_mesh
-
-    sub = plotting.plot_surf_stat_map(
-        mesh,
-        texture,
-        hemi=hemi,
-        view='dorsal',
-        colorbar=show_colorbar,
-        threshold=threshold,
-        cmap=CMAP_BRAIN,
-        engine='plotly',
-        vmin=vmin if vmax > 0 else None,
-        vmax=vmax if vmax > 0 else None,
-        title=None,
-    )
-
-    # Extract min/max for colorbar
-    tmin = float(np.nanmin(texture))
-    tmax = float(np.nanmax(texture))
-
-    # Add traces and style colorbar if present
-    for tr in sub.figure.data:
-        if show_colorbar and hasattr(tr, 'colorbar') and tr.colorbar is not None:
-            tr.colorbar.len = 0.8
-            tr.colorbar.thickness = 16
-            tr.colorbar.tickvals = [tmin, 0.0, tmax]
-            tr.colorbar.ticktext = [f"{tmin:.2f}", "0", f"{tmax:.2f}"]
-            tr.colorbar.tickfont = dict(size=14, family=PLOT_PARAMS['font_family'])
-        fig.add_trace(tr, row=row, col=col)
-
-    return tmin, tmax
 
 
 # Removed thin wrapper plot_surface_map_flat; use common.plotting.plot_flat_pair directly

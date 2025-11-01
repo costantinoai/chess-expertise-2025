@@ -10,8 +10,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Tuple
 from nilearn import image
-from scipy.stats import t as _t
-from scipy.stats import norm as _norm
+from scipy.stats import t, norm
 
 from common.neuro_utils import get_gray_matter_mask, clean_voxels
 from common.stats_utils import apply_fdr_correction, correlate_vectors_bootstrap
@@ -26,12 +25,12 @@ def t_to_two_tailed_z(t_map: np.ndarray, dof: int) -> np.ndarray:
 
     # Compute two-tailed p-value: P(|T| > |t_obs|) = 2 * P(T > |t_obs|)
     # sf() is the survival function: P(X > x) = 1 - CDF(x), more accurate for tail probabilities
-    p_two = 2 * _t.sf(t_abs, df=int(dof))
+    p_two = 2 * t.sf(t_abs, df=int(dof))
 
     # Convert two-tailed p-value back to z-score using inverse survival function.
     # isf(p/2) gives the z-value where P(|Z| > z) = p (two-tailed)
     # This standardizes effect sizes from t-distribution to standard normal distribution.
-    z_abs = _norm.isf(p_two / 2)
+    z_abs = norm.isf(p_two / 2)
 
     # Restore original sign: positive t → positive z, negative t → negative z
     z = np.sign(t_map) * z_abs

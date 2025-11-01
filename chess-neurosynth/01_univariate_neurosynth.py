@@ -152,7 +152,8 @@ logger.info(f"Loaded {len(term_maps)} term maps from {term_dir}")
 # Find group-level statistical parametric maps (SPMs) from SPM12 second-level GLMs.
 # These are T-maps representing group contrasts (e.g., Experts > Novices) computed
 # from first-level beta images. We analyze only the smoothed (4mm FWHM) GLM results.
-group_dir = CONFIG['BIDS_SPM_GROUP'] / 'GLM-smooth4' / 'group'
+# Canonical path: <BIDS>/derivatives/spm-glm/smooth4/group
+group_dir = CONFIG['SPM_GLM_SMOOTH4'] / 'group'
 t_files = find_group_tmaps(group_dir)
 logger.info(f"Found {len(t_files)} group T-map(s) for analysis in {group_dir}")
 

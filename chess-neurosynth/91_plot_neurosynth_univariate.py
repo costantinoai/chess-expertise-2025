@@ -50,6 +50,7 @@ from modules.plot_utils import (
     plot_correlations_on_ax,
     plot_differences_on_ax,
     embed_figure_on_ax,
+    load_term_corr_triple,
 )
 from common.io_utils import find_latest_results_directory
 from common.logging_utils import setup_analysis_in_dir, log_script_end
@@ -88,14 +89,8 @@ _, _, logger = setup_analysis_in_dir(
 stem_all = 'spmT_exp-gt-nonexp_all-gt-rest'
 stem_check = 'spmT_exp-gt-nonexp_check-gt-nocheck'
 
-def _load_triple(stem: str):
-    pos = pd.read_csv(RESULTS_DIR / f"{stem}_term_corr_positive.csv")
-    neg = pd.read_csv(RESULTS_DIR / f"{stem}_term_corr_negative.csv")
-    diff = pd.read_csv(RESULTS_DIR / f"{stem}_term_corr_difference.csv")
-    return pos, neg, diff
-
-df_pos_all, df_neg_all, df_diff_all = _load_triple(stem_all)
-df_pos_chk, df_neg_chk, df_diff_chk = _load_triple(stem_check)
+df_pos_all, df_neg_all, df_diff_all = load_term_corr_triple(RESULTS_DIR, stem_all)
+df_pos_chk, df_neg_chk, df_diff_chk = load_term_corr_triple(RESULTS_DIR, stem_check)
 
 
 # =============================================================================
