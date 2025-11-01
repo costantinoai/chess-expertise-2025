@@ -14,6 +14,8 @@ from pathlib import Path
 import pickle
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add repo root for 'common' module
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 # Add chess-mvpa to import path to reuse its modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
 script_dir = Path(__file__).parent
@@ -26,7 +28,6 @@ from common.bids_utils import (
 )
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
-from common.io_utils import resolve_latest_dir
 
 from modules.mvpa_io import (
     find_subject_tsvs,
@@ -45,8 +46,10 @@ config, out_dir, logger = setup_analysis(
     script_file=__file__,
 )
 
-# Use cortices directory which contains Glasser-22 ROIs and all fine-grained targets
-mvpa_dir = resolve_latest_dir(CONFIG['BIDS_MVPA'], pattern='*_glasser_cortices_bilateral')
+# Use MVPA RSA directory which contains Glasser-22 ROIs and all fine-grained targets
+mvpa_dir = CONFIG['BIDS_MVPA_RSA']
+if not mvpa_dir.exists():
+    raise FileNotFoundError(f"Missing MVPA RSA directory: {mvpa_dir}")
 logger.info(f"Using MVPA finer source: {mvpa_dir}")
 
 participants, (n_exp, n_nov) = get_participants_with_expertise(
@@ -57,15 +60,14 @@ logger.info(f"Participants: {n_exp} experts, {n_nov} novices")
 roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
 default_roi_names, _ = get_roi_names_and_colors(CONFIG['ROI_GLASSER_22'])
 
+# Find all subject-level TSV files containing RSA correlation coefficients
+# These files contain both regular targets and "_half" targets (checkmate-only stimuli)
+files = find_subject_tsvs(mvpa_dir)
 method = 'rsa_corr'
-method_dir = mvpa_dir / method
-if not method_dir.exists():
-    raise FileNotFoundError(f"Missing method directory: {method_dir}")
-files = find_subject_tsvs(method_dir)
 logger.info(f"[{method}] Found {len(files)} subject TSVs")
 
 df = build_group_dataframe(files, participants, default_roi_names)
-roi_names = [c for c in df.columns if c not in ['subject', 'expert', 'target']]
+roi_names = [c for c in df.columns if c not in ['participant_id', 'expert', 'target']]
 
 chance_level = float(CONFIG.get('CHANCE_LEVEL_RSA', 0.0))
 targets = sorted(df['target'].dropna().unique())

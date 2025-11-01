@@ -12,6 +12,8 @@ from pathlib import Path
 import pickle
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add repo root for 'common' module
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 # Add chess-mvpa to import path to reuse its modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
 script_dir = Path(__file__).parent
@@ -29,7 +31,6 @@ from common.bids_utils import (
 )
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
-from common.io_utils import resolve_latest_dir
 
 from modules.mvpa_io import (
     find_subject_tsvs,
@@ -47,10 +48,6 @@ from modules.mvpa_group import (
 # Configuration
 # -----------------------------------------------------------------------------
 
-# Use cortices directory which contains Glasser-22 ROIs and all fine-grained targets
-MVPA_DIR_NAME = None
-
-
 # -----------------------------------------------------------------------------
 # Main workflow
 # -----------------------------------------------------------------------------
@@ -61,9 +58,12 @@ config, out_dir, logger = setup_analysis(
     script_file=__file__,
 )
 
-# Locate the subject-level MVPA results directory. Subject-level SVM decoding was
+# Locate the subject-level MVPA decoding directory. Subject-level SVM decoding was
 # performed in MATLAB; this script reads those results and performs group statistics.
-mvpa_dir = resolve_latest_dir(CONFIG["BIDS_MVPA"], pattern="*_glasser_cortices_bilateral", specific_name=MVPA_DIR_NAME)
+# Data is organized by subject with TSV files containing all targets including "_half" targets.
+mvpa_dir = CONFIG["BIDS_MVPA_DECODING"]
+if not mvpa_dir.exists():
+    raise FileNotFoundError(f"Missing MVPA decoding directory: {mvpa_dir}")
 logger.info(f"Using MVPA finer source: {mvpa_dir}")
 
 # Load participant list with expertise labels (expert=True/False) for group assignment
@@ -79,20 +79,17 @@ default_roi_names, _ = get_roi_names_and_colors(CONFIG["ROI_GLASSER_22"])
 artifact_index = {}
 
 # Process SVM decoding results (linear SVMs with L2 regularization, C=1.0)
+# Find all subject-level TSV files (one per subject, containing accuracies for all ROIs and targets)
+# These files contain both regular targets and "_half" targets (checkmate-only stimuli)
 method = "svm"
-method_dir = mvpa_dir / method
-if not method_dir.exists():
-    raise FileNotFoundError(f"Missing method directory: {method_dir}")
-
-# Find all subject-level TSV files (one per subject, containing accuracies for all ROIs)
-files = find_subject_tsvs(method_dir)
+files = find_subject_tsvs(mvpa_dir)
 logger.info(f"[{method}] Found {len(files)} subject TSVs")
 
 # Load subject TSVs and consolidate into a single DataFrame with columns:
 # subject, expert (bool), target (classification task), and one column per ROI (accuracy).
 # Each row = one subject × one target combination.
 df = build_group_dataframe(files, participants, default_roi_names)
-roi_names = [c for c in df.columns if c not in ["subject", "expert", "target"]]
+roi_names = [c for c in df.columns if c not in ["participant_id", "expert", "target"]]
 
 # Determine chance-level accuracy for each classification target based on stimulus design.
 # For targets ending in "_half", chance is computed from checkmate stimuli only.

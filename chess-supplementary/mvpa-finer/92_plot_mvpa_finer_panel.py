@@ -17,8 +17,9 @@ import os
 import pickle
 from pathlib import Path
 
-# Add parent (repo root) and chess-mvpa to sys.path
+# Add repo root and chess-mvpa to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
 script_dir = Path(__file__).parent
 
@@ -61,7 +62,7 @@ RESULTS_BASE = script_dir / "results"
 
 # Fine-grained targets to plot (those analyzed on checkmate boards)
 FINE_TARGETS = [
-    'categories_half',
+    'strategy_half',
     'check_n_half',
     'total_pieces_half',
     'legal_moves_half',
@@ -70,7 +71,7 @@ FINE_TARGETS = [
 ]
 
 TARGET_DISPLAY_NAMES = {
-    'categories_half': 'Strategy (CM)',
+    'strategy_half': 'Strategy (CM)',
     'check_n_half': 'Moves to Mate (CM)',
     'total_pieces_half': 'Total Pieces (CM)',
     'legal_moves_half': 'Legal Moves (CM)',
@@ -80,7 +81,7 @@ TARGET_DISPLAY_NAMES = {
 
 # Map target names to stimuli.tsv column names
 TARGET_TO_STIMULI_COL = {
-    'categories_half': 'strategy',
+    'strategy_half': 'strategy',
     'check_n_half': 'check_n',
     'total_pieces_half': 'total_pieces',
     'legal_moves_half': 'legal_moves',
@@ -102,7 +103,7 @@ def load_checkmate_stimuli_column(stim_tsv: Path, target: str) -> np.ndarray:
     stim_tsv : Path
         Path to stimuli.tsv
     target : str
-        Target name (e.g., 'categories_half')
+        Target name (e.g., 'strategy_half')
 
     Returns
     -------
@@ -128,7 +129,7 @@ def compute_model_rdm_for_target(stim_tsv: Path, target: str) -> np.ndarray:
     stim_tsv : Path
         Path to stimuli.tsv
     target : str
-        Target name (e.g., 'categories_half')
+        Target name (e.g., 'strategy_half')
 
     Returns
     -------
@@ -140,7 +141,7 @@ def compute_model_rdm_for_target(stim_tsv: Path, target: str) -> np.ndarray:
     # Determine whether feature is categorical or numerical
     # Categorical: strategy, motif, side (binary RDM: 0 if same, 1 if different)
     # Numerical/ordinal: total_pieces, legal_moves, check_n (continuous RDM: absolute difference)
-    categorical_targets = ['categories_half', 'motif_half', 'side_half']
+    categorical_targets = ['strategy_half', 'motif_half', 'side_half']
     is_categorical = target in categorical_targets
 
     # Compute RDM using common.rsa_utils.create_model_rdm

@@ -11,10 +11,12 @@
 %%     5) moves_to_mate       (ordinal counts)   → 'subtraction'
 %%
 %% Output
-%% - Subject-level TSV files saved under:
-%%     <BIDS_DERIVATIVES>/mvpa/<timestamp>_glasser_regions_bilateral_fine/
-%%       ├── svm/sub-XX/mvpa_cv.tsv          (decoding accuracy per ROI per target)
-%%       └── rsa_corr/sub-XX/rsa_corr.tsv    (RSA r-values per ROI per target)
+%% - Subject-level TSV files saved to THE SAME files as main MVPA:
+%%     <BIDS_DERIVATIVES>/
+%%       ├── mvpa-decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv
+%%       └── mvpa-rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv
+%% - Fine-grained dimensions (strategy_cm, motif, pieces_total, legal_moves, moves_to_mate)
+%%   appear as additional ROWS in the same file (only checkmate boards, N=20)
 %%
 %% Notes
 %% - Analysis-only (no figures). Plotting/reporting are in Python.
@@ -38,13 +40,13 @@ roiTSV = getenv_default('CHESS_ROI_TSV_22', ...
 
 stimuliTSV = getenv_default('CHESS_STIMULI_TSV', '/media/costantino_ai/eik-T9/manuscript-data/stimuli/stimuli.tsv');
 
-ts = datestr(now, 'yyyymmdd-HHMMSS');
-outRoot = fullfile(derivativesDir, 'mvpa', [ts, '_glasser_regions_bilateral_fine']);
-outRootSVM = fullfile(outRoot, 'svm');
-outRootRSACorr = fullfile(outRoot, 'rsa_corr');
+% Output root - use same directories and filenames as main MVPA
+% Fine-grained targets will appear as additional rows in the same files
+outRootSVM = fullfile(derivativesDir, 'mvpa-decoding');
+outRootRSACorr = fullfile(derivativesDir, 'mvpa-rsa');
 mkdir_p(outRootSVM); mkdir_p(outRootRSACorr);
 
-fprintf('[INFO] Outputs will be written under: %s\n', outRoot);
+fprintf('[INFO] Fine-grained outputs will be written to same files as main MVPA: %s and %s\n', outRootSVM, outRootRSACorr);
 
 %% --------------------------- Subject discovery ---------------------------
 subDirs = find_subjects(glmRoot, 'sub-*');
@@ -69,7 +71,7 @@ stimT.('stimulus_key_norm') = lower(erase(string(stimT.(stimKeyCol)), '(nomate)'
 
 % Map canonical target names → candidate TSV columns
 targetColMap = struct();
-targetColMap.strategy_cm  = pick_first_present(stimT, {'strategy_cm','strategy','categories'});
+targetColMap.strategy_cm  = pick_first_present(stimT, {'strategy_cm','strategy'});
 targetColMap.motif        = pick_first_present(stimT, {'motif','tactical_motif'});
 targetColMap.pieces_total = pick_first_present(stimT, {'pieces_total','total_pieces'});
 targetColMap.legal_moves  = pick_first_present(stimT, {'legal_moves','total_legal_moves'});
@@ -198,19 +200,24 @@ for s = 1:numel(subDirs)
         end
     end
 
-    % Save TSVs
+    % Save TSVs with BIDS-like naming (same filename as main MVPA)
+    % Fine-grained targets will appear as additional rows in the same file
     svm_tbl = array2table(svm_mat, 'VariableNames', matlab_safe_names(region_names));
     svm_tbl = addvars(svm_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    writetable(svm_tbl, fullfile(subOutSVM, 'mvpa_cv.tsv'), 'FileType','text', 'Delimiter','\t');
+    svmFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv', subName);
+    writetable(svm_tbl, fullfile(subOutSVM, svmFilename), 'FileType','text', 'Delimiter','\t');
 
     rsa_tbl = array2table(rsa_mat, 'VariableNames', matlab_safe_names(region_names));
     rsa_tbl = addvars(rsa_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    writetable(rsa_tbl, fullfile(subOutRSA, 'rsa_corr.tsv'), 'FileType','text', 'Delimiter','\t');
+    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv', subName);
+    writetable(rsa_tbl, fullfile(subOutRSA, rsaFilename), 'FileType','text', 'Delimiter','\t');
 
     fprintf('[INFO]   Saved SVM and RSA TSVs for %s\n', subName);
 end
 
-fprintf('\n[INFO] Done. Subject-level TSV files written to: %s\n', outRoot);
+fprintf('\n[INFO] Done. Subject-level TSV files written to:\n');
+fprintf('         Decoding: %s\n', outRootSVM);
+fprintf('         RSA:      %s\n', outRootRSACorr);
 
 %% ========================================================================
 %% Helper functions
@@ -244,19 +251,19 @@ function col = pick_first_present(T, candidates)
     end
 end
 
-function [checkmateVec, categoriesVec, stimVec, visStimVec, lowerStim] = parse_label_regressors_full(ds)
+function [checkmateVec, strategyVec, stimVec, visSimilarityVec, lowerStim] = parse_label_regressors_full(ds)
     labels = ds.sa.labels(:);
 
     % Checkmate C/NC → 2 levels encoded as 2/1
     cmLabels = regexp(labels, '(?<=\s)(C|NC)\d+', 'match', 'once');
     checkmateVec = cellfun(@(x) strcmpi(x(1), 'C') + 1, cmLabels);
 
-    % Categories (legacy multi-class across all 40)
+    % Strategy (multi-class across all 40)
     catTokens = regexp(labels, '(?<=\s)(C|NC)(\d+)', 'tokens', 'once');
     concatCats = cellfun(@(x) [x{1}, x{2}], catTokens, 'UniformOutput', false);
     uniqCats = unique(concatCats, 'stable');
     catMap = containers.Map(uniqCats, 1:numel(uniqCats));
-    categoriesVec = cellfun(@(x) catMap(x), concatCats);
+    strategyVec = cellfun(@(x) catMap(x), concatCats);
 
     % Stimulus strings
     stimLabels = regexp(labels, '(?<=_).*?(?=\*)', 'match', 'once');
@@ -265,11 +272,11 @@ function [checkmateVec, categoriesVec, stimVec, visStimVec, lowerStim] = parse_l
     stimMap = containers.Map(uStim, 1:numel(uStim));
     stimVec = cellfun(@(x) stimMap(x), lowerStim);
 
-    % Visual identity ignoring '(nomate)'
+    % Visual similarity: identity ignoring '(nomate)'
     cleanStim = erase(lowerStim, '(nomate)');
     uVis = unique(cleanStim, 'stable');
     visMap = containers.Map(uVis, 1:numel(uVis));
-    visStimVec = cellfun(@(x) visMap(x), cleanStim);
+    visSimilarityVec = cellfun(@(x) visMap(x), cleanStim);
 end
 
 function RDM = compute_rdm(vec, metric)
