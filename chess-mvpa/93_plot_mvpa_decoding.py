@@ -19,14 +19,16 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
-# Import pylustrator BEFORE creating any figure
-import pylustrator
-pylustrator.start()
+# Import CONFIG first to check pylustrator flag
+from common import CONFIG
+
+# Conditionally start pylustrator BEFORE creating any figures
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    import pylustrator
+    pylustrator.start()
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-from common import CONFIG
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.bids_utils import load_roi_metadata

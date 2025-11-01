@@ -29,15 +29,19 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
-# Import pylustrator BEFORE creating figures
-import pylustrator
-pylustrator.start()
+# Import CONFIG first to check pylustrator flag
+from common import CONFIG
+
+# Conditionally start pylustrator BEFORE creating any figures
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    import pylustrator
+    pylustrator.start()
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from common import CONFIG, load_stimulus_metadata, MODEL_ORDER, MODEL_LABELS_PRETTY
+from common import load_stimulus_metadata, MODEL_ORDER, MODEL_LABELS_PRETTY
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.plotting import (

@@ -24,9 +24,13 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
-# Import pylustrator BEFORE any Matplotlib figures are created
-import pylustrator
-pylustrator.start()
+# Import CONFIG first to check pylustrator flag
+from common import CONFIG
+
+# Conditionally start pylustrator BEFORE creating any figures
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    import pylustrator
+    pylustrator.start()
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
