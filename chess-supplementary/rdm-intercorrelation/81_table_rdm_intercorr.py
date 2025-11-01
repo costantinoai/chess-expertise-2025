@@ -58,6 +58,7 @@ logger.info("")
 logger.info("Loading analysis results...")
 
 pairwise_file = results_dir / "pairwise_correlations.tsv"
+pairwise_long_file = results_dir / "pairwise_correlations_long.tsv"
 partial_file = results_dir / "partial_correlations.tsv"
 var_part_file = results_dir / "variance_partitioning_all.tsv"
 
@@ -66,6 +67,12 @@ if not pairwise_file.exists():
 
 pairwise_df = pd.read_csv(pairwise_file, sep='\t', index_col=0)
 logger.info(f"Loaded pairwise correlations: {pairwise_df.shape}")
+
+if pairwise_long_file.exists():
+    pairwise_long_df = pd.read_csv(pairwise_long_file, sep='\t')
+    logger.info(f"Loaded pairwise p-values: {pairwise_long_df.shape}")
+else:
+    pairwise_long_df = None
 
 if partial_file.exists():
     partial_df = pd.read_csv(partial_file, sep='\t')
@@ -81,7 +88,7 @@ else:
     var_part_df = None
     logger.warning(f"Variance partitioning file not found: {var_part_file}")
 
-# === Table 1: Pairwise Correlations ===
+# === Table 1: Pairwise Correlations (matrix) ===
 logger.info("")
 logger.info("Generating Table 1: Pairwise RDM correlations...")
 
@@ -118,6 +125,33 @@ table1_file = tables_dir / "table_pairwise_correlations.tex"
 with open(table1_file, 'w') as f:
     f.write(latex1)
 logger.info(f"Saved Table 1 to {table1_file}")
+
+# === Table 1b: Pairwise Correlations with p-values (long format) ===
+if pairwise_long_df is not None:
+    logger.info("")
+    logger.info("Generating Table 1b: Pairwise correlations with p-values...")
+
+    # Pretty names
+    pairwise_long_df = pairwise_long_df.copy()
+    pairwise_long_df['RDM 1'] = pairwise_long_df['rdm1'].map(pretty_model_label)
+    pairwise_long_df['RDM 2'] = pairwise_long_df['rdm2'].map(pretty_model_label)
+    pairwise_long_df['r'] = pairwise_long_df['r'].round(3)
+    pairwise_long_df['p'] = pairwise_long_df['p_raw'].apply(lambda x: f"{x:.3g}")
+    if 'p_fdr' in pairwise_long_df.columns:
+        pairwise_long_df['pFDR'] = pairwise_long_df['p_fdr'].apply(lambda x: f"{x:.3g}")
+
+    display_cols = ['RDM 1','RDM 2','r','p'] + (['pFDR'] if 'pFDR' in pairwise_long_df.columns else [])
+    latex1b = pairwise_long_df[display_cols].to_latex(
+        index=False,
+        escape=False,
+        caption='Pairwise Spearman correlations between model RDMs with raw and FDR-corrected p-values.',
+        label='tab:rdm_pairwise_corr_p'
+    )
+
+    table1b_file = tables_dir / "table_pairwise_correlations_p.tex"
+    with open(table1b_file, 'w') as f:
+        f.write(latex1b)
+    logger.info(f"Saved Table 1b to {table1b_file}")
 
 # === Table 2: Variance Partitioning ===
 if var_part_df is not None:
@@ -176,10 +210,15 @@ if partial_df is not None:
     table3_df['Predictor'] = table3_df['predictor'].map(pretty_model_label)
     table3_df['Controlled For'] = table3_df['covariates'].str.replace(',', ', ').str.title()
     table3_df['Partial $r$'] = table3_df['r_partial'].apply(lambda x: f"{x:.3f}")
-    table3_df['$p$-value'] = table3_df['p_partial'].apply(lambda x: f"{x:.4f}" if x >= 0.001 else "< 0.001")
+    table3_df['$p$-value'] = table3_df['p_partial'].apply(lambda x: f"{x:.3g}")
+    if 'p_fdr' in table3_df.columns:
+        table3_df['$p_{FDR}$'] = table3_df['p_fdr'].apply(lambda x: f"{x:.3g}")
 
     # Select columns for table
-    table3_display = table3_df[['Target RDM', 'Predictor', 'Controlled For', 'Partial $r$', '$p$-value']]
+    cols = ['Target RDM', 'Predictor', 'Controlled For', 'Partial $r$', '$p$-value']
+    if '$p_{FDR}$' in table3_df.columns:
+        cols.append('$p_{FDR}$')
+    table3_display = table3_df[cols]
 
     # Generate LaTeX
     latex3 = table3_display.to_latex(

@@ -209,8 +209,34 @@ logger.info("Computing pairwise RDM correlations...")
 pairwise_corr = compute_pairwise_rdm_correlations(model_rdms, method='spearman')
 pairwise_corr = pairwise_corr.loc[model_names, model_names]
 
+# Save symmetric matrix (r only) for quick reference
 pairwise_corr.to_csv(out_dir / "pairwise_correlations.tsv", sep='\t', float_format='%.4f')
 logger.info(f"Saved pairwise correlations to {out_dir / 'pairwise_correlations.tsv'}")
+
+# Also compute raw + FDR p-values for unique pairs (upper triangle)
+from scipy.stats import spearmanr
+from common.stats_utils import apply_fdr_correction
+
+pair_rows = []
+tri_indices = []
+for i, name_i in enumerate(model_names):
+    for j, name_j in enumerate(model_names):
+        if i < j:
+            # Vectorize upper triangle of both RDMs
+            n_stim = model_rdms[name_i].shape[0]
+            tri = np.triu_indices(n_stim, k=1)
+            x = model_rdms[name_i][tri]
+            y = model_rdms[name_j][tri]
+            r, p = spearmanr(x, y)
+            pair_rows.append({'rdm1': name_i, 'rdm2': name_j, 'r': float(r), 'p_raw': float(p)})
+            tri_indices.append((i, j))
+
+pair_df = pd.DataFrame(pair_rows)
+if not pair_df.empty:
+    _, p_fdr = apply_fdr_correction(pair_df['p_raw'].values, alpha=0.05, method='fdr_bh')
+    pair_df['p_fdr'] = p_fdr
+    pair_df.to_csv(out_dir / "pairwise_correlations_long.tsv", sep='\t', index=False, float_format='%.4f')
+    logger.info(f"Saved pairwise correlation p-values to {out_dir / 'pairwise_correlations_long.tsv'}")
 
 # Log pairwise correlation magnitudes
 logger.info("")
@@ -270,6 +296,10 @@ for target_name in model_names:
         )
 
 partial_df = pd.DataFrame(partial_results)
+if not partial_df.empty:
+    # Apply FDR across all partial tests
+    _, p_fdr = apply_fdr_correction(partial_df['p_partial'].values, alpha=0.05, method='fdr_bh')
+    partial_df['p_fdr'] = p_fdr
 partial_df.to_csv(out_dir / "partial_correlations.tsv", sep='\t', index=False, float_format='%.4f')
 logger.info(f"Saved partial correlations to {out_dir / 'partial_correlations.tsv'}")
 
