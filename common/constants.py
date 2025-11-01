@@ -139,7 +139,7 @@ CONFIG = {
     # ========================================================================
     # Display/Plotting Configuration
     # ========================================================================
-    'ENABLE_PYLUSTRATOR': False,                                # Enable pylustrator for interactive plot editing (dev: True, production: False)
+    'ENABLE_PYLUSTRATOR': True,                                 # Enable pylustrator for interactive plot editing (dev: True, production: False)
     'NEUROSYNTH_TERM_ORDER': [                                  # Term ordering for plots
         'working memory',
         'navigation',
