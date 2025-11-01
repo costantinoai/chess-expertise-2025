@@ -6,7 +6,7 @@ from typing import Dict, List
 
 # Canonical RSA targets (keys → display labels)
 RSA_TARGETS: Dict[str, str] = {
-    'visualSimilarity': 'Visual Similarity',
+    'visual_similarity': 'Visual Similarity',
     'strategy': 'Strategy',
     'checkmate': 'Checkmate',
 }
@@ -36,7 +36,7 @@ def find_subject_rsa_path(subject_id: str, target_key: str, base_dir: Path) -> P
     subject_id : str
         BIDS subject id, e.g., 'sub-01'.
     target_key : str
-        One of RSA_TARGETS keys: 'visualSimilarity', 'strategy', 'checkmate'.
+        One of RSA_TARGETS keys: 'visual_similarity', 'strategy', 'checkmate'.
     base_dir : Path
         Root directory of RSA searchlight derivatives.
     """

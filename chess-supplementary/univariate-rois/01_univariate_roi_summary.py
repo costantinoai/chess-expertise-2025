@@ -19,7 +19,7 @@ Data
 ----
 - Participants: All subjects in participants.tsv (n_experts, n_novices derived
   at runtime via BIDS participants table).
-- Imaging: First-level SPM contrasts from CONFIG['BIDS_GLM_SMOOTHED_4MM'].
+- Imaging: First-level SPM contrasts from CONFIG['SPM_GLM_DIR']/smooth4.
 - Volumetric atlas: Glasser-180 bilateral atlas in MNI152NLin2009cAsym space (180 ROIs total).
 - ROI metadata: region_info.tsv from CONFIG['ROI_GLASSER_180'].
 
@@ -67,7 +67,7 @@ if str(repo_root) not in sys.path:
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
 from common.bids_utils import get_participants_with_expertise, load_roi_metadata
-from common.neuro_utils import load_nifti
+from common.neuro_utils import load_nifti, map_glasser_roi_to_harvard_oxford
 from common.group_stats import get_descriptives_per_roi
 from common.stats_utils import per_roi_welch_and_fdr
 from nilearn.maskers import NiftiLabelsMasker
@@ -95,6 +95,7 @@ logger.info(f"Participants loaded: {len(participants)} (experts={n_exp}, novices
 
 # Load bilateral volumetric atlas and ROI metadata
 atlas_path = CONFIG['ROI_GLASSER_180_ATLAS']
+atlas_img = load_nifti(atlas_path)
 masker = NiftiLabelsMasker(labels_img=str(atlas_path), standardize=False, strategy='mean')
 logger.info(f"Loaded Glasser-180 bilateral atlas from: {atlas_path}")
 
@@ -106,12 +107,20 @@ roi_ids = roi_info['roi_id'].to_numpy()
 n_rois = len(roi_ids)
 logger.info(f"Loaded {n_rois} bilateral ROIs")
 
+# Map each Glasser ROI to Harvard-Oxford anatomical labels via center of mass
+logger.info("Mapping Glasser ROIs to Harvard-Oxford anatomical labels...")
+roi_info['harvard_oxford_label'] = [
+    map_glasser_roi_to_harvard_oxford(roi_id, atlas_img, threshold=0.25)
+    for roi_id in roi_ids
+]
+logger.info("Harvard-Oxford mapping complete")
+
 
 # ============================================================================
 # Per-subject ROI means (volume-based extraction, bilateral)
 # ============================================================================
 
-glm_base = Path(CONFIG['BIDS_GLM_SMOOTHED_4MM'])
+glm_base = Path(CONFIG['SPM_GLM_SMOOTH4'])
 
 # Storage for all contrasts
 subject_rows = {k: [] for k in UNIV_CONTRASTS.keys()}
@@ -154,7 +163,7 @@ for con_code, con_label in UNIV_CONTRASTS.items():
     X_exp = np.vstack(expert_vals[con_code]) if expert_vals[con_code] else np.empty((0, n_rois))
     X_nov = np.vstack(novice_vals[con_code]) if novice_vals[con_code] else np.empty((0, n_rois))
 
-    # Standard t-test with FDR (all 180 bilateral ROIs) - matches old implementation
+    # Standard t-test with FDR (all 180 bilateral ROIs) - equal variances assumption
     welch_df = per_roi_welch_and_fdr(X_exp, X_nov, roi_ids, alpha=CONFIG['ALPHA_FDR'], equal_var=True)
 
     # Descriptives

@@ -145,7 +145,7 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).ax_dict["1_RSA_visualSimilarity"].set(position=[0.05, 0.70, 0.9, 0.25])
+plt.figure(1).ax_dict["1_RSA_visual_similarity"].set(position=[0.05, 0.70, 0.9, 0.25])
 plt.figure(1).ax_dict["2_RSA_strategy"].set(position=[0.05, 0.40, 0.9, 0.25])
 plt.figure(1).ax_dict["3_RSA_checkmate"].set(position=[0.05, 0.10, 0.9, 0.25])
 #% end: automatic generated code from pylustrator
