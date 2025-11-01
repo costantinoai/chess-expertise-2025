@@ -14,22 +14,9 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 import pickle
-import pandas as pd
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
-
-
-def format_ci(ci_tuple):
-    """Format CI tuple as [low, high] string."""
-    return f"[{ci_tuple[0]:.3f}, {ci_tuple[1]:.3f}]"
-
-
-def format_pval(p):
-    """Format p-value for LaTeX."""
-    if p < 0.001:
-        return "$<$.001"
-    else:
-        return f"{p:.3f}"
+from common.formatters import format_ci, format_pvalue_latex
 
 
 def generate_split_half_table(results, output_dir, filename_tex='split_half_reliability.tex'):
@@ -71,27 +58,30 @@ def generate_split_half_table(results, output_dir, filename_tex='split_half_reli
     lines.append(r"\midrule")
 
     # Experts - Within
+    ci_low, ci_high = exp_within['ci_r_full']
     lines.append(
         f"Experts & Within  & {exp_within['mean_r_half']:.3f}  & "
         f"{exp_within['mean_r_full']:.3f}  & "
-        f"{format_ci(exp_within['ci_r_full'])} & "
-        f"{format_pval(exp_within['p_boot_full'])} \\\\"
+        f"{format_ci(ci_low, ci_high, precision=3, latex=False)} & "
+        f"{format_pvalue_latex(exp_within['p_boot_full'], threshold=0.001)} \\\\"
     )
 
     # Novices - Within
+    ci_low, ci_high = nov_within['ci_r_full']
     lines.append(
         f"Novices & Within  & {nov_within['mean_r_half']:.3f}  & "
         f"{nov_within['mean_r_full']:.3f}  & "
-        f"{format_ci(nov_within['ci_r_full'])} & "
-        f"{format_pval(nov_within['p_boot_full'])} \\\\"
+        f"{format_ci(ci_low, ci_high, precision=3, latex=False)} & "
+        f"{format_pvalue_latex(nov_within['p_boot_full'], threshold=0.001)} \\\\"
     )
 
     # Between-groups
+    ci_low, ci_high = between['ci_r_full']
     lines.append(
         f"Between & Experts vs Novices  & {between['mean_r_half']:.3f}  & "
         f"{between['mean_r_full']:.3f}  & "
-        f"{format_ci(between['ci_r_full'])} & "
-        f"{format_pval(between['p_boot_full'])} \\\\"
+        f"{format_ci(ci_low, ci_high, precision=3, latex=False)} & "
+        f"{format_pvalue_latex(between['p_boot_full'], threshold=0.001)} \\\\"
     )
 
     lines.append(r"\midrule")
@@ -99,12 +89,13 @@ def generate_split_half_table(results, output_dir, filename_tex='split_half_reli
     lines.append(r"\midrule")
 
     # Group comparison: Experts vs Novices (difference in r_full)
+    ci_low, ci_high = diff['ci_delta_full']
     lines.append(
         r"\multicolumn{2}{l}{Within: Experts vs. Novices}  & "
         r"\textemdash & "
         f"{diff['mean_delta_full']:.3f} & "
-        f"{format_ci(diff['ci_delta_full'])} & "
-        f"{format_pval(diff['p_boot_delta_full'])} \\\\"
+        f"{format_ci(ci_low, ci_high, precision=3, latex=False)} & "
+        f"{format_pvalue_latex(diff['p_boot_delta_full'], threshold=0.001)} \\\\"
     )
 
     lines.append(r"\bottomrule")
