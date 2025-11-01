@@ -1,0 +1,55 @@
+# Chess Expertise fMRI Analysis - Python Dependencies
+# =====================================================
+#
+# This file specifies all required Python packages for reproducing the
+# chess expertise neuroimaging analyses.
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# Python version requirement: >= 3.9, < 3.13
+#
+# Tested with Python 3.11 and 3.12
+
+# =============================================================================
+# Core Data Science & Numerical Computing
+# =============================================================================
+numpy>=1.26.0,<2.0.0        # Array operations, numerical computing
+pandas>=2.2.0,<3.0.0        # DataFrames, tabular data manipulation
+scipy>=1.10.0,<2.0.0        # Statistical tests, distance metrics, interpolation
+
+# =============================================================================
+# Statistics & Effect Sizes
+# =============================================================================
+statsmodels>=0.14.0,<0.15.0 # Multiple testing correction (FDR)
+pingouin>=0.5.0,<0.6.0      # Effect size computation
+
+# =============================================================================
+# Machine Learning
+# =============================================================================
+scikit-learn>=1.3.0,<2.0.0  # Classification, PCA, cross-validation
+
+# =============================================================================
+# Neuroimaging Analysis
+# =============================================================================
+nilearn>=0.10.0,<1.0.0      # fMRI analysis, GLM, masking, surface plotting
+nibabel>=5.0.0,<6.0.0       # NIfTI file I/O, neuroimaging data formats
+
+# =============================================================================
+# Visualization & Plotting
+# =============================================================================
+matplotlib>=3.7.0,<4.0.0    # Core plotting library
+seaborn>=0.12.0,<1.0.0      # Statistical visualizations
+plotly>=5.14.0,<6.0.0       # Interactive 3D brain surface plots
+
+# =============================================================================
+# Optional Dependencies
+# =============================================================================
+# These are optional but recommended for specific features:
+#
+# pylustrator>=1.2.0        # Publication figure layout (interactive)
+# mat73>=0.62               # MATLAB v7.3 file loading (behavioral data)
+# kaleido>=0.2.1            # Static image export for plotly (PNG, PDF, SVG)
+#
+# Install optional dependencies with:
+#   pip install pylustrator mat73 kaleido
