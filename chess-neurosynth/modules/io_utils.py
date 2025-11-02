@@ -17,7 +17,7 @@ provided by common.bids_utils and common.constants.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Tuple, Dict, List
+from typing import Dict, List
 import pandas as pd
 from common import CONFIG
 # Avoid re-exporting common helpers; import them where needed at call sites
@@ -36,8 +36,8 @@ def load_term_maps(map_dir: str | Path) -> Dict[str, Path]:
     map_dir = Path(map_dir)
     out: Dict[str, Path] = {}
     for fname in sorted(map_dir.iterdir()):
-        if fname.is_file() and (fname.suffix in {'.nii', '.gz'} or fname.name.endswith('.nii.gz')):
-            term = fname.stem.replace('_', ' ').lower()
+        if fname.is_file() and (fname.suffix in {'.nii.gz', '.gz'} or fname.name.endswith('.nii.gz')):
+            term = fname.stem.replace('.nii','').replace('.gz','').replace('_', ' ').lower()
             # Strip optional numeric prefix like "1 working memory" → "working memory"
             parts = term.split(' ', 1)
             if len(parts) == 2 and parts[0].isdigit():
@@ -77,5 +77,5 @@ def find_group_tmaps(group_dir: Path) -> List[Path]:
     Returns a sorted list of files matching 'spmT_*.nii[.gz]'.
     """
     group_dir = Path(group_dir)
-    files = sorted(group_dir.glob('spmT_*.nii')) + sorted(group_dir.glob('spmT_*.nii.gz'))
+    files = sorted(group_dir.glob('spmT_*.nii.gz'))
     return files

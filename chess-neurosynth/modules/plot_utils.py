@@ -77,8 +77,9 @@ def plot_surface_map(img, title: str, threshold: float | None, output_file: Path
     # Compute a representative texture once per hemi to define vmin/vmax
     tex_l = surface.vol_to_surf(img, fsavg.pial_left)
     tex_r = surface.vol_to_surf(img, fsavg.pial_right)
-    vmax = float(np.nanmax(np.abs(np.concatenate([tex_l, tex_r]))))
-    vmin = -vmax
+
+    from common.plotting import compute_ylim_range
+    vmin, vmax = compute_ylim_range(tex_l, tex_r, symmetric=True, padding_pct=0.0)
 
     for i, (view, hemi) in enumerate(views, start=1):
         row = 1 if i <= 2 else 2
@@ -163,11 +164,30 @@ def zero_cis(values):
     return [(v, v) for v in values]
 
 
-def plot_correlations_on_ax(ax, df_pos: 'pd.DataFrame', df_neg: 'pd.DataFrame', title: str):
+def plot_correlations_on_ax(
+    ax,
+    df_pos: 'pd.DataFrame',
+    df_neg: 'pd.DataFrame',
+    title: str,
+    subtitle: str = None
+):
     """
     Plot paired bars for POS vs NEG correlations onto an existing axis.
 
     Uses centralized grouped bar plotting and PLOT_PARAMS styling.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axes to plot on
+    df_pos : pd.DataFrame
+        DataFrame with positive correlations (columns: 'term', 'r')
+    df_neg : pd.DataFrame
+        DataFrame with negative correlations (columns: 'term', 'r')
+    title : str
+        Main plot title (bold)
+    subtitle : str, optional
+        Plot subtitle (normal weight), e.g., contrast name or context
     """
     import numpy as np
     terms = [t.title() for t in df_pos['term']]
@@ -189,23 +209,46 @@ def plot_correlations_on_ax(ax, df_pos: 'pd.DataFrame', df_neg: 'pd.DataFrame', 
         group2_values=r_neg,
         group2_cis=cis_neg,
         group2_color=red,
-        group1_label='POS',
-        group2_label='NEG',
+        group1_label='Positive z-map',
+        group2_label='Negative z-map',
         ylim=None,
+        # DRY formatting in helper
+        y_label='Correlation (z)',
+        title=title,
+        subtitle=subtitle,
+        xtick_labels=terms,
+        x_tick_rotation=30,
+        x_tick_align='right',
+        visible_spines=['left','bottom'],
+        show_legend=True,
+        legend_loc='upper right',
         params=PLOT_PARAMS,
     )
-    ax.set_xticks(x)
-    ax.set_xticklabels(terms, rotation=30, ha='right', fontsize=PLOT_PARAMS['font_size_tick'])
-    ax.set_ylabel('Correlation (z)', fontsize=PLOT_PARAMS['font_size_label'])
-    from common.plotting import set_axis_title
-    set_axis_title(ax, title=title)
 
 
-def plot_differences_on_ax(ax, df_diff: 'pd.DataFrame', title: str):
+def plot_differences_on_ax(
+    ax,
+    df_diff: 'pd.DataFrame',
+    title: str,
+    subtitle: str = None
+):
     """
     Plot Δr bars with sign-colored bars onto an existing axis.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axes to plot on
+    df_diff : pd.DataFrame
+        DataFrame with correlation differences (columns: 'term', 'r_diff')
+    title : str
+        Main plot title (bold)
+    subtitle : str, optional
+        Plot subtitle (normal weight), e.g., contrast description
     """
     import numpy as np
+    from matplotlib.patches import Patch
+
     terms = [t.title() for t in df_diff['term']]
     diffs = df_diff['r_diff'].to_numpy().tolist()
     cis = zero_cis(diffs)
@@ -222,12 +265,27 @@ def plot_differences_on_ax(ax, df_diff: 'pd.DataFrame', title: str):
         group1_color=colors,
         params=PLOT_PARAMS,
         bar_width_multiplier=2.0,
+        # DRY formatting in helper
+        y_label='ΔCorrelation (z)',
+        title=title,
+        subtitle=subtitle,
+        xtick_labels=terms,
+        x_tick_rotation=30,
+        x_tick_align='right',
+        visible_spines=['left','bottom'],
     )
-    ax.set_xticks(x)
-    ax.set_xticklabels(terms, rotation=30, ha='right', fontsize=PLOT_PARAMS['font_size_tick'])
-    ax.set_ylabel('ΔCorrelation (z)', fontsize=PLOT_PARAMS['font_size_label'])
-    from common.plotting import set_axis_title
-    set_axis_title(ax, title=title)
+
+    # Add custom legend for color-coded bars
+    legend_elements = [
+        Patch(facecolor=green, label='Exp > Nov'),
+        Patch(facecolor=red, label='Nov > Exp')
+    ]
+    ax.legend(
+        handles=legend_elements,
+        loc='upper right',
+        frameon=False,
+        fontsize=PLOT_PARAMS['font_size_legend']
+    )
 
 
 # Surface embedding helper (DRY) - scripts should call plot_flat_pair then embed_figure_on_ax

@@ -91,9 +91,6 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
-import numpy as np
-import pandas as pd
-from nilearn import image
 from nilearn.glm.second_level import SecondLevelModel
 
 from common import CONFIG
