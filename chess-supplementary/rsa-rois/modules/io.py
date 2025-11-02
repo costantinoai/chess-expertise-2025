@@ -22,7 +22,6 @@ def _candidates_for_target(subject_id: str, target_key: str, base_dir: Path) -> 
     stem = f"{subject_id}_desc-searchlight_{target_key}_stat-r_map"
     pats = [
         subject_dir / f"{stem}.nii.gz",
-        subject_dir / f"{stem}.nii",
     ]
     return [p for p in pats if p.exists()]
 

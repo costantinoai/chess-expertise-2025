@@ -15,16 +15,13 @@ def _candidates_for_contrast(subject_id: str, con_code: str, base_dir: Path) -> 
     """
     Build strict candidate paths for a subject contrast file.
 
-    Tries both '.nii' and '.nii.gz', and with/without 'exp/' subfolder.
+    Tries '.nii.gz', and with/without 'exp/' subfolder.
     Exactly one existing file must be found; otherwise raises.
     """
-    con_file = f"{con_code}.nii"
     con_file_gz = f"{con_code}.nii.gz"
     subject_dir = Path(base_dir) / subject_id
 
     pats = [
-        subject_dir / 'exp' / con_file,
-        subject_dir / con_file,
         subject_dir / 'exp' / con_file_gz,
         subject_dir / con_file_gz,
     ]

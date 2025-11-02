@@ -67,6 +67,7 @@ def plot_correlation_bars(
     xlabels = [_SHORT_LABELS.get(pred, pred.capitalize()) for pred in predictors]
 
     # Use common grouped bar plotting function
+    target_label = _SHORT_LABELS.get(target, target.capitalize())
     plot_grouped_bars_on_ax(
         ax=ax,
         x_positions=x_pos,
@@ -80,18 +81,18 @@ def plot_correlation_bars(
         show_errorbars=False,
         add_value_labels=True,
         value_label_format='.2f',
+        bar_width_multiplier=.5,  # Wider bars for single-group
+        # DRY formatting in helper
+        y_label=('Correlation' if ylabel else None),
+        subtitle=target_label,
+        xtick_labels=xlabels,
+        x_tick_rotation=0,
+        x_tick_align='center',
+        visible_spines=['left','bottom'],
+        show_legend=True,
+        legend_loc='upper right',
+        params=PLOT_PARAMS,
     )
-
-    # Axis labels and title
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(xlabels, fontsize=PLOT_PARAMS['font_size_tick'])
-    ax.tick_params(axis='both', labelsize=PLOT_PARAMS['font_size_tick'])
-
-    if ylabel:
-        ax.set_ylabel('Correlation', fontsize=PLOT_PARAMS['font_size_label'])
-
-    target_label = _SHORT_LABELS.get(target, target.capitalize())
-    ax.set_title(f'Correlation with {target_label} RDM', fontsize=PLOT_PARAMS['font_size_title'])
 
 
 def plot_variance_partition_bars(
@@ -164,28 +165,26 @@ def plot_variance_partition_bars(
     x_pos = np.arange(len(bar_labels))
 
     # Use common single-group bar plotting
+    target_label = _SHORT_LABELS.get(target, target.capitalize())
     plot_grouped_bars_on_ax(
         ax=ax,
         x_positions=x_pos,
         group1_values=bar_values,
         group1_color=bar_colors,
         ylim=(0, 1.05),
-        bar_width_multiplier=2.0,  # Wider bars for single-group
+        bar_width_multiplier=1.0,  # Wider bars for single-group
         show_errorbars=False,
         add_value_labels=True,
         value_label_format='.2f',
+        # DRY formatting in helper
+        y_label=('Variance explained (R²)' if ylabel else None),
+        subtitle=f'{target_label}',
+        xtick_labels=bar_labels,
+        x_tick_rotation=30,
+        x_tick_align='center',
+        visible_spines=['left','bottom'],
+        params=PLOT_PARAMS,
     )
-
-    # Axis labels and title
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(bar_labels, fontsize=PLOT_PARAMS['font_size_tick'], rotation=0)
-    ax.tick_params(axis='both', labelsize=PLOT_PARAMS['font_size_tick'])
-
-    if ylabel:
-        ax.set_ylabel('Variance explained (R²)', fontsize=PLOT_PARAMS['font_size_label'])
-
-    target_label = _SHORT_LABELS.get(target, target.capitalize())
-    ax.set_title(f'Explaining {target_label} RDM', fontsize=PLOT_PARAMS['font_size_title'])
 
 
 __all__ = [
