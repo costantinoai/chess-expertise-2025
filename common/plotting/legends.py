@@ -101,6 +101,9 @@ def create_roi_group_legend(
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     ax.axis('off')
 
+    # Store zorder metadata for embed_figure_on_ax to use
+    fig._roi_legend_zorder = -1  # type: ignore[attr-defined]
+
     legend_handles: Sequence[Patch] = handles
     legend_labels = [h.get_label() for h in handles]
 
@@ -131,12 +134,10 @@ def create_roi_group_legend(
         ncol=ncol,
         frameon=True,
         fontsize=params['font_size_legend'],
-        title='ROI Groups',
-        title_fontsize=params['font_size_legend'],
         edgecolor='black',
         fancybox=False,
-        columnspacing=1.0,
-        handletextpad=0.5,
+        columnspacing=2.0,
+        handletextpad=0.8,
     )
     legend.get_frame().set_linewidth(params['plot_linewidth'])
 
@@ -149,7 +150,10 @@ def create_roi_group_legend(
         except AttributeError:
             pass
 
-    plt.tight_layout()
+    # Remove all white space around the legend
+    # Turn off constrained layout and use tight bbox
+    fig.set_constrained_layout(False)
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
     if output_path is not None:
         save_figure(fig, Path(output_path))

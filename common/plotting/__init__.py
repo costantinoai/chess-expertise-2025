@@ -24,6 +24,7 @@ from .style import (
 # Colors
 from .colors import (
     CMAP_BRAIN,
+    CMAP_SEQUENTIAL,
     COLORS_EXPERT_NOVICE,
     COLORS_CHECKMATE_NONCHECKMATE,
     COLORS_WONG,
@@ -33,7 +34,6 @@ from .colors import (
 
 # Helpers
 from .helpers import (
-    compute_symmetric_range,
     compute_ylim_range,
     format_axis_commas,
     label_axes,
@@ -42,10 +42,9 @@ from .helpers import (
     save_figure,
     sanitize_label_to_filename,
     save_axes_svgs,
-    save_panel_svg,
-    save_axes_pdfs,
     save_panel_pdf,
     format_roi_labels_and_colors,
+    draw_regression_line,
 )
 
 # Titles (pylustrator handles layout; only titles retained)
@@ -82,7 +81,6 @@ from .scatter import (
 from .surfaces import (
     plot_flat_pair,
     plot_flat_hemisphere,
-    compute_surface_symmetric_range,
     embed_figure_on_ax,
     plot_pial_hemisphere,
     plot_pial_views_triplet,
@@ -97,6 +95,7 @@ __all__ = [
 
     # Colors
     'CMAP_BRAIN',
+    'CMAP_SEQUENTIAL',
     'COLORS_EXPERT_NOVICE',
     'COLORS_CHECKMATE_NONCHECKMATE',
     'COLORS_WONG',
@@ -104,7 +103,6 @@ __all__ = [
     'lighten_color',
 
     # Helpers
-    'compute_symmetric_range',
     'compute_ylim_range',
     'format_axis_commas',
     'label_axes',
@@ -113,10 +111,9 @@ __all__ = [
     'save_figure',
     'sanitize_label_to_filename',
     'save_axes_svgs',
-    'save_panel_svg',
-    'save_axes_pdfs',
     'save_panel_pdf',
     'format_roi_labels_and_colors',
+    'draw_regression_line',
 
     # Titles
     'set_axis_title',
@@ -142,7 +139,6 @@ __all__ = [
     # Surfaces
     'plot_flat_pair',
     'plot_flat_hemisphere',
-    'compute_surface_symmetric_range',
     'embed_figure_on_ax',
     'plot_pial_hemisphere',
     'plot_pial_views_triplet',

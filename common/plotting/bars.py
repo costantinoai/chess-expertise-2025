@@ -262,7 +262,7 @@ def _add_significance_stars(
                 ax.plot(
                     [x_positions[i] - bar_width/2, x_positions[i] + bar_width/2],
                     [line_y, line_y],
-                    color='black', linewidth=1, zorder=3
+                    color='black', linewidth=params['comparison_linewidth'], zorder=3
                 )
 
                 # Star is above the line, centered vertically on proper distance
@@ -319,6 +319,18 @@ def plot_grouped_bars_on_ax(
     show_errorbars: bool = True,
     add_value_labels: bool = False,
     value_label_format: str = '.2f',
+    # Optional DRY formatting controls (applied if provided)
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    subtitle: Optional[str] = None,
+    xtick_labels: Optional[List[str]] = None,
+    x_label_colors: Optional[List[str]] = None,
+    x_tick_rotation: int = 30,
+    x_tick_align: str = 'right',
+    hide_xticklabels: bool = False,
+    show_legend: Optional[bool] = None,
+    legend_loc: str = 'upper right',
+    visible_spines: Optional[List[str]] = None,
     params: dict = None
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
@@ -395,6 +407,9 @@ def plot_grouped_bars_on_ax(
     from .style import PLOT_PARAMS
     if params is None:
         params = PLOT_PARAMS
+
+    import matplotlib.ticker as mticker
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.2f'))
 
     bw = params['target_bar_width_mm'] * bar_width_multiplier  # Will be converted to data units
     n_items = len(x_positions)
@@ -481,7 +496,7 @@ def plot_grouped_bars_on_ax(
                             f'{val:{value_label_format}}',
                             ha='center', va=va, fontsize=params['font_size_tick'] - 1)
 
-        # Within-group significance stars - EXACTLY matching main branch
+        # Within-group significance stars
         if group1_pvals is not None:
             _add_significance_stars(
                 ax, x_positions - bw/2, group1_values, g1_yerr, group1_pvals, params
@@ -491,7 +506,7 @@ def plot_grouped_bars_on_ax(
                 ax, x_positions + bw/2, group2_values, g2_yerr, group2_pvals, params
             )
 
-        # Between-group comparison stars - EXACTLY matching main branch
+        # Between-group comparison stars
         if comparison_pvals is not None:
             _add_significance_stars(
                 ax, x_positions, group1_values, g1_yerr, comparison_pvals, params,
@@ -518,6 +533,23 @@ def plot_grouped_bars_on_ax(
 
         # Add zero reference line (always, for all bar plots)
         ax.axhline(0, color='gray', linestyle=':', linewidth=0.75, alpha=0.6, zorder=1)
+
+        # Optional DRY formatting
+        _apply_dry_formatting(
+            ax, x_positions,
+            y_label=y_label,
+            title=title,
+            subtitle=subtitle,
+            xtick_labels=xtick_labels,
+            x_label_colors=x_label_colors,
+            x_tick_rotation=x_tick_rotation,
+            x_tick_align=x_tick_align,
+            hide_xticklabels=hide_xticklabels,
+            show_legend=show_legend,
+            legend_loc=legend_loc,
+            visible_spines=visible_spines,
+            params=params,
+        )
 
         return g1_yerr, g2_yerr
 
@@ -569,7 +601,76 @@ def plot_grouped_bars_on_ax(
         # Add zero reference line (always, for all bar plots)
         ax.axhline(0, color='gray', linestyle=':', linewidth=0.75, alpha=0.6, zorder=1)
 
+        # Optional DRY formatting
+        _apply_dry_formatting(
+            ax, x_positions,
+            y_label=y_label,
+            title=title,
+            subtitle=subtitle,
+            xtick_labels=xtick_labels,
+            x_label_colors=x_label_colors,
+            x_tick_rotation=x_tick_rotation,
+            x_tick_align=x_tick_align,
+            hide_xticklabels=hide_xticklabels,
+            show_legend=show_legend,
+            legend_loc=legend_loc,
+            visible_spines=visible_spines,
+            params=params,
+        )
+
         return g1_yerr
+
+
+def _apply_dry_formatting(
+    ax,
+    x_positions,
+    *,
+    y_label: Optional[str],
+    title: Optional[str],
+    subtitle: Optional[str],
+    xtick_labels: Optional[List[str]],
+    x_label_colors: Optional[List[str]],
+    x_tick_rotation: int,
+    x_tick_align: str,
+    hide_xticklabels: bool,
+    show_legend: Optional[bool],
+    legend_loc: str,
+    visible_spines: Optional[List[str]],
+    params: dict,
+):
+    """Apply labeling, axis styling, and optional legend in a DRY fashion."""
+    from .helpers import label_axes, set_axis_title, style_spines
+
+    # X ticks and labels
+    if hide_xticklabels:
+        ax.set_xlim(-0.5, len(x_positions) - 0.5)
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels([])
+    elif xtick_labels is not None:
+        ax.set_xlim(-0.5, len(x_positions) - 0.5)
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels(xtick_labels, rotation=x_tick_rotation, ha=x_tick_align,
+                           fontsize=params['font_size_tick'])
+        if x_label_colors is not None:
+            for ticklabel, color in zip(ax.get_xticklabels(), x_label_colors):
+                ticklabel.set_color(color)
+
+    # Y label
+    if y_label is not None:
+        label_axes(ax, ylabel=y_label, params=params)
+
+    # Title/subtitle
+    if title is not None or subtitle is not None:
+        set_axis_title(ax, title=title or '', subtitle=subtitle or '', params=params)
+
+    # Legend
+    if show_legend is True:
+        ax.legend(loc=legend_loc, ncol=2, frameon=False,
+                  fontsize=params['font_size_legend'])
+
+    # Spines
+    if visible_spines is not None:
+        style_spines(ax, visible_spines=visible_spines, params=params)
 
 
 def plot_grouped_bars_with_ci(

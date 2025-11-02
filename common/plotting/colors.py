@@ -193,3 +193,13 @@ def lighten_color(color: str | tuple, amount: float = 0.5) -> tuple:
     white = np.ones(3)
     blended = base + (white - base) * amount
     return tuple(blended)
+
+
+# =============================================================================
+# Centralized Sequential Colormap for Matrices
+# =============================================================================
+
+import seaborn as sns  # explicit dependency; ImportError should surface
+
+# Public sequential colormap (mako), centralized (no wrappers)
+CMAP_SEQUENTIAL = sns.color_palette("mako", as_cmap=True)

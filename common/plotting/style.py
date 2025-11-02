@@ -36,6 +36,13 @@ _FONT_SIZE_LEGEND = 5.0
 _FONT_SIZE_ANNOTATION = 5.0
 
 # =============================================================================
+# Line Width Hierarchy (all derived from base)
+# =============================================================================
+
+_BASE_LINEWIDTH = 0.3  # Base line width in points
+_COMPARISON_LINE_FRACTION = 1.0  # Comparison significance lines (same as base)
+
+# =============================================================================
 # Physical Bar Width
 # =============================================================================
 
@@ -54,35 +61,40 @@ PLOT_PARAMS = {
     'font_size_legend': _FONT_SIZE_LEGEND,
     'font_size_annotation': _FONT_SIZE_ANNOTATION * 1.4,  # Larger asterisks for visibility
 
-    # Line widths (points, scaled for 6pt fonts)
-    'spine_linewidth': 0.5,
-    'axes_linewidth': 0.5,
-    'errorbar_linewidth': 0.5,
-    'bar_linewidth': 0.5,
-    'plot_linewidth': 0.5,
+    # Line widths (all derived from base linewidth)
+    'base_linewidth': _BASE_LINEWIDTH,
+    'spine_linewidth': _BASE_LINEWIDTH,
+    'axes_linewidth': _BASE_LINEWIDTH,
+    'errorbar_linewidth': _BASE_LINEWIDTH,
+    'bar_linewidth': _BASE_LINEWIDTH,
+    'plot_linewidth': _BASE_LINEWIDTH,
+    'comparison_linewidth': _BASE_LINEWIDTH * _COMPARISON_LINE_FRACTION,
 
     # Tick parameters
     'tick_major_size': 3.0,
     'tick_minor_size': 1.5,
-    'tick_major_width': 0.5,
-    'tick_minor_width': 0.5,
+    'tick_major_width': _BASE_LINEWIDTH,
+    'tick_minor_width': _BASE_LINEWIDTH,
     'tick_max_nbins': 6,  # MaxNLocator for legible tick counts
 
     # Marker size for scatter/MDS (Matplotlib scatter 's' in points^2)
-    'marker_size': 12.0,
+    'marker_size': 8.0,
     'line_alpha': 0.5,
 
     # Bar parameters
     'target_bar_width_mm': _TARGET_BAR_WIDTH_MM,
-    'bar_alpha': 1.0,
+    'bar_alpha': 0.7,
     'bar_edgecolor': 'black',
-    'bar_hatch_novice': '//',
+    'bar_hatch_novice': '////',
 
     # Error bars (capsize set to 0 - no caps)
     'errorbar_capsize': 0,
 
     # Spacing
     'title_pad': 10.0,  # Points above plot
+    # Vertical gap between title and subtitle, as a multiple of title font size
+    # Increased for better separation (was implicitly ~0.9× in helper)
+    'title_subtitle_gap_factor': 1.2,
     'panel_label_offset_mm': (-5, 6),  # (x, y) from upper-left corner (increased y for higher placement)
     'significance_offset_pct': 0.02,  # Significance star offset as percentage of y-range (2%)
 
@@ -151,6 +163,7 @@ def apply_nature_rc(params: dict = None) -> None:
     matplotlib.rcParams['xtick.minor.width'] = params['tick_minor_width']
     matplotlib.rcParams['ytick.minor.width'] = params['tick_minor_width']
     matplotlib.rcParams['lines.linewidth'] = params['plot_linewidth']
+    matplotlib.rcParams['hatch.linewidth'] = params['base_linewidth']  # Same as base
 
     # Tick sizes
     matplotlib.rcParams['xtick.major.size'] = params['tick_major_size']

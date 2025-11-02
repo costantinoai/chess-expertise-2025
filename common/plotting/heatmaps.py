@@ -376,7 +376,14 @@ def plot_matrix_on_ax(
 
     if yticklabels is not None:
         ax.set_yticks(np.arange(n_rows) + 0.5)
-        ax.set_yticklabels(yticklabels, fontsize=params['font_size_tick'])
+        ax.set_yticklabels(
+            yticklabels,
+            fontsize=params['font_size_tick'],
+            rotation=0,          # <-- make them horizontal
+            va='center',         # vertical alignment (middle)
+            ha='right'           # horizontal alignment (optional: 'center' or 'right')
+        )
+
     else:
         hide_ticks(ax, hide_x=False, hide_y=True)
 

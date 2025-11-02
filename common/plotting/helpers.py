@@ -4,8 +4,7 @@
 Helper utilities for Nature-compliant plotting.
 
 Provides:
-- compute_symmetric_range(): Symmetric vmin/vmax for RDMs
-- compute_ylim_range(): Shared y-axis limits for bar plots
+- compute_ylim_range(): Universal range computation for bar plots, RDMs, brain maps
 - format_axis_commas(): Thousands separators (1,000)
 - label_axes(): Format axis labels (capitalize, no periods)
 - style_spines(): Apply spine styling with MaxNLocator
@@ -24,72 +23,163 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 # Range Computation
 # =============================================================================
 
-def compute_symmetric_range(*arrays: np.ndarray) -> Tuple[float, float]:
-    """
-    Compute symmetric vmin/vmax for multiple arrays (for RDMs/heatmaps).
-
-    Ensures color scale is centered at 0 with symmetric limits.
-
-    Parameters
-    ----------
-    *arrays : np.ndarray
-        One or more arrays to compute range from
-
-    Returns
-    -------
-    vmin, vmax : float, float
-        Symmetric limits (-max_abs, max_abs)
-
-    Examples
-    --------
-    >>> # Shared color range for multiple RDMs
-    >>> vmin, vmax = compute_symmetric_range(expert_rdm, novice_rdm, diff_rdm)
-    >>> plot_rdm_on_ax(ax1, expert_rdm, vmin=vmin, vmax=vmax)
-    >>> plot_rdm_on_ax(ax2, novice_rdm, vmin=vmin, vmax=vmax)
-    """
-    max_abs = max(np.abs(arr).max() for arr in arrays if arr is not None)
-    return (-max_abs, max_abs)
-
-
 def compute_ylim_range(
-    *value_lists: List[float],
-    padding_pct: float = 0.1
+    *value_lists,
+    symmetric: bool = False,
+    zero_anchor: bool = False,
+    padding_pct: float = 0.1,
+    round_decimals: Optional[int] = None,
 ) -> Tuple[float, float]:
     """
-    Compute shared ylim for multiple bar plots.
+    Compute shared range (ylim/vmin/vmax) for visualizations.
+
+    Universal range computation for bar plots, RDMs, brain maps, and surface plots.
+    Handles lists and numpy arrays, ignoring non-finite values.
+
+    Use Cases
+    ---------
+    **Bar plots** (default behavior):
+        Uses simple (min, max) with 10% padding for natural spacing.
+
+        >>> # Shared y-axis across expert/novice/difference panels
+        >>> ylim = compute_ylim_range(expert_vals, novice_vals, diff_vals)
+        >>> plot_grouped_bars_on_ax(ax1, ..., ylim=ylim)
+        >>> plot_grouped_bars_on_ax(ax2, ..., ylim=ylim)
+
+    **RDMs and brain maps** (symmetric around 0):
+        Centers color scale at 0 using maximum absolute value.
+
+        >>> # Symmetric range for RDM triplet (expert/novice/difference)
+        >>> vmin, vmax = compute_ylim_range(
+        ...     expert_rdm, novice_rdm, diff_rdm,
+        ...     symmetric=True,
+        ...     padding_pct=0.0
+        ... )
+        >>> plot_rdm_on_ax(ax1, expert_rdm, vmin=vmin, vmax=vmax)
+
+        >>> # Symmetric range for NIfTI brain volumes
+        >>> vmin, vmax = compute_ylim_range(
+        ...     *[img.get_fdata() for img in nifti_volumes],
+        ...     symmetric=True,
+        ...     padding_pct=0.0
+        ... )
+        >>> plot_flat_pair(data=volume, vmin=vmin, vmax=vmax)
+
+    **Zero-anchored surface maps** (positive or negative only):
+        Anchors one end at 0, extends to extrema on the other side.
+
+        >>> # Pial surface with only positive Δr values
+        >>> vmin, vmax = compute_ylim_range(
+        ...     delta_r_sig_values,
+        ...     symmetric=False,
+        ...     zero_anchor=True,
+        ...     padding_pct=0.0,
+        ...     round_decimals=1
+        ... )
+        >>> # Returns (0.0, max_positive) rounded to 1 decimal
 
     Parameters
     ----------
-    *value_lists : List[float]
-        One or more lists of values to compute range from
+    *value_lists : list[float] or np.ndarray
+        One or more value collections (lists, arrays, or flattened volumes).
+        Non-finite values (NaN, Inf) are automatically ignored.
+    symmetric : bool, default=False
+        If True, center range at 0 using max absolute value: (-max_abs, max_abs).
+        Use for: RDMs, correlation differences, brain activation maps.
+    zero_anchor : bool, default=False
+        If True (requires symmetric=False), anchor one end at 0.
+        - Only positive values → (0.0, max)
+        - Only negative values → (min, 0.0)
+        - Both signs → (min, max)  [includes 0 within range]
+        Use for: pial surface maps with only positive or only negative deltas.
     padding_pct : float, default=0.1
-        Padding as fraction of range (0.1 = 10% padding)
+        Fractional padding added to range (0.1 = 10%).
+        - Use 0.1 for bar plots (natural spacing)
+        - Use 0.0 for brain/RDM visualizations (exact data range)
+    round_decimals : int, optional
+        If provided, round vmin and vmax to this many decimal places.
+        Useful for clean colorbar labels (e.g., round_decimals=1 → 0.1, 0.2, ...).
 
     Returns
     -------
-    ylim : (ymin, ymax)
+    (vmin, vmax) : tuple[float, float]
+        Display range for ylim, vmin/vmax, or other range parameters.
 
-    Examples
+    Notes
+    -----
+    - Backwards compatible: default parameters match original bar plot behavior
+    - Handles mixed input types: lists, numpy arrays, flattened volumes
+    - Robust to NaN/Inf: non-finite values are filtered before computation
+    - Zero-division safe: identical values get small default padding
+
+    See Also
     --------
-    >>> # Shared y-axis for expert/novice/difference panels
-    >>> ylim = compute_ylim_range(expert_vals, novice_vals, diff_vals)
-    >>> plot_grouped_bars_on_ax(ax1, ..., ylim=ylim)
-    >>> plot_grouped_bars_on_ax(ax2, ..., ylim=ylim)
+    plot_grouped_bars_on_ax : Bar plotting with ylim parameter
+    plot_rdm_on_ax : RDM plotting with vmin/vmax parameters
+    plot_flat_pair : Surface plotting with vmin/vmax parameters
     """
-    all_vals = [v for lst in value_lists for v in lst if v is not None]
-    if not all_vals:
-        return (0, 1)
+    # Collect all finite values from inputs (handles lists and arrays)
+    vals: list[float] = []
+    for item in value_lists:
+        if item is None:
+            continue
+        # Handle both lists and numpy arrays
+        arr = np.asarray(item)
+        if arr.ndim == 0:  # Scalar
+            if np.isfinite(arr):
+                vals.append(float(arr))
+        else:
+            finite = arr[np.isfinite(arr)]
+            if finite.size:
+                vals.extend(finite.tolist())
 
-    ymin = min(all_vals)
-    ymax = max(all_vals)
-    y_range = ymax - ymin
+    # Handle empty input
+    if not vals:
+        return (0.0, 1.0) if zero_anchor else (-1.0, 1.0)
 
-    if y_range == 0:
-        # All values identical
-        return (ymin - 0.1, ymax + 0.1)
+    vmin_data = float(np.min(vals))
+    vmax_data = float(np.max(vals))
 
-    padding = y_range * padding_pct
-    return (ymin - padding, ymax + padding)
+    # Compute range based on mode
+    if symmetric:
+        # Symmetric around 0: (-max_abs, max_abs)
+        m = max(abs(vmin_data), abs(vmax_data))
+        vmin, vmax = -m, m
+    elif zero_anchor:
+        # Anchor one end at 0
+        has_pos = vmax_data > 0
+        has_neg = vmin_data < 0
+        if has_pos and not has_neg:
+            # Only positive → (0, max)
+            vmin, vmax = 0.0, vmax_data
+        elif has_neg and not has_pos:
+            # Only negative → (min, 0)
+            vmin, vmax = vmin_data, 0.0
+        else:
+            # Both signs → (min, max) which includes 0
+            vmin, vmax = vmin_data, vmax_data
+    else:
+        # Simple min/max
+        vmin, vmax = vmin_data, vmax_data
+
+    # Apply padding (only if range is non-zero)
+    if padding_pct and vmax > vmin:
+        span = vmax - vmin
+        if span == 0:
+            # All values identical: add small default padding
+            vmin -= 0.1
+            vmax += 0.1
+        else:
+            pad = span * float(padding_pct)
+            vmin -= pad
+            vmax += pad
+
+    # Optional rounding (for clean colorbar labels)
+    if round_decimals is not None:
+        vmin = round(vmin, int(round_decimals))
+        vmax = round(vmax, int(round_decimals))
+
+    return float(vmin), float(vmax)
 
 
 # =============================================================================
@@ -197,7 +287,7 @@ def style_spines(
 
     Notes
     -----
-    - Also applies MaxNLocator to limit tick counts (max 6 intervals)
+    - Also applies MaxNLocator to limit Y-axis tick counts (max 6 intervals)
     """
     from .style import PLOT_PARAMS
     if params is None:
@@ -213,27 +303,22 @@ def style_spines(
         else:
             ax.spines[spine_loc].set_visible(False)
 
-    # Apply MaxNLocator for legible tick counts at small fonts
+    # Apply MaxNLocator for legible tick counts (Y-axis only)
+    # DRY policy: limit applies centrally to Y labels; X labels should show all
+    # categories when explicitly provided by callers (e.g., bar plots).
     tick_max_nbins = params.get('tick_max_nbins', 6)
-    ax.xaxis.set_major_locator(MaxNLocator(nbins=tick_max_nbins))
     ax.yaxis.set_major_locator(MaxNLocator(nbins=tick_max_nbins))
 
 
 def hide_ticks(ax, hide_x: bool = True, hide_y: bool = True):
     """
-    Hide tick labels.
-
-    Parameters
-    ----------
-    ax : plt.Axes
-        Axes to modify
-    hide_x, hide_y : bool, default=True
-        Whether to hide x/y tick labels
+    Fully hide tick marks and labels on the given axes.
     """
     if hide_x:
-        ax.set_xticks([])
+        ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
     if hide_y:
-        ax.set_yticks([])
+        ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+
 
 
 # =============================================================================
@@ -453,36 +538,73 @@ def save_axes_svgs(fig, out_dir: Path | str, prefix: str,
     return saved
 
 
-def save_panel_svg(fig, output_file: Path | str, dpi: int = 450) -> Path:
-    """Save full arranged panel as SVG with tight bbox and return path."""
-    output_file = Path(output_file)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_file, format='svg', bbox_inches='tight', dpi=dpi)
-    return output_file
+# =============================================================================
+# Regression overlay helper (DRY)
+# =============================================================================
 
-
-def save_axes_pdfs(fig, out_dir: Path | str, prefix: str,
-                   expand_xy: tuple = (1.02, 1.08),
-                   dpi: int = 450) -> List[Path]:
+def draw_regression_line(
+    ax,
+    xvals,
+    slope: float,
+    intercept: float,
+    r: float | None = None,
+    p: float | None = None,
+    *,
+    params: dict | None = None,
+    color: str = 'black',
+    annotate: bool = True,
+    text_xy: tuple = (0.98, 0.02),
+):
     """
-    Save each axes in a Matplotlib figure as a separate PDF using tight bboxes.
+    Draw a simple regression line and optional r/p annotation on an axes.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axes.
+    xvals : array-like
+        X values used to bound the line segment (min..max).
+    slope, intercept : float
+        Regression line parameters (y = intercept + slope * x).
+    r, p : float, optional
+        Correlation and p-value to annotate in the lower-right corner.
+    params : dict, optional
+        PLOT_PARAMS override.
+    color : str, default 'black'
+        Line color.
+    annotate : bool, default True
+        Whether to add the text annotation when r and p are provided.
+    text_xy : (float, float), default (0.98, 0.02)
+        Axes-relative coordinates for the annotation text.
     """
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    from .style import PLOT_PARAMS
+    if params is None:
+        params = PLOT_PARAMS
 
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
+    import numpy as _np
+    xvals = _np.asarray(xvals)
+    if xvals.size == 0:
+        return
 
-    saved: List[Path] = []
-    for idx, ax in enumerate(fig.axes, start=1):
-        label = getattr(ax, 'get_label', lambda: f'ax{idx}')()
-        safe = sanitize_label_to_filename(label or f'ax{idx}')
-        out_path = out_dir / f"{prefix}__{safe}.pdf"
-        bbox = ax.get_tightbbox(renderer).expanded(expand_xy[0], expand_xy[1])
-        bbox_in = bbox.transformed(fig.dpi_scale_trans.inverted())
-        fig.savefig(out_path, format='pdf', bbox_inches=bbox_in, dpi=dpi)
-        saved.append(out_path)
-    return saved
+    x0, x1 = float(_np.min(xvals)), float(_np.max(xvals))
+    y0 = intercept + slope * x0
+    y1 = intercept + slope * x1
+
+    ax.plot(
+        [x0, x1], [y0, y1],
+        color=color,
+        linewidth=params['plot_linewidth'],
+        alpha=params.get('line_alpha', 0.5),
+        zorder=1,
+    )
+
+    if annotate and (r is not None) and (p is not None):
+        ax.text(
+            text_xy[0], text_xy[1], f"r={r:.2f}, p={p:.3f}",
+            transform=ax.transAxes,
+            ha='right', va='bottom',
+            fontsize=params['font_size_tick'], color='#666666'
+        )
 
 
 def save_panel_pdf(fig, output_file: Path | str, dpi: int = 450) -> Path:
@@ -598,7 +720,9 @@ def set_axis_title(
         ha='center', va='bottom'
     )
 
-    subtitle_offset_pts = title_size * 0.9
+    # Increase spacing between title and subtitle (configurable via params)
+    gap_factor = params.get('title_subtitle_gap_factor', 1.2)
+    subtitle_offset_pts = title_size * gap_factor
     subtitle_y = title_y - subtitle_offset_pts * pts_to_axes
     ax.text(
         0.5, subtitle_y, subtitle,
@@ -617,6 +741,7 @@ def create_standalone_colorbar(
     label: Optional[str] = None,
     output_path: Optional[Path] = None,
     params: dict | None = None,
+    tick_position: Optional[str] = None,
 ) -> plt.Figure:
     """
     Create a standalone colorbar figure with 3 ticks (vmin, center, vmax).
@@ -637,6 +762,9 @@ def create_standalone_colorbar(
         If provided, save figure to this path.
     params : dict, optional
         Plotting parameters.
+    tick_position : str, optional
+        Position of ticks and labels. For vertical: 'left' or 'right' (default: 'right').
+        For horizontal: 'top' or 'bottom' (default: 'bottom').
 
     Returns
     -------
@@ -669,8 +797,8 @@ def create_standalone_colorbar(
     fig = plt.figure(figsize=(fig_w, fig_h))
 
     # Centered axis with identical physical thickness for both orientations
-    bar_fraction = 0.24  # fraction of the short dimension occupied by the colorbar
-    margin_along_axis = 0.12  # padding along the long axis for labels/ticks
+    bar_fraction = 0.18  # fraction of the short dimension occupied by the colorbar (thinner)
+    margin_along_axis = 0.06  # padding along the long axis for labels/ticks (reduced)
     margin_per_side = (1.0 - bar_fraction) / 2.0
 
     if orientation == 'horizontal':
@@ -705,9 +833,17 @@ def create_standalone_colorbar(
     ticks = [vmin, center, vmax]
     cbar.set_ticks(ticks)
 
+    # Determine if we should use integer formatting (if vmin and vmax are whole numbers)
+    def is_whole_number(val):
+        return abs(val - round(val)) < 1e-10
+
+    use_int_format = is_whole_number(vmin) and is_whole_number(vmax)
+
     # Format tick labels with appropriate precision
     def format_tick(val):
-        if abs(val) < 0.01 and val != 0:
+        if use_int_format and is_whole_number(val):
+            return f"{int(round(val))}"
+        elif abs(val) < 0.01 and val != 0:
             return f"{val:.2e}"
         elif abs(val) >= 1000:
             return f"{val:.0f}"
@@ -718,14 +854,34 @@ def create_standalone_colorbar(
 
     cbar.set_ticklabels([format_tick(t) for t in ticks])
 
-    # Style
-    cbar.ax.tick_params(labelsize=params['font_size_tick'])
+    # Position ticks and labels
+    if tick_position:
+        if orientation == 'vertical':
+            if tick_position == 'left':
+                cbar.ax.yaxis.set_ticks_position('left')
+                cbar.ax.yaxis.set_label_position('left')
+            elif tick_position == 'right':
+                cbar.ax.yaxis.set_ticks_position('right')
+                cbar.ax.yaxis.set_label_position('right')
+        elif orientation == 'horizontal':
+            if tick_position == 'top':
+                cbar.ax.xaxis.set_ticks_position('top')
+                cbar.ax.xaxis.set_label_position('top')
+            elif tick_position == 'bottom':
+                cbar.ax.xaxis.set_ticks_position('bottom')
+                cbar.ax.xaxis.set_label_position('bottom')
+
+    # Style - use larger fonts for better readability (2x standard size)
+    cbar.ax.tick_params(labelsize=params['font_size_label'] * 2)  # Use 2x label size for ticks
 
     if label:
         if orientation == 'horizontal':
-            cbar.set_label(label, fontsize=params['font_size_label'])
+            cbar.set_label(label, fontsize=params['font_size_title'] * 2)  # Use 2x title size for label
         else:
-            cbar.set_label(label, fontsize=params['font_size_label'], rotation=270, labelpad=15)
+            if tick_position == 'left':
+                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=90, labelpad=5)
+            else:
+                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=270, labelpad=12)
 
     # Set colorbar outline width
     cbar.outline.set_linewidth(params['plot_linewidth'])
