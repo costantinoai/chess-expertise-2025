@@ -21,6 +21,8 @@ from .spm_utils import _get_beta_filename, _get_spm_dir
 import scipy.io as sio
 import re
 import logging
+import pandas as pd
+from .constants import CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,7 @@ def load_nifti(file_path):
 
     Example
     -------
-    >>> img = load_nifti('/path/to/beta_0001.nii')
+    >>> img = load_nifti('/path/to/beta_0001.nii.gz')
     >>> data = img.get_fdata()
     """
     file_path = Path(file_path)
@@ -75,7 +77,7 @@ def load_roi_mask(roi_path, threshold=0.5):
 
     Example
     -------
-    >>> mask_data, mask_img = load_roi_mask('rois/motor_cortex.nii')
+    >>> mask_data, mask_img = load_roi_mask('rois/motor_cortex.nii.gz')
     >>> n_voxels = np.sum(mask_data)
     """
     img = load_nifti(roi_path)
@@ -135,8 +137,8 @@ def extract_roi_data(beta_imgs, roi_mask):
 
     Example
     -------
-    >>> beta_imgs = [load_nifti(f'beta_{i:04d}.nii') for i in range(1, 41)]
-    >>> mask_data, _ = load_roi_mask('rois/motor.nii')
+    >>> beta_imgs = [load_nifti(f'beta_{i:04d}.nii.gz') for i in range(1, 41)]
+    >>> mask_data, _ = load_roi_mask('rois/motor.nii.gz')
     >>> roi_data = extract_roi_data(beta_imgs, mask_data)
     >>> # roi_data shape: (40 conditions, n_voxels)
     """
@@ -177,7 +179,7 @@ def mask_brain_data(data, mask):
     -------
     >>> # 3D case
     >>> brain_data = img.get_fdata()  # shape: (x, y, z)
-    >>> mask = load_roi_mask('roi.nii')[0]
+    >>> mask = load_roi_mask('roi.nii.gz')[0]
     >>> masked = mask_brain_data(brain_data, mask)  # shape: (n_voxels,)
     >>>
     >>> # 4D case
@@ -218,9 +220,9 @@ def save_brain_map(data, output_path, reference_img):
 
     Example
     -------
-    >>> ref_img = load_nifti('mask.nii')
+    >>> ref_img = load_nifti('mask.nii.gz')
     >>> result_data = np.random.randn(*ref_img.shape)
-    >>> save_brain_map(result_data, 'output/result.nii', ref_img)
+    >>> save_brain_map(result_data, 'output/result.nii.gz', ref_img)
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -252,10 +254,10 @@ def reconstruct_brain_map(masked_data, mask, fill_value=0):
 
     Example
     -------
-    >>> mask_data, mask_img = load_roi_mask('roi.nii')
+    >>> mask_data, mask_img = load_roi_mask('roi.nii.gz')
     >>> roi_values = np.random.randn(np.sum(mask_data))
     >>> full_brain = reconstruct_brain_map(roi_values, mask_data)
-    >>> save_brain_map(full_brain, 'output.nii', mask_img)
+    >>> save_brain_map(full_brain, 'output.nii.gz', mask_img)
     """
     # Initialize full volume with fill_value
     full_volume = np.full(mask.shape, fill_value, dtype=masked_data.dtype)
@@ -282,7 +284,7 @@ def get_roi_coordinates(mask):
 
     Example
     -------
-    >>> mask_data, _ = load_roi_mask('roi.nii')
+    >>> mask_data, _ = load_roi_mask('roi.nii.gz')
     >>> coords = get_roi_coordinates(mask_data)
     >>> print(f"ROI contains {len(coords)} voxels")
     """
@@ -309,7 +311,7 @@ def compute_roi_size(mask, affine=None):
 
     Example
     -------
-    >>> mask_data, mask_img = load_roi_mask('roi.nii')
+    >>> mask_data, mask_img = load_roi_mask('roi.nii.gz')
     >>> roi_size = compute_roi_size(mask_data, mask_img.affine)
     >>> print(f"ROI: {roi_size['n_voxels']} voxels, {roi_size['volume_mm3']:.1f} mm³")
     """
@@ -592,6 +594,11 @@ __all__ = [
     'compute_surface_roi_means',
     'roi_values_to_surface_texture',
     'map_glasser_roi_to_harvard_oxford',
+    'load_glasser180_annotations',
+    'load_glasser180_region_info',
+    'map_180_to_22',
+    'expand_roi22_to_roi180_values',
+    'project_volume_to_surfaces',
 ]
 
 def compute_roi_means(
@@ -850,3 +857,254 @@ def roi_values_to_surface_texture(
         if np.any(mask):
             tex[mask] = float(val)
     return tex
+
+
+def load_glasser180_annotations(hemi: str) -> np.ndarray:
+    """
+    Load fsaverage Glasser-180 surface annotation labels for a hemisphere.
+
+    Parameters
+    ----------
+    hemi : {'left','right'}
+        Hemisphere to load.
+
+    Returns
+    -------
+    np.ndarray
+        Per-vertex integer labels as read by nibabel.freesurfer.io.read_annot.
+
+    Raises
+    ------
+    KeyError
+        If required CONFIG path is missing.
+    FileNotFoundError
+        If the annotation file does not exist.
+    ValueError
+        If `hemi` is not 'left' or 'right'.
+    """
+    if hemi not in {"left", "right"}:
+        raise ValueError("hemi must be 'left' or 'right'")
+    key = 'ROI_GLASSER_180_ANNOT_L' if hemi == 'left' else 'ROI_GLASSER_180_ANNOT_R'
+    annot_path = CONFIG[key]
+    if not Path(annot_path).exists():
+        raise FileNotFoundError(f"Annotation file not found: {annot_path}")
+    labels, _, _ = fsio.read_annot(annot_path)
+    return labels
+
+
+def load_glasser180_region_info() -> pd.DataFrame:
+    """
+    Load and normalize Glasser-180 region metadata.
+
+    Expects a TSV at CONFIG['ROI_GLASSER_180']/region_info.tsv including a
+    column that identifies ROI ids and a 'region22_id' column mapping each
+    180 parcel to a corresponding 22-region label.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with at least columns: 'roi_id' (int), 'region22_id' (int).
+
+    Raises
+    ------
+    FileNotFoundError
+        If region_info.tsv is missing.
+    RuntimeError
+        If no usable ROI id column is found or 'region22_id' is missing.
+    """
+    info_path = Path(CONFIG['ROI_GLASSER_180']) / 'region_info.tsv'
+    if not info_path.exists():
+        raise FileNotFoundError(f"Glasser-180 region info not found: {info_path}")
+    df = pd.read_csv(info_path, sep='\t')
+
+    # Normalize ROI id column to 'roi_id'
+    id_candidates = ['roi_id', 'ROI_idx', 'index', 'roi_idx']
+    id_cols = [c for c in id_candidates if c in df.columns]
+    if not id_cols:
+        raise RuntimeError(
+            f"No ROI id column found in {info_path}. Expected one of {id_candidates}"
+        )
+    id_col = id_cols[0]
+    df = df.copy()
+    df['roi_id'] = df[id_col].astype(int)
+
+    if 'region22_id' not in df.columns:
+        raise RuntimeError("'region22_id' column is required in Glasser-180 region info")
+    df['region22_id'] = df['region22_id'].astype(int)
+    return df
+
+
+def map_180_to_22(roi180_df: pd.DataFrame, hemisphere: str = 'left') -> Dict[int, int]:
+    """
+    Build mapping from Glasser-180 parcel ids to Glasser-22 region ids.
+
+    Parameters
+    ----------
+    roi180_df : pd.DataFrame
+        Output of load_glasser180_region_info(). Must contain 'roi_id' and 'region22_id'.
+    hemisphere : {'left','right','both'}, default 'left'
+        Which hemisphere's parcels to include.
+
+    Returns
+    -------
+    dict[int,int]
+        Mapping of 180-parcel id -> 22-region id.
+
+    Raises
+    ------
+    ValueError
+        If hemisphere argument is invalid.
+    """
+    hemi = hemisphere.lower()
+    if hemi not in {"left", "right", "both"}:
+        raise ValueError("hemisphere must be 'left', 'right', or 'both'")
+
+    df = roi180_df
+    if hemi == 'left':
+        sel = df['roi_id'] <= 180
+    elif hemi == 'right':
+        sel = df['roi_id'] > 180
+    else:  # both
+        sel = np.ones(len(df), dtype=bool)
+
+    df_hemi = df.loc[sel, ['roi_id', 'region22_id']].copy()
+    return dict(zip(df_hemi['roi_id'].astype(int), df_hemi['region22_id'].astype(int)))
+
+
+def expand_roi22_to_roi180_values(
+    roi22_ids: np.ndarray,
+    roi22_values: np.ndarray,
+    roi180_df: pd.DataFrame,
+    hemisphere: str = 'left',
+    include_mask: Optional[np.ndarray] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Expand per-22-region values into per-180-parcel values for a hemisphere.
+
+    Parameters
+    ----------
+    roi22_ids : np.ndarray
+        1D array of 22-region ids.
+    roi22_values : np.ndarray
+        1D array of values per 22-region id (same length as roi22_ids).
+    roi180_df : pd.DataFrame
+        Region info with 'roi_id' and 'region22_id' columns.
+    hemisphere : {'left','right','both'}, default 'left'
+        Hemisphere whose 180-parcel ids to generate.
+    include_mask : np.ndarray, optional
+        Boolean mask for roi22_ids/values indicating which 22-regions to include.
+        Excluded regions will yield NaN in the expanded 180 values.
+
+    Returns
+    -------
+    (roi_ids_180, roi_vals_180) : Tuple[np.ndarray, np.ndarray]
+        Integer array of 180-parcel ids and float array of corresponding values.
+
+    Raises
+    ------
+    ValueError
+        On shape mismatch or invalid hemisphere.
+    """
+    roi22_ids = np.asarray(roi22_ids).astype(int)
+    roi22_values = np.asarray(roi22_values).astype(float)
+    if roi22_ids.shape[0] != roi22_values.shape[0]:
+        raise ValueError("roi22_ids and roi22_values length mismatch")
+    if include_mask is not None:
+        include_mask = np.asarray(include_mask).astype(bool)
+        if include_mask.shape[0] != roi22_ids.shape[0]:
+            raise ValueError("include_mask length mismatch for 22-region arrays")
+    else:
+        include_mask = np.ones_like(roi22_ids, dtype=bool)
+
+    mapping = map_180_to_22(roi180_df, hemisphere=hemisphere)
+    # Build a dict from 22-region id -> value (NaN if excluded)
+    region22_to_val = {
+        int(r22): (float(val) if keep and np.isfinite(val) else np.nan)
+        for r22, val, keep in zip(roi22_ids, roi22_values, include_mask)
+    }
+
+    roi_ids_180: list[int] = []
+    roi_vals_180: list[float] = []
+    for rid180, rid22 in mapping.items():
+        roi_ids_180.append(int(rid180))
+        roi_vals_180.append(region22_to_val.get(int(rid22), np.nan))
+    return np.asarray(roi_ids_180, dtype=int), np.asarray(roi_vals_180, dtype=float)
+
+
+def project_volume_to_surfaces(
+    volume_img,
+    surfaces: Tuple[str, ...] = ('pial_left', 'pial_right'),
+) -> Tuple[np.ndarray, ...]:
+    """
+    Project NIfTI volume to fsaverage surface textures.
+
+    Centralizes the volume→surface projection logic for consistent handling
+    across visualization workflows. Callers can then use the textures for
+    range computation and plotting without re-projecting.
+
+    Parameters
+    ----------
+    volume_img : NIfTI-like
+        Volumetric image to project (e.g., statistical map, activation map).
+    surfaces : tuple of str, default=('pial_left', 'pial_right')
+        Surface names from fsaverage to project onto.
+        Valid names: 'pial_left', 'pial_right', 'infl_left', 'infl_right', etc.
+
+    Returns
+    -------
+    textures : tuple of np.ndarray
+        Per-vertex textures for each requested surface, in the same order as input.
+
+    Raises
+    ------
+    AttributeError
+        If a requested surface name is not available in fsaverage.
+
+    Examples
+    --------
+    >>> # Project once, use for both range computation and plotting
+    >>> from nilearn import image
+    >>> from common.neuro_utils import project_volume_to_surfaces
+    >>> from common.plotting import compute_ylim_range, plot_flat_pair
+    >>>
+    >>> nifti_vol = image.load_img('zmap.nii.gz')
+    >>> tex_l, tex_r = project_volume_to_surfaces(nifti_vol)
+    >>>
+    >>> # Compute symmetric range from projected textures
+    >>> vmin, vmax = compute_ylim_range(tex_l, tex_r, symmetric=True, padding_pct=0.0)
+    >>>
+    >>> # Plot using pre-computed textures (no re-projection!)
+    >>> fig = plot_flat_pair(
+    ...     textures=(tex_l, tex_r),
+    ...     title='Statistical Map',
+    ...     vmin=vmin,
+    ...     vmax=vmax,
+    ...     show_colorbar=True
+    ... )
+
+    See Also
+    --------
+    common.plotting.compute_ylim_range : Compute symmetric or zero-anchored ranges
+    common.plotting.plot_flat_pair : Plot flat surface maps from textures
+    common.plotting.plot_pial_views_triplet : Plot pial views from textures
+    """
+    from nilearn import surface, datasets
+
+    fsavg = datasets.fetch_surf_fsaverage()
+
+    textures = []
+    for surf_name in surfaces:
+        # Get surface mesh from fsaverage
+        try:
+            surf_mesh = getattr(fsavg, surf_name)
+        except AttributeError as e:
+            raise AttributeError(
+                f"Surface '{surf_name}' not found in fsaverage. "
+                f"Available surfaces: pial_left, pial_right, infl_left, infl_right, etc."
+            ) from e
+
+        # Project volume to surface
+        tex = surface.vol_to_surf(volume_img, surf_mesh)
+        textures.append(tex)
+
+    return tuple(textures)
