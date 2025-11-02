@@ -71,13 +71,14 @@ CONFIG = {
     # ========================================================================
     # All analysis inputs live in this external directory
     'EXTERNAL_DATA_ROOT': _EXTERNAL_DATA_ROOT,  # Base directory for all inputs
+    'NEUROSYNTH_ROOT': _NEUROSYNTH_ROOT,
 
     # --- ROI Definitions ---
     'ROI_ROOT': _ROI_ROOT,                                      # Base ROI directory
     'ROI_GLASSER_22': _ROI_GLASSER_22_DIR,                      # 22 bilateral cortical ROIs
     'ROI_GLASSER_180': _ROI_GLASSER_180_DIR,                    # 180 bilateral cortical ROIs
-    'ROI_GLASSER_22_ATLAS': _ROI_GLASSER_22_DIR / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii",    # Volume atlas (NIfTI)
-    'ROI_GLASSER_180_ATLAS': _ROI_GLASSER_180_DIR / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii",  # Volume atlas (NIfTI)
+    'ROI_GLASSER_22_ATLAS': _ROI_GLASSER_22_DIR / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz",    # Volume atlas (NIfTI)
+    'ROI_GLASSER_180_ATLAS': _ROI_GLASSER_180_DIR / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii.gz",  # Volume atlas (NIfTI)
     'ROI_GLASSER_180_SURFACE': _ROI_GLASSER_180_SURFACE_DIR,    # Surface parcellation directory
     'ROI_GLASSER_180_ANNOT_L': _ROI_GLASSER_180_SURFACE_DIR / "lh.HCPMMP1.annot",  # Left hemisphere annotation
     'ROI_GLASSER_180_ANNOT_R': _ROI_GLASSER_180_SURFACE_DIR / "rh.HCPMMP1.annot",  # Right hemisphere annotation

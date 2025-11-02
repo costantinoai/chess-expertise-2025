@@ -409,12 +409,12 @@ def pick_first_present(obj, candidates: List[str]) -> Optional[str]:
 
 def find_nifti_files(data_dir: Path | str, pattern: str | None = None) -> List[Path]:
     """
-    Recursively find .nii or .nii.gz files under `data_dir` optionally matching a substring.
+    Recursively find .nii.gz files under `data_dir` optionally matching a substring.
     """
     root = Path(data_dir)
     matches: List[Path] = []
     for p in root.rglob('*'):
-        if p.is_file() and (p.suffix in {'.nii', '.gz'} or p.name.endswith('.nii.gz')):
+        if p.is_file() and (p.suffix == '.gz' or p.name.endswith('.nii.gz')):
             if pattern is None or (pattern in p.name):
                 matches.append(p)
     return sorted(matches)

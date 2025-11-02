@@ -130,7 +130,7 @@ def get_subject_info(subject_id, tsv_path=None):
     return subject_row.iloc[0]
 
 
-def find_beta_images(subject_id, bids_deriv_path=None, pattern='beta_*.nii'):
+def find_beta_images(subject_id, bids_deriv_path=None, pattern='beta_*.nii.gz'):
     """
     Find beta images for a subject in GLM derivatives.
 
@@ -140,7 +140,7 @@ def find_beta_images(subject_id, bids_deriv_path=None, pattern='beta_*.nii'):
         Subject ID (e.g., 'sub-01')
     bids_deriv_path : str or Path, optional
         Path to GLM derivatives root. If None, uses CONFIG['SPM_GLM_UNSMOOTHED'].
-    pattern : str, default='beta_*.nii'
+    pattern : str, default='beta_*.nii.gz'
         Glob pattern for beta images
 
     Returns
@@ -177,7 +177,7 @@ def find_beta_images(subject_id, bids_deriv_path=None, pattern='beta_*.nii'):
     return beta_files
 
 
-def find_contrast_images(subject_id, bids_deriv_path=None, pattern='con_*.nii'):
+def find_contrast_images(subject_id, bids_deriv_path=None, pattern='con_*.nii.gz'):
     """
     Find contrast images for a subject in GLM derivatives.
 
@@ -187,7 +187,7 @@ def find_contrast_images(subject_id, bids_deriv_path=None, pattern='con_*.nii'):
         Subject ID (e.g., 'sub-01')
     bids_deriv_path : str or Path, optional
         Path to GLM derivatives root. If None, uses CONFIG['SPM_GLM_UNSMOOTHED'].
-    pattern : str, default='con_*.nii'
+    pattern : str, default='con_*.nii.gz'
         Glob pattern for contrast images
 
     Returns
