@@ -39,7 +39,6 @@ from .plotting import (
     COLORS_WONG,
     compute_stimulus_palette,
     # Helpers
-    compute_symmetric_range,
     compute_ylim_range,
     format_axis_commas,
     label_axes,
@@ -48,8 +47,6 @@ from .plotting import (
     save_figure,
     sanitize_label_to_filename,
     save_axes_svgs,
-    save_panel_svg,
-    save_axes_pdfs,
     save_panel_pdf,
     format_roi_labels_and_colors,
     # Titles
@@ -124,7 +121,6 @@ __all__ = [
     'COLORS_WONG',
     'compute_stimulus_palette',
     # Plotting - Helpers
-    'compute_symmetric_range',
     'compute_ylim_range',
     'format_axis_commas',
     'label_axes',
@@ -133,8 +129,6 @@ __all__ = [
     'save_figure',
     'sanitize_label_to_filename',
     'save_axes_svgs',
-    'save_panel_svg',
-    'save_axes_pdfs',
     'save_panel_pdf',
     'format_roi_labels_and_colors',
     # Plotting - Titles
