@@ -11,7 +11,6 @@ import os
 import sys
 from pathlib import Path
 import pickle
-import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -76,4 +75,3 @@ for tgt in targets:
     logger.info(f"Saved RSA table for {tgt}: {tex}")
 
 log_script_end(logger)
-
