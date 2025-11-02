@@ -1,13 +1,46 @@
 #!/usr/bin/env python3
 """
-Pylustrator-driven layout for RSA ROI results (Glasser-180 Bilateral).
+Generate RSA ROI Supplementary Figure (Pylustrator)
+===================================================
 
-Creates flat surface panels showing ROI-level t-statistics (Experts vs Novices)
-for each RSA target, arranged with pylustrator.
+Creates publication-ready flat surface plots showing ROI-level RSA correlation
+t-statistics (Experts vs Novices) for each target RDM. Uses pylustrator for
+interactive layout arrangement. Displays bilateral Glasser-180 ROIs on
+flattened cortical surfaces with shared symmetric color scale.
 
-Usage:
-    python 91_plot_rsa_rois.py
-Then arrange axes in the pylustrator window and save to inject layout code.
+Figures Produced
+----------------
+
+RSA ROIs Panel
+- File: figures/panels/rsa_rois_panel.svg (and .pdf)
+- Individual axes saved to figures/: rsa_rois_1_RSA_visual_similarity.svg, etc.
+- Content: Flat cortical surface pair (left/right hemispheres) for each RSA target
+- Colors: Symmetric diverging colormap (blue = novices > experts, red = experts > novices)
+- ROIs: Glasser-180 bilateral parcellation
+
+Panel Layout:
+- One panel per RSA target (e.g., visual_similarity, strategy, checkmate)
+- Each panel shows left and right hemisphere flat surfaces side-by-side
+- T-statistics from Welch's t-test (expert vs novice RSA correlations) mapped to ROI colors
+- Shared vmin/vmax across all targets for consistent color interpretation
+
+Inputs
+------
+- rsa_group_stats.pkl (from RSA ROI analysis)
+  Contains: Per-ROI Welch t-test results for each RSA target
+- ROI annotations: Glasser-180 bilateral surface labels (L/R hemispheres)
+- ROI metadata: roi_info with roi_id, pretty_name, hemisphere, etc.
+
+Dependencies
+------------
+- pylustrator (optional; import is guarded by CONFIG['ENABLE_PYLUSTRATOR'])
+- common.plotting primitives (apply_nature_rc, plot_flat_pair, save_axes_svgs)
+- common.neuro_utils (roi_values_to_surface_texture for mapping ROI values to vertices)
+- Strict I/O: fails if expected results are missing; no silent fallbacks
+
+Usage
+-----
+python chess-supplementary/rsa-rois/91_plot_rsa_rois.py
 """
 
 import sys
@@ -15,7 +48,7 @@ from pathlib import Path
 import pickle
 import numpy as np
 
-# Enable repo root imports
+# Add parent (repo root) to sys.path for 'common' and 'modules'
 repo_root = Path(__file__).resolve().parent.parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
@@ -39,16 +72,20 @@ from common.plotting import (
     plot_flat_pair,
     embed_figure_on_ax,
     save_axes_svgs,
-    save_panel_svg,
-    save_axes_pdfs,
     save_panel_pdf,
 )
 from modules import RSA_TARGETS
 
 
+# =============================================================================
+# Configuration and Results Loading
+# =============================================================================
+# Find latest RSA ROI results directory and initialize logging
+
 script_dir = Path(__file__).parent
 results_base = script_dir / 'results'
 
+# Find latest results directory (fails if not found)
 results_dir = find_latest_results_directory(
     results_base,
     pattern='*_rsa_rois',
@@ -59,6 +96,7 @@ results_dir = find_latest_results_directory(
 
 figures_dir = results_dir / 'figures'
 
+# Initialize logging in existing results directory
 extra = {"RESULTS_DIR": str(results_dir), "FIGURES_DIR": str(figures_dir)}
 config, _, logger = setup_analysis_in_dir(
     results_dir,
@@ -68,95 +106,225 @@ config, _, logger = setup_analysis_in_dir(
     log_name='pylustrator_rsa_rois.log',
 )
 
-apply_nature_rc()
+apply_nature_rc()  # Apply Nature journal style to all figures
 
-# Load analysis results
+# Load RSA group statistics (per-ROI Welch t-test results)
+# Structure: index['rsa_corr'][target]['welch_expert_vs_novice']
+# Contains: ROI_Label, t_stat, p_val, etc.
 with open(results_dir / 'rsa_group_stats.pkl', 'rb') as f:
     index = pickle.load(f)
 
-# Load surface annotations and ROI metadata
+# Load surface annotations (vertex-to-ROI mapping for left/right hemispheres)
+# labels_l/r: array of ROI labels for each surface vertex
 labels_l, _, _ = fsio.read_annot(CONFIG['ROI_GLASSER_180_ANNOT_L'])
 labels_r, _, _ = fsio.read_annot(CONFIG['ROI_GLASSER_180_ANNOT_R'])
 
+# Load ROI metadata (pretty names, hemisphere, etc.)
+# Filter to bilateral ROIs only (roi_id <= 180)
 roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_180'])
 roi_info_bilateral = roi_info[roi_info['roi_id'] <= 180].copy()
 
 logger.info(f"Loaded surface annotations: L={len(np.unique(labels_l))} labels, R={len(np.unique(labels_r))} labels")
 logger.info(f"ROI metadata: {len(roi_info_bilateral)} bilateral ROIs")
 
+# Get list of all RSA targets to plot
 targets = list(RSA_TARGETS.keys())
 
-# Compute shared symmetric vmin/vmax across all targets
+
+# =============================================================================
+# Compute Shared Color Scale
+# =============================================================================
+# Compute symmetric vmin/vmax across all RSA targets to ensure consistent
+# color interpretation. Uses max absolute t-statistic across all targets.
+
 all_abs = []
 for tgt in targets:
     if 'rsa_corr' in index and tgt in index['rsa_corr']:
+        # Extract t-statistics for this RSA target
         tvals = index['rsa_corr'][tgt]['welch_expert_vs_novice']['t_stat'].to_numpy()
+        # Keep only finite values (exclude NaN/Inf)
         all_abs.append(np.abs(tvals[np.isfinite(tvals)]))
+
+# Compute global max absolute value
 vmax_shared = float(np.max(all_abs)) if len(all_abs) else 1.0
-vmin_shared = -vmax_shared
+vmin_shared = -vmax_shared  # Symmetric range for diverging colormap
 logger.info(f"RSA shared symmetric color scale (t): vmin={vmin_shared:.3f}, vmax={vmax_shared:.3f}")
 
 
 # =============================================================================
-# Create a single figure with independent axes (to arrange in pylustrator)
+# Figure: RSA ROI Surfaces (Independent Axes for Pylustrator)
 # =============================================================================
+# Creates one axis per RSA target, each showing bilateral flat surfaces with
+# ROI-level RSA correlation t-statistics. Pylustrator will arrange these axes.
+# For each target, creates two panels:
+# 1. All ROIs (showing all t-statistics)
+# 2. Significant ROIs only (FDR-corrected, same color scale)
 
 fig = plt.figure(1)
 
 for idx, tgt in enumerate(targets, start=1):
+    # Skip targets with missing data
     if 'rsa_corr' not in index or tgt not in index['rsa_corr']:
         logger.warning(f"No stats for {tgt}; skipping")
         continue
 
+    # Extract Welch t-test results for this RSA target
     blocks = index['rsa_corr'][tgt]
     welch = blocks['welch_expert_vs_novice']
 
-    bilateral_roi_ids = welch['ROI_Label'].to_numpy()
-    tvals = welch['t_stat'].to_numpy()
-    finite_mask = np.isfinite(tvals)
+    # Extract ROI IDs, t-statistics, and FDR significance
+    bilateral_roi_ids = welch['ROI_Label'].to_numpy()  # ROI labels (1-180)
+    tvals = welch['t_stat'].to_numpy()                 # Welch t-statistics
+    sig_fdr = welch['significant_fdr'].to_numpy()      # FDR-corrected significance
+    finite_mask = np.isfinite(tvals)                   # Exclude NaN/Inf values
 
-    # Map bilateral values to both L and R hemisphere surfaces
+    # Map bilateral ROI values to surface textures (vertex-level)
+    # Each bilateral ROI ID is used for both L and R hemisphere surfaces
     roi_ids = bilateral_roi_ids
 
-    # Create textures for both hemispheres
-    tex_l_all = roi_values_to_surface_texture(labels_l, roi_ids, tvals, include_mask=finite_mask, default_value=0.0)
-    tex_r_all = roi_values_to_surface_texture(labels_r, roi_ids, tvals, include_mask=finite_mask, default_value=0.0)
-
-    # Create surface plot and embed in matplotlib axis (in-memory, no disk writes)
-    ax = plt.axes()
-    ax.set_label(f'{idx}_RSA_{tgt}')
-
-    surface_fig = plot_flat_pair(
-        data={'left': tex_l_all, 'right': tex_r_all},
-        title='',
-        threshold=None,
-        output_file=None,
-        show_hemi_labels=False,
-        show_colorbar=False,
-        vmin=vmin_shared,
-        vmax=vmax_shared,
-        show_directions=True,
+    # Create texture arrays for ALL ROIs (one value per surface vertex)
+    # roi_values_to_surface_texture maps ROI-level values to all vertices in that ROI
+    tex_l_all = roi_values_to_surface_texture(
+        labels_l,              # Left hemisphere vertex-to-ROI mapping
+        roi_ids,               # ROI IDs to map
+        tvals,                 # T-statistics to assign to each ROI
+        include_mask=finite_mask,  # Only include finite values
+        default_value=0.0      # Value for excluded/missing ROIs
     )
-    embed_figure_on_ax(ax, surface_fig, title=f'{RSA_TARGETS[tgt]} RSA (Experts > Novices)')
+    tex_r_all = roi_values_to_surface_texture(
+        labels_r,              # Right hemisphere vertex-to-ROI mapping
+        roi_ids,
+        tvals,
+        include_mask=finite_mask,
+        default_value=0.0
+    )
+
+    # Create texture arrays for SIGNIFICANT ROIs ONLY (FDR-corrected)
+    # Mask combines finite values AND FDR significance
+    sig_mask = finite_mask & sig_fdr
+    tex_l_sig = roi_values_to_surface_texture(
+        labels_l,
+        roi_ids,
+        tvals,
+        include_mask=sig_mask,  # Only include FDR-significant ROIs
+        default_value=0.0
+    )
+    tex_r_sig = roi_values_to_surface_texture(
+        labels_r,
+        roi_ids,
+        tvals,
+        include_mask=sig_mask,
+        default_value=0.0
+    )
+
+    # -----------------------------------------------------------------------------
+    # Panel 1: All ROIs - Flat surface pair (L/R hemispheres) for this RSA target
+    # -----------------------------------------------------------------------------
+    # Create matplotlib axis with descriptive label for pylustrator
+    ax_all = plt.axes()
+    ax_all.set_label(f'{idx}_RSA_{tgt}_all')
+
+    # Create flat surface plot (in-memory, no disk writes)
+    # plot_flat_pair returns a matplotlib figure with L/R flat surfaces
+    surface_fig_all = plot_flat_pair(
+        (tex_l_all, tex_r_all),  # Hemisphere textures (all ROIs)
+        title='',                      # No title (added by embed_figure_on_ax)
+        threshold=None,                # No thresholding
+        output_file=None,              # Don't save to disk (in-memory only)
+        show_hemi_labels=False,        # Don't show L/R labels
+        show_colorbar=False,           # Don't show colorbar (shown separately)
+        vmin=vmin_shared,              # Shared color scale minimum
+        vmax=vmax_shared,              # Shared color scale maximum
+        show_directions=True,          # Show anterior/posterior labels
+    )
+
+    # Embed surface figure in matplotlib axis with title
+    embed_figure_on_ax(
+        ax_all,
+        surface_fig_all,
+        title=f'{RSA_TARGETS[tgt]} RSA (All ROIs)'  # Target name
+    )
+
+    # -----------------------------------------------------------------------------
+    # Panel 2: Significant ROIs Only - Flat surface pair (L/R hemispheres)
+    # -----------------------------------------------------------------------------
+    # Create matplotlib axis with descriptive label for pylustrator
+    ax_sig = plt.axes()
+    ax_sig.set_label(f'{idx}_RSA_{tgt}_sig')
+
+    # Create flat surface plot (in-memory, no disk writes)
+    surface_fig_sig = plot_flat_pair(
+        (tex_l_sig, tex_r_sig),  # Hemisphere textures (significant ROIs only)
+        title='',                      # No title (added by embed_figure_on_ax)
+        threshold=None,                # No thresholding (already masked by sig_fdr)
+        output_file=None,              # Don't save to disk (in-memory only)
+        show_hemi_labels=False,        # Don't show L/R labels
+        show_colorbar=False,           # Don't show colorbar (shown separately)
+        vmin=vmin_shared,              # Same shared color scale minimum
+        vmax=vmax_shared,              # Same shared color scale maximum
+        show_directions=True,          # Show anterior/posterior labels
+    )
+
+    # Embed surface figure in matplotlib axis with title
+    embed_figure_on_ax(
+        ax_sig,
+        surface_fig_sig,
+        title=f'{RSA_TARGETS[tgt]} RSA (FDR-Significant)'  # Target name
+    )
+
+    # Log number of significant ROIs for this target
+    n_sig = sig_mask.sum()
+    logger.info(f"{tgt}: {n_sig}/{len(sig_mask)} FDR-significant ROIs")
 
 # Provide axis dictionary for pylustrator convenience
+# This allows pylustrator to reference axes by label
 fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
-# Show pylustrator window; save to inject layout code
+
+# =============================================================================
+# Pylustrator Auto-Generated Layout Code
+# =============================================================================
+# The code between "#% start:" and "#% end:" markers is automatically generated
+# by pylustrator when you save the layout interactively. This code positions
+# and styles each axis according to your manual adjustments in the GUI.
+# DO NOT manually edit this section - it will be overwritten on next save.
+
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).ax_dict["1_RSA_visual_similarity"].set(position=[0.05, 0.70, 0.9, 0.25])
-plt.figure(1).ax_dict["2_RSA_strategy"].set(position=[0.05, 0.40, 0.9, 0.25])
-plt.figure(1).ax_dict["3_RSA_checkmate"].set(position=[0.05, 0.10, 0.9, 0.25])
+plt.figure(1).set_size_inches(18.290000/2.54, 16.890000/2.54, forward=True)
+plt.figure(1).ax_dict["1_RSA_visual_similarity_all"].set(position=[0.01502, 0.6776, 0.4417, 0.2526])
+plt.figure(1).ax_dict["1_RSA_visual_similarity_all"].set_position([0.014904, 0.681734, 0.441677, 0.254154])
+plt.figure(1).ax_dict["1_RSA_visual_similarity_sig"].set(position=[0.5037, 0.6776, 0.4417, 0.2526])
+plt.figure(1).ax_dict["1_RSA_visual_similarity_sig"].set_position([0.503633, 0.681734, 0.441677, 0.254154])
+plt.figure(1).ax_dict["2_RSA_strategy_all"].set(position=[0.01502, 0.3268, 0.4417, 0.2526])
+plt.figure(1).ax_dict["2_RSA_strategy_all"].set_position([0.014904, 0.328847, 0.441677, 0.254154])
+plt.figure(1).ax_dict["2_RSA_strategy_sig"].set(position=[0.5037, 0.3268, 0.4417, 0.2526])
+plt.figure(1).ax_dict["2_RSA_strategy_sig"].set_position([0.503633, 0.328847, 0.441677, 0.254154])
+plt.figure(1).ax_dict["3_RSA_checkmate_all"].set(position=[0.01502, -0.02389, 0.4417, 0.2526])
+plt.figure(1).ax_dict["3_RSA_checkmate_all"].set_position([0.014904, -0.024041, 0.441677, 0.254154])
+plt.figure(1).ax_dict["3_RSA_checkmate_sig"].set(position=[0.5037, -0.02389, 0.4417, 0.2526])
+plt.figure(1).ax_dict["3_RSA_checkmate_sig"].set_position([0.503633, -0.024041, 0.441677, 0.254154])
 #% end: automatic generated code from pylustrator
+
+# Display figure in pylustrator GUI for interactive layout adjustment
 plt.show()
 
-# Save each axis separately first, then full panel (SVG + PDF)
+
+# =============================================================================
+# Save Figures (Individual Axes and Full Panel)
+# =============================================================================
+# After arranging axes in pylustrator, save both:
+# 1. Individual axes as separate SVG/PDF files (for modular figure assembly)
+# 2. Full panel as complete SVG/PDF file (for standalone use)
+
+# Save individual axes (one file per axis, named by prefix + axis label)
 save_axes_svgs(fig, figures_dir, 'rsa_rois')
-save_axes_pdfs(fig, figures_dir, 'rsa_rois')
-save_panel_svg(fig, figures_dir / 'panels' / 'rsa_rois_panel.svg')
+
+# Save full panel (complete multi-axis figure)
 save_panel_pdf(fig, figures_dir / 'panels' / 'rsa_rois_panel.pdf')
+
+logger.info("✓ Panel: RSA ROI maps complete")
 
 log_script_end(logger)
