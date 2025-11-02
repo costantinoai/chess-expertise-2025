@@ -1,13 +1,44 @@
 """
-Pylustrator-driven MVPA panels — RSA only.
+Generate MVPA RSA Figure Panels (Pylustrator)
+==============================================
 
-Figure: ROI RSA correlations (Expert vs Novice) for three targets
-  - Visual Similarity, Strategy, Checkmate
+Creates publication-ready multi-panel figures for MVPA ROI-based RSA analysis.
+Uses pylustrator for interactive layout arrangement. The script builds
+independent axes using standardized plotting primitives and then saves both
+individual axes (SVG/PDF) and assembled panels (SVG/PDF) into the current
+MVPA RSA results directory.
 
-Arrange interactively in pylustrator and save to inject layout code.
+Figures Produced
+----------------
 
-Usage:
-    python 92_plot_mvpa_rsa.py
+Panel: MVPA RSA Multi-Panel Figure
+- File: figures/panels/mvpa_rsa_panel.svg (and .pdf)
+- Axes saved to figures/: mvpa_rsa_*.svg and mvpa_rsa_*.pdf
+- Content:
+  - RSA_1: Visual Similarity RSA - grouped bars showing Expert vs Novice correlations per ROI
+  - RSA_2: Strategy RSA - grouped bars showing Expert vs Novice correlations per ROI
+  - RSA_3: Checkmate RSA - grouped bars showing Expert vs Novice correlations per ROI
+  - RSA_Pial_1/2/3: Left hemisphere pial surface maps showing Δr (Expert - Novice) for FDR-significant ROIs
+  - RSA_Pial_Colorbar: Horizontal colorbar for pial surface maps
+  - RSA_Pial_Legend: ROI group legend
+
+Inputs
+------
+- mvpa_group_stats.pkl: Group-level MVPA statistics containing RSA correlations per ROI
+  - Dict structure: ['rsa_corr'][target_name]['welch_expert_vs_novice']
+  - Contains ROI_Label, mean_diff (Δr), p_val_fdr, group means and CIs
+- ROI metadata from CONFIG['ROI_GLASSER_22'] and CONFIG['ROI_GLASSER_180']
+
+Dependencies
+------------
+- pylustrator (optional; import is guarded by CONFIG['ENABLE_PYLUSTRATOR'])
+- common.plotting primitives and style (apply_nature_rc, plot_grouped_bars_on_ax, etc.)
+- modules.mvpa_plot_utils for MVPA-specific data extraction helpers
+- Strict I/O: fails if expected results are missing; no silent fallbacks
+
+Usage
+-----
+python chess-mvpa/92_plot_mvpa_rsa.py
 """
 
 import sys
@@ -35,14 +66,9 @@ from common.bids_utils import load_roi_metadata
 from common.plotting import (
     apply_nature_rc,
     plot_grouped_bars_on_ax,
-    set_axis_title,
     compute_ylim_range,
-    format_roi_labels_and_colors,
-    style_spines,
     PLOT_PARAMS,
     save_axes_svgs,
-    save_panel_svg,
-    save_axes_pdfs,
     save_panel_pdf,
     embed_figure_on_ax,
     plot_pial_views_triplet,
@@ -50,19 +76,30 @@ from common.plotting import (
     CMAP_BRAIN,
     create_roi_group_legend,
 )
-from nibabel.freesurfer import io as fsio
-import pandas as pd
 from modules.mvpa_plot_utils import extract_mvpa_bar_data
+from common.neuro_utils import (
+    load_glasser180_annotations,
+    load_glasser180_region_info,
+    expand_roi22_to_roi180_values,
+    roi_values_to_surface_texture,
+)
 
 
 # =============================================================================
-# Configuration
+# Configuration and results
 # =============================================================================
 
-RESULTS_DIR_NAME = None
+RESULTS_DIR_NAME = None  # Use latest results directory
 RESULTS_BASE = script_dir / "results"
 
+# Define RSA target models to analyze
+# These represent different model RDMs used in RSA analysis:
+# - visual_similarity: Low-level visual feature dissimilarity
+# - strategy: Chess strategy-based dissimilarity
+# - checkmate: Binary checkmate vs non-checkmate dissimilarity
 MAIN_TARGETS = ['visual_similarity', 'strategy', 'checkmate']
+
+# Pretty titles for each RSA target (for plot labels)
 RSA_TITLES = {
     'visual_similarity': 'Visual Similarity RSA',
     'strategy': 'Strategy RSA',
@@ -71,12 +108,14 @@ RSA_TITLES = {
 
 
 # =============================================================================
-# Load results
+# Load MVPA RSA results
 # =============================================================================
 
+# Find latest MVPA group RSA results directory
+# Creates 'figures' subdirectory if needed for saving outputs
 RESULTS_DIR = find_latest_results_directory(
     RESULTS_BASE,
-    pattern="*_mvpa_group_rsa",
+    pattern="*_mvpa_group_rsa",  # Match MVPA group RSA analysis results
     specific_name=RESULTS_DIR_NAME,
     create_subdirs=["figures"],
     require_exists=True,
@@ -84,6 +123,11 @@ RESULTS_DIR = find_latest_results_directory(
 )
 
 FIGURES_DIR = RESULTS_DIR / "figures"
+
+
+# =============================================================================
+# Setup logging
+# =============================================================================
 
 extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
 config, _, logger = setup_analysis_in_dir(
@@ -94,101 +138,106 @@ config, _, logger = setup_analysis_in_dir(
     log_name="pylustrator_mvpa_rsa.log",
 )
 
+# Load group-level MVPA statistics
+# Dict structure: group_stats['rsa_corr'][target_name]['welch_expert_vs_novice']
+# Contains: ROI_Label, mean_diff (Δr), p_val_fdr, group means and CIs
 logger.info("Loading MVPA RSA group statistics...")
 with open(RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
     group_stats = pickle.load(f)
 
+# Load ROI metadata for Glasser 22-region parcellation
+# Contains: roi_id, pretty_name, color, group/family information
 roi_info = load_roi_metadata(CONFIG["ROI_GLASSER_22"])
+
 apply_nature_rc()
 
-# Figure: RSA correlations (3 axes, no layout)
-rsa_data = extract_mvpa_bar_data(group_stats, roi_info, MAIN_TARGETS, method='rsa_corr', subtract_chance=False)
+# =============================================================================
+# Figure: MVPA RSA Multi-Panel Figure - RSA Correlation Barplots
+# =============================================================================
+# This section creates grouped barplots showing RSA correlations for Expert vs Novice
+# groups across 22 ROIs, for each of the 3 target model RDMs
 
+# Extract RSA correlation data for all targets
+# Returns dict with target_name -> {exp_means, nov_means, exp_cis, nov_cis, pvals, roi_names, roi_colors, label_colors}
+rsa_data = extract_mvpa_bar_data(
+    group_stats,          # Group statistics dict
+    roi_info,             # ROI metadata
+    MAIN_TARGETS,         # List of targets to plot
+    method='rsa_corr',    # Extract RSA correlation data
+    subtract_chance=False # Use raw correlation values (not chance-corrected)
+)
+
+# Compute global y-axis limits for consistent scale across all panels
+# Collects all expert and novice mean values across all targets
 all_vals = []
 for d in rsa_data.values():
-    all_vals.extend(d['exp_means'])
-    all_vals.extend(d['nov_means'])
-ylim_rsa = compute_ylim_range(all_vals, padding_pct=0.15)
+    all_vals.extend(d['exp_means'])  # Expert mean correlations
+    all_vals.extend(d['nov_means'])  # Novice mean correlations
 
 fig1 = plt.figure(1)
 
+# Create one panel for each RSA target (Visual Similarity, Strategy, Checkmate)
 for idx, tgt in enumerate(MAIN_TARGETS):
     if tgt not in rsa_data:
-        continue
-    data = rsa_data[tgt]
-    roi_names = data['roi_names']
-    roi_colors = data['roi_colors']
-    label_colors = data['label_colors']
-    x = np.arange(len(roi_names))
+        continue  # Skip if data is missing for this target
 
+    # Extract data for this target
+    data = rsa_data[tgt]
+    roi_names = data['roi_names']        # ROI pretty names (for x-axis labels)
+    roi_colors = data['roi_colors']      # ROI group colors (for bars)
+    label_colors = data['label_colors']  # Label colors (gray if not significant)
+    x = np.arange(len(roi_names))        # X-positions for bars
+
+    # -------------------------------------------------------------------------
+    # Panel RSA_{idx+1}: RSA Correlations for {target}
+    # -------------------------------------------------------------------------
+    # Grouped barplot showing Expert vs Novice RSA correlations per ROI
+    # Shows Spearman correlation (r) between model RDM and neural RDM
+    # Bars colored by ROI group; labels grayed for non-significant ROIs
     ax = plt.axes()
     ax.set_label(f'RSA_{idx+1}_{tgt}')
 
     plot_grouped_bars_on_ax(
         ax=ax,
         x_positions=x,
-        group1_values=data['exp_means'],
-        group1_cis=data['exp_cis'],
-        group1_color=roi_colors,
-        group2_values=data['nov_means'],
-        group2_cis=data['nov_cis'],
-        group2_color=roi_colors,
-        group1_label='Experts',
-        group2_label='Novices',
-        comparison_pvals=data['pvals'],
-        ylim=ylim_rsa,
+        group1_values=data['exp_means'],      # Expert mean correlations
+        group1_cis=data['exp_cis'],           # Expert 95% CIs
+        group1_color=roi_colors,              # ROI group colors (solid bars)
+        group2_values=data['nov_means'],      # Novice mean correlations
+        group2_cis=data['nov_cis'],           # Novice 95% CIs
+        group2_color=roi_colors,              # Same colors (hatched bars)
+        group1_label='Experts',               # Legend label
+        group2_label='Novices',               # Legend label
+        comparison_pvals=data['pvals'],       # FDR p-values for significance stars
+        ylim=(-.06, .25),                        # Shared y-axis limits
+        y_label=PLOT_PARAMS['ylabel_correlation_r'],  # Y-axis label (Spearman r)
+        subtitle=RSA_TITLES[tgt],                # Panel title
+        xtick_labels=roi_names,               # ROI names on x-axis
+        x_label_colors=label_colors,          # Color by significance (gray if p ≥ 0.05)
+        x_tick_rotation=30,
+        x_tick_align='right',
+        show_legend=(idx == 0),               # Only show legend on first panel
+        legend_loc='upper right',
+        visible_spines=['left','bottom'],
         params=PLOT_PARAMS
     )
 
-    ax.set_ylabel(PLOT_PARAMS['ylabel_correlation_r'], fontsize=PLOT_PARAMS['font_size_label'])
-    ax.tick_params(axis='y', labelsize=PLOT_PARAMS['font_size_tick'])
-    set_axis_title(ax, title=RSA_TITLES[tgt])
-
-    if idx == 0:
-        ax.legend(frameon=False, loc='upper right', ncol=1, fontsize=PLOT_PARAMS['font_size_legend'])
-
-    style_spines(ax, visible_spines=['left', 'bottom'], params=PLOT_PARAMS)
-    ax.set_xlim(-0.5, len(roi_names) - 0.5)
-    ax.set_xticks(x)
-    ax.set_xticklabels(roi_names, rotation=30, ha='right', fontsize=PLOT_PARAMS['font_size_tick'])
-    for ticklabel, color in zip(ax.get_xticklabels(), label_colors):
-        ticklabel.set_color(color)
-
+# Create ax_dict for pylustrator convenience
 fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 
 # =============================================================================
-# Add 3×1 left pial surface axes (FDR-significant ROIs only)
+# Figure: MVPA RSA Multi-Panel Figure - Pial Surface Maps
 # =============================================================================
+# This section creates left hemisphere pial surface maps showing Δr (Expert - Novice)
+# for FDR-significant ROIs only. Maps are created for each of the 3 RSA targets.
+# Uses Glasser-180 parcellation for fine-grained surface visualization.
 
-# Build per-vertex left-hemisphere textures: Δr (Experts−Novices) where pFDR<alpha; others NaN
-alpha_fdr = float(CONFIG.get('ALPHA_FDR', 0.05))
+# Get FDR threshold from configuration (strict: no fallback)
+alpha_fdr = float(CONFIG['ALPHA_FDR'])
 
-# Load surface annotations and Glasser-180 metadata (must contain a 'region22_id' column for mapping)
-labels_l, _, _ = fsio.read_annot(CONFIG['ROI_GLASSER_180_ANNOT_L'])
-
-roi180_info_path = CONFIG['ROI_GLASSER_180'] / 'region_info.tsv'
-roi180_df = pd.read_csv(roi180_info_path, sep='\t')
-# Determine id column name (roi_id preferred, accept 'index' or 'ROI_idx')
-if 'roi_id' in roi180_df.columns:
-    roi_id_col = 'roi_id'
-elif 'index' in roi180_df.columns:
-    roi_id_col = 'index'
-elif 'ROI_idx' in roi180_df.columns:
-    roi_id_col = 'ROI_idx'
-else:
-    raise RuntimeError(f"Expected an ROI id column ('roi_id'|'index'|'ROI_idx') in {roi180_info_path}")
-if 'region22_id' not in roi180_df.columns:
-    raise RuntimeError(
-        "Missing 'region22_id' column in Glasser-180 region_info.tsv.\n"
-        "Please add an integer column 'region22_id' mapping each left-hemisphere MMP parcel (roi_id 1–180)\n"
-        "to one of the 22 bilateral regions, per the Glasser paper grouping."
-    )
-
-# Use only left hemisphere rows (1..180) to match fsaverage left annot
-roi180_left = roi180_df[roi180_df[roi_id_col] <= 180].copy()
-
-# Mapping from 180 parcel id -> 22-region id
-map_180_to_22 = dict(zip(roi180_left[roi_id_col].astype(int), roi180_left['region22_id'].astype(int)))
+# Load surface annotations and Glasser-180 metadata (strict)
+labels_l = load_glasser180_annotations('left')
+roi180_df = load_glasser180_region_info()
 
 left_textures_by_target = {}
 delta_values_by_target = {}
@@ -205,19 +254,15 @@ for tgt in MAIN_TARGETS:
     include_mask = (p_fdr < alpha_fdr) & np.isfinite(delta_r)
 
     # Map 22-region deltas (sig-only) to 180 parcels (left hemi)
-    delta_map = {int(rid): (float(val) if keep else np.nan) for rid, val, keep in zip(roi22_ids.astype(int), delta_r, include_mask)}
-
-    # Expand to per-180 values
-    roi_ids_180 = []
-    roi_vals_180 = []
-    for rid180, rid22 in map_180_to_22.items():
-        roi_ids_180.append(int(rid180))
-        roi_vals_180.append(delta_map.get(int(rid22), np.nan))
-    roi_ids_180 = np.asarray(roi_ids_180, dtype=int)
-    roi_vals_180 = np.asarray(roi_vals_180, dtype=float)
+    roi_ids_180, roi_vals_180 = expand_roi22_to_roi180_values(
+        roi22_ids=roi22_ids,
+        roi22_values=delta_r,
+        roi180_df=roi180_df,
+        hemisphere='left',
+        include_mask=include_mask,
+    )
 
     # Build per-vertex texture for left hemisphere
-    from common.neuro_utils import roi_values_to_surface_texture
     tex_left = roi_values_to_surface_texture(
         labels=labels_l,
         roi_labels=roi_ids_180,
@@ -228,25 +273,16 @@ for tgt in MAIN_TARGETS:
     left_textures_by_target[tgt] = tex_left
     delta_values_by_target[tgt] = roi_vals_180
 
-# Shared color scale across the three targets: vmin=0, vmax=max positive Δr (rounded to 1 decimal)
-all_positive = []
-for tgt, vals in delta_values_by_target.items():
-    if vals is None:
-        continue
-    vals = np.asarray(vals)
-    if vals.size:
-        pos = vals[np.isfinite(vals) & (vals > 0)]
-        if pos.size:
-            all_positive.append(np.nanmax(pos))
-
-if not all_positive:
-    raise RuntimeError("No positive significant Δr values found across targets; cannot set color scale with vmin=0.")
-
-vmax_raw = float(np.max(all_positive))
-vmax_surf = round(vmax_raw, 1)
-if vmax_surf <= 0:
-    raise RuntimeError(f"Computed vmax <= 0 after rounding: raw={vmax_raw:.4f}, rounded={vmax_surf:.1f}")
-vmin_surf = 0.0
+# Shared color scale: anchor at 0 and extend to extrema from significant values
+vmin_surf, vmax_surf = compute_ylim_range(
+    *[vals for vals in delta_values_by_target.values() if vals is not None],
+    symmetric=True,
+    zero_anchor=True,
+    padding_pct=0.0,
+    round_decimals=1,
+)
+if not np.isfinite(vmin_surf) or not np.isfinite(vmax_surf) or vmax_surf <= vmin_surf:
+    raise RuntimeError(f"Invalid pial color range computed: vmin={vmin_surf}, vmax={vmax_surf}")
 
 # Create and embed one left-lateral pial surface per target
 for idx, tgt in enumerate(MAIN_TARGETS):
@@ -255,13 +291,12 @@ for idx, tgt in enumerate(MAIN_TARGETS):
     fig_pial = plot_pial_views_triplet(
         data={'left': left_textures_by_target[tgt]},
         hemi='left',
-        views=('lateral', 'medial'),
-        title='',
+        views=('lateral', 'medial', 'ventral'),
         threshold=None,
         vmin=vmin_surf,
         vmax=vmax_surf,
     )
-    embed_figure_on_ax(ax, fig_pial, title=f"{RSA_TITLES[tgt]} — Left Pial (FDR sig)")
+    embed_figure_on_ax(ax, fig_pial)
 
 # Add a standalone horizontal colorbar for Δr across all pial panels
 ax_cbar = plt.axes()
@@ -286,21 +321,64 @@ legend_fig = create_roi_group_legend(
 )
 embed_figure_on_ax(ax_legend, legend_fig, title='')
 
-# Update axis dictionary (for pylustrator)
+# =============================================================================
+# Pylustrator Setup and Interactive Layout
+# =============================================================================
+# Update ax_dict for the figure to enable easy axis reference in pylustrator
+# This allows pylustrator to reference axes by label (e.g., fig1.ax_dict["RSA_1_visual_similarity"])
 fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
+
+
+# =============================================================================
+# Pylustrator Auto-Generated Layout Code
+# =============================================================================
+# The code between "#% start:" and "#% end:" markers is automatically generated
+# by pylustrator when you save the layout interactively. This code positions
+# and styles each axis according to your manual adjustments in the GUI.
+# DO NOT manually edit this section - it will be overwritten on next save.
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
+import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).ax_dict["RSA_1_visual_similarity"].set(position=[0.05595, 0.7798, 0.4479, 0.1829])
-plt.figure(1).ax_dict["RSA_2_strategy"].set(position=[0.05595, 0.4436, 0.4479, 0.1829])
-plt.figure(1).ax_dict["RSA_3_checkmate"].set(position=[0.05595, 0.1074, 0.4479, 0.1829])
+plt.figure(1).set_size_inches(11.430000/2.54, 16.000000/2.54, forward=True)
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].set(position=[0.07572, 0.7997, 0.4217, 0.1421])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].set_position([0.119538, 0.790607, 0.665730, 0.148551])
+plt.figure(1).ax_dict["RSA_2_strategy"].set(position=[0.07572, 0.5055, 0.4217, 0.1421])
+plt.figure(1).ax_dict["RSA_2_strategy"].set_position([0.119538, 0.483051, 0.665730, 0.148551])
+plt.figure(1).ax_dict["RSA_3_checkmate"].set(position=[0.07572, 0.2113, 0.4217, 0.1421])
+plt.figure(1).ax_dict["RSA_3_checkmate"].set_position([0.119538, 0.175495, 0.665730, 0.148551])
+plt.figure(1).ax_dict["RSA_Pial_1_visual_similarity"].set(position=[0.5066, 0.7149, 0.07588, 0.2366])
+plt.figure(1).ax_dict["RSA_Pial_1_visual_similarity"].set_position([0.799915, 0.702312, 0.119358, 0.246521])
+plt.figure(1).ax_dict["RSA_Pial_2_strategy"].set(position=[0.5065, 0.4207, 0.07588, 0.2366])
+plt.figure(1).ax_dict["RSA_Pial_2_strategy"].set_position([0.799757, 0.394756, 0.119358, 0.246521])
+plt.figure(1).ax_dict["RSA_Pial_3_checkmate"].set(position=[0.5066, 0.1267, 0.07581, 0.2364])
+plt.figure(1).ax_dict["RSA_Pial_3_checkmate"].set_position([0.799915, 0.087471, 0.119248, 0.246293])
+plt.figure(1).ax_dict["RSA_Pial_Colorbar"].set(position=[0.4769, 0.1086, 0.1385, 0.03607])
+plt.figure(1).ax_dict["RSA_Pial_Colorbar"].set_position([0.753298, 0.068206, 0.217931, 0.037581])
+plt.figure(1).ax_dict["RSA_Pial_Legend"].set(position=[-0.02237, 0.02747, 0.6129, 0.09074])
+plt.figure(1).ax_dict["RSA_Pial_Legend"].set_position([-0.033568, -0.016491, 0.964081, 0.094480])
+plt.figure(1).text(0.2317, 0.9836, 'Brain-Model RSA', transform=plt.figure(1).transFigure, fontsize=7., weight='bold')  # id=plt.figure(1).texts[0].new
+plt.figure(1).texts[0].set_position([0.365780, 0.982855])
 #% end: automatic generated code from pylustrator
+
+# Display figures in pylustrator GUI for interactive layout adjustment
 plt.show()
 
-save_axes_svgs(fig1, FIGURES_DIR, 'mvpa_rsa')
-save_axes_pdfs(fig1, FIGURES_DIR, 'mvpa_rsa')
-save_panel_svg(fig1, FIGURES_DIR / 'panels' / 'mvpa_rsa_panel.svg')
+
+# =============================================================================
+# Save Figures (Individual Axes and Full Panels)
+# =============================================================================
+# After arranging axes in pylustrator, save both:
+# 1. Individual axes as separate SVG/PDF files (for modular figure assembly)
+# 2. Full panels as complete SVG/PDF files (for standalone use)
+
+# Save individual axes (one file per axis, named by axis label)
+save_axes_svgs(fig1, FIGURES_DIR, 'mvpa_rsa')  # e.g., mvpa_rsa_RSA_1_visual_similarity.svg
+
+# Save full panels (complete multi-axis figure)
 save_panel_pdf(fig1, FIGURES_DIR / 'panels' / 'mvpa_rsa_panel.pdf')
+
+logger.info("✓ Panel: MVPA RSA results complete")
 
 log_script_end(logger)

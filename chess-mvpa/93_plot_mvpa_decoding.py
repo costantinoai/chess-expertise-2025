@@ -1,13 +1,49 @@
 """
-Pylustrator-driven MVPA panels — Decoding only.
+Generate MVPA Decoding + RSA + RDM Figure Panels (Pylustrator)
+===============================================================
 
-Figure: ROI SVM decoding (Expert vs Novice) for three targets
-  - Visual Similarity, Strategy, Checkmate
+Creates publication-ready multi-panel figures combining MVPA ROI-based SVM decoding,
+RSA correlations, and model RDM visualizations for the three main dimensions
+(visual similarity, strategy, checkmate). Uses pylustrator for interactive layout
+arrangement. The script builds independent axes using standardized plotting primitives
+and then saves both individual axes (SVG/PDF) and assembled panels (SVG/PDF) into
+the current MVPA decoding results directory.
 
-Arrange interactively in pylustrator and save to inject layout code.
+Figures Produced
+----------------
 
-Usage:
-    python 93_plot_mvpa_decoding.py
+Panel: MVPA Decoding + RSA + RDM Multi-Panel Figure
+- File: figures/panels/mvpa_svm_panel.svg (and .pdf)
+- Axes saved to figures/: mvpa_svm_*.svg and mvpa_svm_*.pdf
+- Content:
+  - SVM_1-3: SVM Decoding - grouped bars showing Expert vs Novice accuracy per ROI
+    (Visual Similarity, Strategy, Checkmate)
+  - RSA_1-3: RSA Correlations - grouped bars showing Expert vs Novice correlations per ROI
+    (Visual Similarity, Strategy, Checkmate)
+  - RDM_1-3: Model RDMs - theoretical model RDMs for each dimension
+    (All dimensions: categorical/binary encoding)
+
+Inputs
+------
+- *_mvpa_group_decoding/mvpa_group_stats.pkl: SVM decoding statistics
+  - ['svm'][target_name]['welch_expert_vs_novice']: Decoding accuracy per ROI
+- *_mvpa_group_rsa/mvpa_group_stats.pkl: RSA correlation statistics
+  - ['rsa_corr'][target_name]['welch_expert_vs_novice']: RSA correlations per ROI
+- Each contains: ROI_Label, mean_diff, p_val_fdr, group means and CIs
+- ROI metadata from CONFIG['ROI_GLASSER_22']
+- Stimulus metadata from CONFIG['STIMULI_FILE'] for model RDM construction
+
+Dependencies
+------------
+- pylustrator (optional; import is guarded by CONFIG['ENABLE_PYLUSTRATOR'])
+- common.plotting primitives and style (apply_nature_rc, plot_grouped_bars_on_ax, plot_rdm_on_ax, etc.)
+- common.rsa_utils for model RDM creation
+- modules.mvpa_plot_utils for MVPA-specific data extraction helpers
+- Strict I/O: fails if expected results are missing; no silent fallbacks
+
+Usage
+-----
+python chess-mvpa/93_plot_mvpa_decoding.py
 """
 
 import sys
@@ -31,52 +67,81 @@ import numpy as np
 import matplotlib.pyplot as plt
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory
-from common.bids_utils import load_roi_metadata
+from common.bids_utils import load_roi_metadata, load_stimulus_metadata
+from common.rsa_utils import create_model_rdm
 from common.plotting import (
     apply_nature_rc,
     plot_grouped_bars_on_ax,
-    set_axis_title,
+    plot_rdm_on_ax,
     compute_ylim_range,
-    format_roi_labels_and_colors,
-    style_spines,
+    compute_stimulus_palette,
     PLOT_PARAMS,
     save_axes_svgs,
-    save_panel_svg,
-    save_axes_pdfs,
     save_panel_pdf,
 )
 from modules.mvpa_plot_utils import extract_mvpa_bar_data
 
 
 # =============================================================================
-# Configuration
+# Configuration and results
 # =============================================================================
 
-RESULTS_DIR_NAME = None
+RESULTS_DIR_NAME = None  # Use latest results directory
 RESULTS_BASE = script_dir / "results"
 
+# Define SVM decoding target classes to analyze
+# These represent different binary classification tasks:
+# - visual_similarity: High vs low visual similarity stimuli
+# - strategy: Different chess strategy types
+# - checkmate: Checkmate vs non-checkmate stimuli
 MAIN_TARGETS = ['visual_similarity', 'strategy', 'checkmate']
+
+# Pretty titles for each target (for plot labels)
 SVM_TITLES = {
-    'visual_similarity': 'Visual Similarity Decoding',
-    'strategy': 'Strategy Decoding',
-    'checkmate': 'Checkmate Decoding',
+    'visual_similarity': 'Visual Similarity',
+    'strategy': 'Strategy',
+    'checkmate': 'Checkmate',
 }
 
+RSA_TITLES = {
+    'visual_similarity': 'Visual Similarity',
+    'strategy': 'Strategy',
+    'checkmate': 'Checkmate',
+}
 
 # =============================================================================
-# Load results
+# Load MVPA results from both decoding and RSA directories
 # =============================================================================
 
-RESULTS_DIR = find_latest_results_directory(
+# Find latest MVPA group decoding results directory
+# Creates 'figures' subdirectory if needed for saving outputs
+DECODING_RESULTS_DIR = find_latest_results_directory(
     RESULTS_BASE,
-    pattern="*_mvpa_group_decoding",
+    pattern="*_mvpa_group_decoding",  # Match MVPA group decoding analysis results
     specific_name=RESULTS_DIR_NAME,
     create_subdirs=["figures"],
     require_exists=True,
     verbose=True,
 )
 
+# Find latest MVPA group RSA results directory (for RSA correlation data)
+RSA_RESULTS_DIR = find_latest_results_directory(
+    RESULTS_BASE,
+    pattern="*_mvpa_group_rsa",  # Match MVPA group RSA analysis results
+    specific_name=None,  # Use latest
+    create_subdirs=[],
+    require_exists=True,
+    verbose=True,
+)
+
+# Save outputs to decoding directory
+RESULTS_DIR = DECODING_RESULTS_DIR
 FIGURES_DIR = RESULTS_DIR / "figures"
+
+
+# =============================================================================
+# Setup logging
+# =============================================================================
 
 extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
 config, _, logger = setup_analysis_in_dir(
@@ -87,75 +152,281 @@ config, _, logger = setup_analysis_in_dir(
     log_name="pylustrator_mvpa_decoding.log",
 )
 
+# Load group-level MVPA statistics from both directories
+# Decoding: group_stats['svm'][target_name]['welch_expert_vs_novice']
+# RSA: group_stats['rsa_corr'][target_name]['welch_expert_vs_novice']
+# Each contains: ROI_Label, mean_diff, p_val_fdr, group means and CIs
 logger.info("Loading MVPA decoding group statistics...")
-with open(RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
-    group_stats = pickle.load(f)
+with open(DECODING_RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
+    decoding_stats = pickle.load(f)
 
+logger.info("Loading MVPA RSA group statistics...")
+with open(RSA_RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
+    rsa_stats = pickle.load(f)
+
+# Merge both into single dict
+group_stats = {**decoding_stats, **rsa_stats}
+
+# Load ROI metadata for Glasser 22-region parcellation
+# Contains: roi_id, pretty_name, color, group/family information
 roi_info = load_roi_metadata(CONFIG["ROI_GLASSER_22"])
+
+# Load stimulus metadata and create model RDMs for visualization
+# stimuli_df: DataFrame with stimulus info (checkmate status, strategy type, visual similarity)
+stimuli_df = load_stimulus_metadata()
+stim_colors, stim_alphas = compute_stimulus_palette(stimuli_df)
+
+# Create model RDMs for the three target dimensions
+# All dimensions are treated as categorical (Hamming distance: 0=same category, 1=different)
+model_rdms = {}
+model_rdms['visual_similarity'] = create_model_rdm(stimuli_df['visual'].values, is_categorical=True)
+model_rdms['strategy'] = create_model_rdm(stimuli_df['strategy'].values, is_categorical=True)
+model_rdms['checkmate'] = create_model_rdm(
+    (stimuli_df['check'] == 'checkmate').astype(int).values,
+    is_categorical=True
+)
+
 apply_nature_rc()
 
-# Figure: SVM decoding (3 axes, no layout)
-svm_data = extract_mvpa_bar_data(group_stats, roi_info, MAIN_TARGETS, method='svm', subtract_chance=True)
+
+# =============================================================================
+# Figure: MVPA Decoding + RSA + RDM Multi-Panel Figure
+# =============================================================================
+# This section creates a comprehensive figure with three types of visualizations:
+# 1. SVM Decoding: Barplots showing Expert vs Novice decoding accuracy per ROI
+# 2. RSA Correlations: Barplots showing Expert vs Novice RSA correlations per ROI
+# 3. Model RDMs: Theoretical model RDMs for each dimension
+#
+# Part 1: SVM Decoding Barplots
+# ------------------------------
+# Grouped barplots showing SVM decoding accuracy for Expert vs Novice
+# groups across 22 ROIs, for each of the 3 target binary classification tasks
+# Y-axis shows accuracy above chance (chance = 0.5 for binary classification)
+
+# Extract SVM decoding accuracy data for all targets
+# Returns dict with target_name -> {exp_means, nov_means, exp_cis, nov_cis, pvals, roi_names, roi_colors, label_colors}
+# subtract_chance=True converts accuracy to accuracy-above-chance (subtracts 0.5)
+svm_data = extract_mvpa_bar_data(
+    group_stats,          # Group statistics dict
+    roi_info,             # ROI metadata
+    MAIN_TARGETS,         # List of targets to plot
+    method='svm',         # Extract SVM decoding data
+    subtract_chance=True  # Convert to accuracy-above-chance
+)
 
 fig1 = plt.figure(1)
 
+# Create one panel for each SVM decoding target (Visual Similarity, Strategy, Checkmate)
 for idx, tgt in enumerate(MAIN_TARGETS):
     if tgt not in svm_data:
-        continue
-    data = svm_data[tgt]
-    roi_names = data['roi_names']
-    roi_colors = data['roi_colors']
-    label_colors = data['label_colors']
-    x = np.arange(len(roi_names))
+        continue  # Skip if data is missing for this target
 
+    # Extract data for this target
+    data = svm_data[tgt]
+    roi_names = data['roi_names']        # ROI pretty names (for x-axis labels)
+    roi_colors = data['roi_colors']      # ROI group colors (for bars)
+    label_colors = data['label_colors']  # Label colors (gray if not significant)
+    x = np.arange(len(roi_names))        # X-positions for bars
+
+    # -------------------------------------------------------------------------
+    # Panel SVM_{idx+1}: SVM Decoding Accuracy for {target}
+    # -------------------------------------------------------------------------
+    # Grouped barplot showing Expert vs Novice SVM decoding accuracy per ROI
+    # Shows accuracy above chance (0.5 subtracted from raw accuracy)
+    # Bars colored by ROI group; labels grayed for non-significant ROIs
     ax = plt.axes()
     ax.set_label(f'SVM_{idx+1}_{tgt}')
 
     plot_grouped_bars_on_ax(
         ax=ax,
         x_positions=x,
-        group1_values=data['exp_means'],
-        group1_cis=data['exp_cis'],
-        group1_color=roi_colors,
-        group2_values=data['nov_means'],
-        group2_cis=data['nov_cis'],
-        group2_color=roi_colors,
-        group1_label='Experts',
-        group2_label='Novices',
-        comparison_pvals=data['pvals'],
-        ylim=(0, 0.25),
+        group1_values=data['exp_means'],      # Expert mean accuracy (above chance)
+        group1_cis=data['exp_cis'],           # Expert 95% CIs
+        group1_color=roi_colors,              # ROI group colors (solid bars)
+        group2_values=data['nov_means'],      # Novice mean accuracy (above chance)
+        group2_cis=data['nov_cis'],           # Novice 95% CIs
+        group2_color=roi_colors,              # Same colors (hatched bars)
+        group1_label='Experts',               # Legend label
+        group2_label='Novices',               # Legend label
+        comparison_pvals=data['pvals'],       # FDR p-values for significance stars
+        ylim=(-0.06, 0.25),                       # Y-axis limits (0 to 25% above chance)
+        y_label='Accuracy - chance',          # Y-axis label
+        subtitle=SVM_TITLES[tgt],                # Panel title
+        xtick_labels=roi_names,               # ROI names on x-axis
+        x_label_colors=label_colors,          # Color by significance (gray if p ≥ 0.05)
+        x_tick_rotation=30,
+        x_tick_align='right',
+        show_legend=(idx == 0),               # Only show legend on first panel
+        legend_loc='upper right',
+        visible_spines=['left','bottom'],
         params=PLOT_PARAMS
     )
 
-    ax.set_ylabel('Accuracy - chance', fontsize=PLOT_PARAMS['font_size_label'])
-    ax.tick_params(axis='y', labelsize=PLOT_PARAMS['font_size_tick'])
-    set_axis_title(ax, title=SVM_TITLES[tgt])
+# =============================================================================
+# Figure: MVPA RSA Correlation Barplots
+# =============================================================================
+# This section creates grouped barplots showing RSA correlations for Expert vs Novice
+# groups across 22 ROIs, for each of the 3 target model RDMs
 
-    if idx == 0:
-        ax.legend(frameon=False, loc='upper right', ncol=1, fontsize=PLOT_PARAMS['font_size_legend'])
+# Extract RSA correlation data for all targets
+# Returns dict with target_name -> {exp_means, nov_means, exp_cis, nov_cis, pvals, roi_names, roi_colors, label_colors}
+rsa_data = extract_mvpa_bar_data(
+    group_stats,          # Group statistics dict
+    roi_info,             # ROI metadata
+    MAIN_TARGETS,         # List of targets to plot
+    method='rsa_corr',    # Extract RSA correlation data
+    subtract_chance=False # Use raw correlation values (not chance-corrected)
+)
 
-    style_spines(ax, visible_spines=['left', 'bottom'], params=PLOT_PARAMS)
-    ax.set_xlim(-0.5, len(roi_names) - 0.5)
-    ax.set_xticks(x)
-    ax.set_xticklabels(roi_names, rotation=30, ha='right', fontsize=PLOT_PARAMS['font_size_tick'])
-    for ticklabel, color in zip(ax.get_xticklabels(), label_colors):
-        ticklabel.set_color(color)
+# Compute global y-axis limits for consistent scale across all RSA panels
+# Collects all expert and novice mean values across all targets
+all_vals = []
+for d in rsa_data.values():
+    all_vals.extend(d['exp_means'])  # Expert mean correlations
+    all_vals.extend(d['nov_means'])  # Novice mean correlations
+ylim_rsa = (-0.06, 0.25)
 
+# Create one RSA panel for each target (Visual Similarity, Strategy, Checkmate)
+for idx, tgt in enumerate(MAIN_TARGETS):
+    if tgt not in rsa_data:
+        continue  # Skip if data is missing for this target
+
+    # Extract data for this target
+    data = rsa_data[tgt]
+    roi_names = data['roi_names']        # ROI pretty names (for x-axis labels)
+    roi_colors = data['roi_colors']      # ROI group colors (for bars)
+    label_colors = data['label_colors']  # Label colors (gray if not significant)
+    x = np.arange(len(roi_names))        # X-positions for bars
+
+    # -------------------------------------------------------------------------
+    # Panel RSA_{idx+1}: RSA Correlations for {target}
+    # -------------------------------------------------------------------------
+    # Grouped barplot showing Expert vs Novice RSA correlations per ROI
+    # Shows Spearman correlation (r) between model RDM and neural RDM
+    # Bars colored by ROI group; labels grayed for non-significant ROIs
+    ax = plt.axes()
+    ax.set_label(f'RSA_{idx+1}_{tgt}')
+
+    plot_grouped_bars_on_ax(
+        ax=ax,
+        x_positions=x,
+        group1_values=data['exp_means'],      # Expert mean correlations
+        group1_cis=data['exp_cis'],           # Expert 95% CIs
+        group1_color=roi_colors,              # ROI group colors (solid bars)
+        group2_values=data['nov_means'],      # Novice mean correlations
+        group2_cis=data['nov_cis'],           # Novice 95% CIs
+        group2_color=roi_colors,              # Same colors (hatched bars)
+        group1_label='Experts',               # Legend label
+        group2_label='Novices',               # Legend label
+        comparison_pvals=data['pvals'],       # FDR p-values for significance stars
+        ylim=ylim_rsa,                        # Shared y-axis limits
+        y_label=PLOT_PARAMS['ylabel_correlation_r'],  # Y-axis label (Spearman r)
+        subtitle=RSA_TITLES[tgt],                # Panel title
+        xtick_labels=roi_names,               # ROI names on x-axis
+        x_label_colors=label_colors,          # Color by significance (gray if p ≥ 0.05)
+        x_tick_rotation=30,
+        x_tick_align='right',
+        show_legend=(idx == 0),               # Only show legend on first panel
+        legend_loc='upper right',
+        visible_spines=['left','bottom'],
+        params=PLOT_PARAMS
+    )
+
+# =============================================================================
+# Figure: Model RDMs for Three Dimensions
+# =============================================================================
+# This section creates RDM visualizations for the three model dimensions
+# (visual similarity, strategy, checkmate)
+
+# Compute global symmetric color scale for RDM panels
+# Use same vmin/vmax across all model RDMs for consistent color interpretation
+rdm_vmin = 0
+rdm_vmax = max([rdm.max() for rdm in model_rdms.values()])
+
+# Create one RDM panel for each target dimension
+for idx, tgt in enumerate(MAIN_TARGETS):
+    # -------------------------------------------------------------------------
+    # Panel RDM_{idx+1}: Model RDM for {target}
+    # -------------------------------------------------------------------------
+    # Shows the theoretical model RDM for this dimension
+    # Matrix is 40x40, with values representing dissimilarity between stimuli
+    # All dimensions use categorical encoding: binary (0=same category, 1=different category)
+    ax = plt.axes()
+    ax.set_label(f'RDM_{idx+1}_{tgt}')
+
+    plot_rdm_on_ax(
+        ax=ax,
+        rdm=model_rdms[tgt],         # Model RDM (40x40)
+        colors=stim_colors,          # Strategy-based colors for matrix borders
+        alphas=stim_alphas,          # Alpha values for each stimulus
+        show_colorbar=False,         # Don't show individual colorbars
+    )
+    ax.set_xticks([])
+    ax.set_yticks([])  # Hide tick labels (too many stimuli)
+
+
+# =============================================================================
+# Pylustrator Setup and Interactive Layout
+# =============================================================================
+# Create ax_dict for the figure to enable easy axis reference in pylustrator
+# This allows pylustrator to reference axes by label (e.g., fig1.ax_dict["SVM_1_visual_similarity"])
 fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
+
+
+# =============================================================================
+# Pylustrator Auto-Generated Layout Code
+# =============================================================================
+# The code between "#% start:" and "#% end:" markers is automatically generated
+# by pylustrator when you save the layout interactively. This code positions
+# and styles each axis according to your manual adjustments in the GUI.
+# DO NOT manually edit this section - it will be overwritten on next save.
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).ax_dict["SVM_1_visual_similarity"].set(position=[0.044, 0.7789, 0.4626, 0.1855])
-plt.figure(1).ax_dict["SVM_2_strategy"].set(position=[0.044, 0.4513, 0.4626, 0.1855])
-plt.figure(1).ax_dict["SVM_3_checkmate"].set(position=[0.044, 0.1236, 0.4626, 0.1855])
+plt.figure(1).set_size_inches(21.260000/2.54, 16.080000/2.54, forward=True)
+plt.figure(1).ax_dict["RDM_1_visual_similarity"].set(position=[0.4499, 0.7901, 0.0929, 0.1228])
+plt.figure(1).ax_dict["RDM_1_visual_similarity"].text(0.4306, 1.3739, 'b', transform=plt.figure(1).ax_dict["RDM_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["RDM_1_visual_similarity"].texts[0].new
+plt.figure(1).ax_dict["RDM_2_strategy"].set(position=[0.3778, 0.5618, 0.07887, 0.09863])
+plt.figure(1).ax_dict["RDM_2_strategy"].set_position([0.449913, 0.465718, 0.092902, 0.122817])
+plt.figure(1).ax_dict["RDM_3_checkmate"].set(position=[0.3778, 0.3013, 0.07887, 0.09863])
+plt.figure(1).ax_dict["RDM_3_checkmate"].set_position([0.449913, 0.141302, 0.092902, 0.122817])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].set(position=[0.519, 0.8222, 0.3032, 0.1188])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].set_position([0.617271, 0.789950, 0.360350, 0.148003])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].text(0.3660, 1.2740, 'Brain-Model RSA', transform=plt.figure(1).ax_dict["RSA_1_visual_similarity"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["RSA_1_visual_similarity"].texts[0].new
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].text(0.9773, 1.1415, 'c', transform=plt.figure(1).ax_dict["RSA_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["RSA_1_visual_similarity"].texts[1].new
+plt.figure(1).ax_dict["RSA_2_strategy"].set(position=[0.519, 0.5618, 0.3032, 0.1188])
+plt.figure(1).ax_dict["RSA_2_strategy"].set_position([0.617271, 0.465712, 0.360350, 0.148003])
+plt.figure(1).ax_dict["RSA_3_checkmate"].set(position=[0.519, 0.3013, 0.3032, 0.1188])
+plt.figure(1).ax_dict["RSA_3_checkmate"].set_position([0.617271, 0.141241, 0.360350, 0.148003])
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].set(position=[0.044, 0.8222, 0.3032, 0.1188])
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].set_position([0.052843, 0.790004, 0.360298, 0.147949])
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].text(0.3885, 1.2741, 'Brain Decoding', transform=plt.figure(1).ax_dict["SVM_1_visual_similarity"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_1_visual_similarity"].texts[5].new
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].text(-0.0386, 1.1416, 'a', transform=plt.figure(1).ax_dict["SVM_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["SVM_1_visual_similarity"].texts[6].new
+plt.figure(1).ax_dict["SVM_2_strategy"].set(position=[0.044, 0.5618, 0.3032, 0.1188])
+plt.figure(1).ax_dict["SVM_2_strategy"].set_position([0.052843, 0.465712, 0.360298, 0.147949])
+plt.figure(1).ax_dict["SVM_3_checkmate"].set(position=[0.044, 0.3013, 0.3032, 0.1188])
+plt.figure(1).ax_dict["SVM_3_checkmate"].set_position([0.052843, 0.141295, 0.360298, 0.147949])
 #% end: automatic generated code from pylustrator
+
+# Display figures in pylustrator GUI for interactive layout adjustment
 plt.show()
 
-save_axes_svgs(fig1, FIGURES_DIR, 'mvpa_svm')
-save_axes_pdfs(fig1, FIGURES_DIR, 'mvpa_svm')
-save_panel_svg(fig1, FIGURES_DIR / 'panels' / 'mvpa_svm_panel.svg')
+
+# =============================================================================
+# Save Figures (Individual Axes and Full Panels)
+# =============================================================================
+# After arranging axes in pylustrator, save both:
+# 1. Individual axes as separate SVG/PDF files (for modular figure assembly)
+# 2. Full panels as complete SVG/PDF files (for standalone use)
+
+# Save individual axes (one file per axis, named by axis label)
+save_axes_svgs(fig1, FIGURES_DIR, 'mvpa_svm')  # e.g., mvpa_svm_SVM_1_visual_similarity.svg
+
+# Save full panels (complete multi-axis figure)
 save_panel_pdf(fig1, FIGURES_DIR / 'panels' / 'mvpa_svm_panel.pdf')
+
+logger.info("✓ Panel: MVPA SVM decoding + RSA + RDM panels complete")
 
 log_script_end(logger)
