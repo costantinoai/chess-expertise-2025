@@ -159,7 +159,7 @@ def compute_subject_roi_prs(
     Examples
     --------
     >>> from common.neuro_utils import load_atlas
-    >>> atlas, rois = load_atlas("atlas.nii")
+    >>> atlas, rois = load_atlas("atlas.nii.gz")
     >>> pr_vals, vox_counts = compute_subject_roi_prs(
     ...     "03", atlas, rois, Path("/data/glm")
     ... )

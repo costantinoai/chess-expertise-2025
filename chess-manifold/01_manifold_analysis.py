@@ -81,9 +81,6 @@ visualize the linear separability of expert and novice PR profiles.
 
 Statistical Assumptions and Limitations
 ----------------------------------------
-- **Normality**: t-tests assume normally distributed PR values within each
-  group and ROI. With n=20 per group, the central limit theorem provides
-  robustness.
 - **Independence**: PR values are assumed independent across participants but
   may share common noise sources (scanner drift, task strategies).
 - **ROI size**: PR is sensitive to the number of voxels in each ROI. We
