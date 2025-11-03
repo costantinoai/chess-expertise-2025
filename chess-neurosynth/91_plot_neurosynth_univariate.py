@@ -42,13 +42,18 @@ Usage
 python chess-neurosynth/91_plot_neurosynth_univariate.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
-
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -68,6 +73,8 @@ from common.plotting import (
     compute_ylim_range,
     plot_flat_pair,
     embed_figure_on_ax,
+    PLOT_YLIMITS,
+    cm_to_inches,
 )
 from common.neuro_utils import project_volume_to_surfaces
 from modules.plot_utils import (
@@ -75,8 +82,7 @@ from modules.plot_utils import (
     plot_differences_on_ax,
     load_term_corr_triple,
 )
-from common.io_utils import find_latest_results_directory
-from common.logging_utils import setup_analysis_in_dir, log_script_end
+from common import setup_script, log_script_end
 
 
 # NOTE: Helper functions moved to modules.plot_utils for reusability
@@ -88,30 +94,20 @@ from common.logging_utils import setup_analysis_in_dir, log_script_end
 
 apply_nature_rc()
 
-# Find latest neurosynth univariate results directory
-# Creates 'figures' subdirectory if needed for saving outputs
-RESULTS_DIR = find_latest_results_directory(
-    script_dir / 'results',
-    pattern='*_neurosynth_univariate',  # Match neurosynth univariate analysis results
-    create_subdirs=['figures'],
-    require_exists=True,
-    verbose=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='neurosynth_univariate',
+    output_subdirs=['figures'],
+    log_name='pylustrator_neurosynth_univariate.log',
 )
-FIGURES_DIR = RESULTS_DIR / 'figures'
+RESULTS_DIR = results_dir
+FIGURES_DIR = dirs['figures']
 
 
 # =============================================================================
 # Setup logging
 # =============================================================================
 
-extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
-_, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name='pylustrator_neurosynth_univariate.log',
-)
 
 
 # =============================================================================
@@ -159,8 +155,11 @@ plot_correlations_on_ax(
     df_pos_all,                         # Positive term correlations (Expert > Novice)
     df_neg_all,                         # Negative term correlations (Novice > Expert)
     title='Term correlations',
-    subtitle='All > Baseline'
+    subtitle='All > Baseline',
+    ylim=PLOT_YLIMITS['neurosynth_univariate_corr']  # Centralized neurosynth univariate correlation limits
 )
+# Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
+ax_A1.set_ylim(*PLOT_YLIMITS['neurosynth_univariate_corr'])
 
 # -----------------------------------------------------------------------------
 # Panel B1: Term Correlations (Checkmate > Non-checkmate)
@@ -172,8 +171,11 @@ plot_correlations_on_ax(
     df_pos_chk,                         # Positive term correlations (Checkmate > Non-checkmate)
     df_neg_chk,                         # Negative term correlations (No-Check > Check)
     title='Term correlations',
-    subtitle='Checkmate > Non-checkmate'
+    subtitle='Checkmate > Non-checkmate',
+    ylim=PLOT_YLIMITS['neurosynth_univariate_corr']  # Centralized neurosynth univariate correlation limits
 )
+# Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
+ax_B1.set_ylim(*PLOT_YLIMITS['neurosynth_univariate_corr'])
 
 # -----------------------------------------------------------------------------
 # Panel A2: Correlation Differences (All > Baseline)
@@ -186,8 +188,11 @@ plot_differences_on_ax(
     ax_A2,
     df_diff_all,                        # Correlation differences (POS - NEG)
     title='ΔCorrelation',
-    subtitle='All > Baseline'
+    subtitle='All > Baseline',
+    ylim=PLOT_YLIMITS['neurosynth_univariate_diff']  # Centralized neurosynth univariate difference limits
 )
+# Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
+ax_A2.set_ylim(*PLOT_YLIMITS['neurosynth_univariate_diff'])
 
 # -----------------------------------------------------------------------------
 # Panel B2: Correlation Differences (Checkmate > Non-checkmate)
@@ -198,8 +203,11 @@ plot_differences_on_ax(
     ax_B2,
     df_diff_chk,                        # Correlation differences (POS - NEG)
     title='ΔCorrelation',
-    subtitle='Checkmate > Non-checkmate'
+    subtitle='Checkmate > Non-checkmate',
+    ylim=PLOT_YLIMITS['neurosynth_univariate_diff']  # Centralized neurosynth univariate difference limits
 )
+# Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
+ax_B2.set_ylim(*PLOT_YLIMITS['neurosynth_univariate_diff'])
 
 # Load volumes for both contrasts
 z_img_all = image.load_img(str(RESULTS_DIR / f"zmap_{stem_all}.nii.gz"))
@@ -293,25 +301,25 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(18.230000/2.54, 14.170000/2.54, forward=True)
-plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].legend(loc=(0.4927, 0.7789), frameon=False)
-plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].set(position=[0.05757, 0.4808, 0.2188, 0.2177], ylim=(-0.15, 0.19))
+plt.figure(1).set_size_inches(cm_to_inches(18.23), cm_to_inches(14.17), forward=True)
+plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].legend(loc=(0.4927, 0.8425), frameon=False)
+plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].set(position=[0.05757, 0.4808, 0.2188, 0.2177])
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].set_position([0.062204, 0.385487, 0.216904, 0.258545])
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].texts[0].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].texts[1].set(position=(0.5, 1.017))
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].text(-0.1489, 1.0710, 'b', transform=plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].texts[2].new
-plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].legend(loc=(0.4261, 0.7811), frameon=False)
-plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].set(position=[0.3343, 0.4808, 0.1422, 0.2177], yticks=[-0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4], yticklabels=['−0.2', '−0.1', '0.0', '0.1', '0.2', '0.3', '0.4'], ylim=(-0.15, 0.35))
+plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].legend(loc=(0.3983, 0.8425), frameon=False)
+plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].set(position=[0.3343, 0.4808, 0.1422, 0.2177], yticks=[-0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4], yticklabels=['−0.2', '−0.1', '0.0', '0.1', '0.2', '0.3', '0.4'])
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].set_position([0.336506, 0.385487, 0.140968, 0.258545])
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].texts[0].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].texts[1].set(position=(0.5, 1.017))
-plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].legend(loc=(0.5172, 0.7789), frameon=False)
-plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].set(position=[0.5479, 0.4808, 0.2188, 0.2177], yticks=[-0.18, -0.12, -0.06, 0., 0.06, 0.12, 0.18, 0.24], yticklabels=['−0.18', '−0.12', '−0.06', '0.00', '0.06', '0.12', '0.18', '0.24'], ylim=(-0.15, 0.19))
+plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].legend(loc=(0.5172, 0.8425), frameon=False)
+plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].set(position=[0.5479, 0.4808, 0.2188, 0.2177], yticks=[-0.18, -0.12, -0.06, 0., 0.06, 0.12, 0.18, 0.24], yticklabels=['−0.18', '−0.12', '−0.06', '0.00', '0.06', '0.12', '0.18', '0.24'])
 plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].set_position([0.548255, 0.385487, 0.216904, 0.258545])
 plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].texts[0].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].texts[1].set(position=(0.5, 1.017))
-plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].legend(loc=(0.4026, 0.7811), frameon=False)
-plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].set(position=[0.8381, 0.4808, 0.1422, 0.2177], yticks=[-0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4], yticklabels=['−0.2', '−0.1', '0.0', '0.1', '0.2', '0.3', '0.4'], ylim=(-0.15, 0.35))
+plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].legend(loc=(0.3983, 0.8425), frameon=False)
+plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].set(position=[0.8381, 0.4808, 0.1422, 0.2177], yticks=[-0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4], yticklabels=['−0.2', '−0.1', '0.0', '0.1', '0.2', '0.3', '0.4'])
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].set_position([0.835940, 0.385487, 0.140968, 0.258545])
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].texts[0].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].texts[1].set(position=(0.5, 1.017))
@@ -335,7 +343,8 @@ plt.figure(1).ax_dict["E_Terms_Glass"].text(0.0096, 0.9750, 'a', transform=plt.f
 #% end: automatic generated code from pylustrator
 
 # Display figures in pylustrator GUI for interactive layout adjustment
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================

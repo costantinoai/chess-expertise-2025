@@ -39,13 +39,18 @@ Usage
 python chess-neurosynth/92_plot_neurosynth_rsa.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
-
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -69,10 +74,11 @@ from common.plotting import (
     embed_figure_on_ax,
     compute_stimulus_palette,
     plot_rdm_on_ax,
+    PLOT_YLIMITS,
+    cm_to_inches,
 )
 from common.neuro_utils import project_volume_to_surfaces
-from common.io_utils import find_latest_results_directory
-from common.logging_utils import setup_analysis_in_dir, log_script_end
+from common import setup_script, log_script_end
 from modules.plot_utils import (
     plot_correlations_on_ax,
     plot_differences_on_ax,
@@ -102,16 +108,14 @@ PATTERNS = [
 
 apply_nature_rc()
 
-# Find latest neurosynth RSA results directory
-# Creates 'figures' subdirectory if needed for saving outputs
-RESULTS_DIR = find_latest_results_directory(
-    script_dir / 'results',
-    pattern='*_neurosynth_rsa',  # Match neurosynth RSA searchlight analysis results
-    create_subdirs=['figures'],
-    require_exists=True,
-    verbose=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='neurosynth_rsa',
+    output_subdirs=['figures'],
+    log_name='pylustrator_neurosynth_rsa.log',
 )
-FIGURES_DIR = RESULTS_DIR / 'figures'
+RESULTS_DIR = results_dir
+FIGURES_DIR = dirs['figures']
 
 
 # =============================================================================
@@ -119,13 +123,6 @@ FIGURES_DIR = RESULTS_DIR / 'figures'
 # =============================================================================
 
 extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
-_, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name='pylustrator_neurosynth_rsa.log',
-)
 
 
 
@@ -186,7 +183,8 @@ for idx, (stem, pretty) in enumerate(PATTERNS, start=1):
         df_pos,                         # Positive term correlations (Expert > Novice)
         df_neg,                         # Negative term correlations (Novice > Expert)
         title="",
-        subtitle=dimension
+        subtitle=dimension,
+        ylim=PLOT_YLIMITS['rsa_neurosynth_corr']  # Centralized neurosynth RSA correlation limits
     )
 
     # -------------------------------------------------------------------------
@@ -200,7 +198,8 @@ for idx, (stem, pretty) in enumerate(PATTERNS, start=1):
         ax_diff,
         df_diff,                        # Correlation differences (POS - NEG)
         title="",
-        subtitle=dimension
+        subtitle=dimension,
+        ylim=PLOT_YLIMITS['rsa_neurosynth_diff']  # Centralized neurosynth RSA difference limits
     )
 
     # -------------------------------------------------------------------------
@@ -293,9 +292,8 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(16.670000/2.54, 15.020000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(16.67), cm_to_inches(15.02), forward=True)
 plt.figure(1).ax_dict["1A_RSA_Corr_searchlight_checkmate"].legend(loc=(0.4579, 0.808), frameon=False)
 plt.figure(1).ax_dict["1A_RSA_Corr_searchlight_checkmate"].set(position=[0.4549, 0.1873, 0.2174, 0.1699])
 plt.figure(1).ax_dict["1A_RSA_Corr_searchlight_checkmate"].set_position([0.496846, 0.104319, 0.234715, 0.187779])
@@ -332,7 +330,8 @@ plt.figure(1).ax_dict["RDM_3_checkmate"].set_position([0.398304, 0.072787, 0.046
 #% end: automatic generated code from pylustrator
 
 # Display figures in pylustrator GUI for interactive layout adjustment
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================

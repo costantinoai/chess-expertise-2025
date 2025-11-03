@@ -13,12 +13,45 @@ from nilearn import image
 from scipy.stats import t, norm
 
 from common.neuro_utils import get_gray_matter_mask, clean_voxels
-from common.stats_utils import apply_fdr_correction, correlate_vectors_bootstrap
 
 
 def t_to_two_tailed_z(t_map: np.ndarray, dof: int) -> np.ndarray:
     """
     Convert a t-map to a signed two-tailed z-map, retaining original sign.
+
+    Transforms t-statistics to z-scores using two-tailed p-values, which
+    standardizes effect sizes across different sample sizes while preserving
+    directionality. This is useful for comparing maps with different degrees
+    of freedom or for correlation with reference maps.
+
+    Parameters
+    ----------
+    t_map : np.ndarray
+        3D array of t-statistics (can be positive or negative)
+    dof : int
+        Degrees of freedom for the t-distribution
+
+    Returns
+    -------
+    np.ndarray
+        3D array of z-scores with same shape and sign as input t_map
+
+    Notes
+    -----
+    Conversion procedure:
+    1. Take absolute value for two-tailed test
+    2. Compute two-tailed p-value: P(|T| > |t|) = 2 * P(T > |t|)
+    3. Convert p-value to z-score using inverse survival function
+    4. Restore original sign (positive t -> positive z, negative t -> negative z)
+
+    Examples
+    --------
+    >>> # Convert group comparison t-map to z-map
+    >>> import numpy as np
+    >>> t_map = np.random.randn(10, 10, 10) * 3  # Simulated t-map
+    >>> dof = 42  # n_experts + n_novices - 2
+    >>> z_map = t_to_two_tailed_z(t_map, dof)
+    >>> # z_map has same shape and signs as t_map, but standardized scale
     """
     # Take absolute value for two-tailed testing (we want magnitude, not direction yet)
     t_abs = np.abs(t_map)
@@ -41,7 +74,39 @@ def t_to_two_tailed_z(t_map: np.ndarray, dof: int) -> np.ndarray:
 def split_zmap_by_sign(z_map: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Split a z-map into positive and negative magnitude maps.
-    Returns (z_pos, z_neg) where z_neg is positive magnitude of negative voxels.
+
+    Separates a signed z-map into two maps representing regions where the
+    target group shows enhanced (positive) or reduced (negative) activation
+    relative to the control group. This enables separate correlation analyses
+    for positive and negative effects.
+
+    Parameters
+    ----------
+    z_map : np.ndarray
+        3D array of signed z-scores from group comparison
+
+    Returns
+    -------
+    z_pos : np.ndarray
+        Positive z-values (negative voxels set to 0)
+    z_neg : np.ndarray
+        Absolute value of negative z-values (positive voxels set to 0)
+
+    Notes
+    -----
+    - z_pos contains only voxels where z > 0 (e.g., expert > novice)
+    - z_neg contains absolute values where z < 0 (e.g., novice > expert)
+    - Both maps have same shape as input, with non-selected regions as 0
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> z_map = np.array([2.5, -1.8, 0.5, -3.2, 1.0])
+    >>> z_pos, z_neg = split_zmap_by_sign(z_map)
+    >>> print(z_pos)
+    [2.5  0.   0.5  0.   1.0]
+    >>> print(z_neg)
+    [0.   1.8  0.   3.2  0. ]
     """
     z_pos = np.where(z_map > 0, z_map, 0.0)
     z_neg = np.where(z_map < 0, -z_map, 0.0)
@@ -57,10 +122,20 @@ def compute_all_zmap_correlations(
     """
     Correlate directional z-maps (pos/neg) with Neurosynth term maps.
 
+    This function computes spatial correlations between group comparison maps
+    (expert vs novice) and Neurosynth meta-analytic term association maps.
+    By splitting the comparison map by sign, we can identify which cognitive
+    terms are associated with expert-enhanced regions (Z+) versus expert-reduced
+    regions (Z-).
+
     For each term map, compute:
     - r_pos: correlation between term map and Z+ (expert-enhanced regions)
-    - r_neg: correlation between term map and Z− (expert-reduced regions)
+    - r_neg: correlation between term map and Z- (expert-reduced regions)
     - r_diff: difference (r_pos - r_neg)
+
+    A positive r_diff indicates the term is more strongly associated with
+    expert-enhanced regions; a negative r_diff indicates stronger association
+    with expert-reduced regions.
 
     Parameters
     ----------
@@ -76,11 +151,30 @@ def compute_all_zmap_correlations(
     Returns
     -------
     df_pos : pd.DataFrame
-        Columns: term, r
+        Columns: term, r (correlation with expert-enhanced regions)
     df_neg : pd.DataFrame
-        Columns: term, r
+        Columns: term, r (correlation with expert-reduced regions)
     df_diff : pd.DataFrame
-        Columns: term, r_pos, r_neg, r_diff
+        Columns: term, r_pos, r_neg, r_diff (difference score)
+
+    Notes
+    -----
+    - Gray matter masking ensures correlation is computed only within brain
+    - Voxel cleaning removes NaNs and zero-variance voxels
+    - All term maps are resampled to reference image geometry before correlation
+
+    Examples
+    --------
+    >>> # After computing z-map from group comparison
+    >>> z_pos, z_neg = split_zmap_by_sign(z_map)
+    >>> term_maps = load_term_maps('neurosynth_maps/')
+    >>> df_pos, df_neg, df_diff = compute_all_zmap_correlations(
+    ...     z_pos, z_neg, term_maps, ref_img
+    ... )
+    >>> # Find terms most associated with expert enhancements
+    >>> top_pos = df_pos.nlargest(5, 'r')
+    >>> # Find terms with largest difference
+    >>> top_diff = df_diff.nlargest(5, 'r_diff')
     """
     # Build gray matter mask to restrict analysis to brain voxels
     gm_mask = get_gray_matter_mask(ref_img)

@@ -5,11 +5,9 @@ Plotting helpers for neurosynth analyses (local, style from common.plotting_util
 from __future__ import annotations
 
 from pathlib import Path
-import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from nilearn import plotting, surface, datasets
 from nilearn import image
 from plotly.subplots import make_subplots
@@ -21,8 +19,6 @@ from common.plotting import (
     plot_grouped_bars_with_ci,
     plot_grouped_bars_on_ax,
     COLORS_EXPERT_NOVICE,
-    plot_flat_pair,
-    plot_flat_hemisphere,
 )
 
 
@@ -169,7 +165,8 @@ def plot_correlations_on_ax(
     df_pos: 'pd.DataFrame',
     df_neg: 'pd.DataFrame',
     title: str,
-    subtitle: str = None
+    subtitle: str = None,
+    ylim=None
 ):
     """
     Plot paired bars for POS vs NEG correlations onto an existing axis.
@@ -188,6 +185,8 @@ def plot_correlations_on_ax(
         Main plot title (bold)
     subtitle : str, optional
         Plot subtitle (normal weight), e.g., contrast name or context
+    ylim : tuple, optional
+        Y-axis limits (ymin, ymax). If None, uses automatic scaling.
     """
     import numpy as np
     terms = [t.title() for t in df_pos['term']]
@@ -211,7 +210,7 @@ def plot_correlations_on_ax(
         group2_color=red,
         group1_label='Positive z-map',
         group2_label='Negative z-map',
-        ylim=None,
+        ylim=ylim,
         # DRY formatting in helper
         y_label='Correlation (z)',
         title=title,
@@ -230,7 +229,8 @@ def plot_differences_on_ax(
     ax,
     df_diff: 'pd.DataFrame',
     title: str,
-    subtitle: str = None
+    subtitle: str = None,
+    ylim=None
 ):
     """
     Plot Δr bars with sign-colored bars onto an existing axis.
@@ -245,26 +245,34 @@ def plot_differences_on_ax(
         Main plot title (bold)
     subtitle : str, optional
         Plot subtitle (normal weight), e.g., contrast description
+    ylim : tuple, optional
+        Y-axis limits (ymin, ymax). If None, uses automatic scaling.
     """
     import numpy as np
     from matplotlib.patches import Patch
 
     terms = [t.title() for t in df_diff['term']]
     diffs = df_diff['r_diff'].to_numpy().tolist()
-    cis = zero_cis(diffs)
+    # cis = zero_cis(diffs)
     green = COLORS_EXPERT_NOVICE.get('expert', '#198019')
     red = COLORS_EXPERT_NOVICE.get('novice', '#a90f0f')
     colors = [green if (isinstance(v, (int, float)) and np.isfinite(v) and v >= 0) else red for v in diffs]
+
+    # legend wants exactly one entry per unique color:
+    labels_for_colors = ['Exp > Nov', 'Nov > Exp']  # must match unique colors order (first appearance)
+
 
     x = np.arange(len(terms))
     plot_grouped_bars_on_ax(
         ax=ax,
         x_positions=x,
         group1_values=diffs,
-        group1_cis=cis,
+        # group1_cis=cis,
         group1_color=colors,
+        group1_label=labels_for_colors,
         params=PLOT_PARAMS,
         bar_width_multiplier=2.0,
+        ylim=ylim,
         # DRY formatting in helper
         y_label='ΔCorrelation (z)',
         title=title,
@@ -274,103 +282,3 @@ def plot_differences_on_ax(
         x_tick_align='right',
         visible_spines=['left','bottom'],
     )
-
-    # Add custom legend for color-coded bars
-    legend_elements = [
-        Patch(facecolor=green, label='Exp > Nov'),
-        Patch(facecolor=red, label='Nov > Exp')
-    ]
-    ax.legend(
-        handles=legend_elements,
-        loc='upper right',
-        frameon=False,
-        fontsize=PLOT_PARAMS['font_size_legend']
-    )
-
-
-# Surface embedding helper (DRY) - scripts should call plot_flat_pair then embed_figure_on_ax
-from common.plotting import embed_figure_on_ax
-
-
-def plot_correlations(df_pos, df_neg, df_diff, run_id: str, out_fig: Path | str):
-    """
-    Paired bars for POS vs NEG correlations using common.plotting_utils.
-
-    Reuses plot_grouped_bars_with_ci for consistent styling and DRY.
-    """
-    terms = [t.title() for t in df_pos['term']]
-    r_pos = df_pos['r'].to_numpy().tolist()
-    r_neg = df_neg['r'].to_numpy().tolist()
-
-    cis_pos = list(zip(df_pos.get('CI_low', np.nan).to_numpy(), df_pos.get('CI_high', np.nan).to_numpy()))
-    cis_neg = list(zip(df_neg.get('CI_low', np.nan).to_numpy(), df_neg.get('CI_high', np.nan).to_numpy()))
-
-    # Colors and y-limits (legacy style: green=positive, red=negative; symmetric ylim)
-    green = COLORS_EXPERT_NOVICE.get('expert', '#198019')
-    red = COLORS_EXPERT_NOVICE.get('novice', '#a90f0f')
-    # Fixed publication y-limits for correlations
-    ylim = (-0.15, 0.30)
-
-    # Plot with centralized parameters (no manual overrides)
-    plot_grouped_bars_with_ci(
-        group1_values=r_pos,
-        group2_values=r_neg,
-        group1_cis=cis_pos,
-        group2_cis=cis_neg,
-        x_labels=terms,
-        # No significance stars for neurosynth plots
-        group1_pvals=None,
-        group2_pvals=None,
-        group1_label=None,
-        group2_label=None,
-        group1_color=green,
-        group2_color=red,
-        ylabel='Correlation (z)',
-        title=None,
-        subtitle=str(run_id),
-        ylim=ylim,
-        add_zero_line=True,
-        output_path=Path(out_fig),
-    )
-
-
-def plot_difference(df_diff, run_id: str, out_fig: Path | str):
-    """
-    Plot Δr = r_pos − r_neg with 95% CI and FDR significance stars using common plotting.
-    """
-    terms = [t.title() for t in df_diff['term']]
-    diffs = df_diff['r_diff'].to_numpy().tolist()
-    cis = list(zip(df_diff.get('CI_low', np.nan).to_numpy(), df_diff.get('CI_high', np.nan).to_numpy()))
-    # No significance stars for neurosynth plots
-    pvals = None
-
-    # Per-bar colors by sign
-    green = COLORS_EXPERT_NOVICE.get('expert', '#198019')
-    red = COLORS_EXPERT_NOVICE.get('novice', '#a90f0f')
-    bar_colors = [green if (isinstance(v, (int, float)) and np.isfinite(v) and v >= 0) else red for v in diffs]
-    # Fixed publication y-limits for correlation differences
-    ylim = (-0.20, 0.35)
-
-    # Hide error bars in single-bar plot as well
-    # Plot with centralized parameters (no manual overrides)
-    # NOTE: figsize will be computed automatically by auto_bar_figure_size()
-    plot_grouped_bars_with_ci(
-        group1_values=diffs,
-        group1_cis=cis,
-        x_labels=terms,
-        group2_values=None,
-        group1_pvals=None,
-        group1_label='',
-        group2_label='',
-        group1_color=bar_colors,
-        ylabel='ΔCorrelation (z)',
-        title=None,
-        subtitle=None,
-        ylim=ylim,
-        add_zero_line=True,
-        output_path=Path(out_fig),
-        show_legend=True,
-    )
-
-
-# Removed thin wrapper plot_surface_map_flat; use common.plotting.plot_flat_pair directly

@@ -96,15 +96,12 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
-import numpy as np
-import pandas as pd
 from nilearn import image
 
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
  
 
-from common.io_utils import find_nifti_files
 from modules.io_utils import (
     load_term_maps,
     extract_run_label,
