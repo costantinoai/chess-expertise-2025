@@ -42,8 +42,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import shared RSA functions from common
 from common.rsa_utils import (
-    create_model_rdm,
-    correlate_rdms,
     correlate_rdm_with_models,
 )
 

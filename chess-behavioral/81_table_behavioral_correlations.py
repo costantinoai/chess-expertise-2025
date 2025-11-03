@@ -1,88 +1,121 @@
 #!/usr/bin/env python3
 """
-Behavioral RSA — LaTeX table generation (Experts vs Novices)
+Behavioral RSA — LaTeX Table Generation (Experts vs Novices)
+==============================================================
 
-Loads correlation_results.pkl from the latest behavioral_rsa results and
-produces a multicolumn LaTeX table summarizing model correlations with
-95% CIs and FDR-corrected p-values for Experts and Novices.
+This script generates publication-ready LaTeX and CSV tables summarizing the
+correlations between behavioral representational dissimilarity matrices (RDMs)
+and theoretical model RDMs for expert and novice chess players.
+
+METHODS (Academic Manuscript Section)
+--------------------------------------
+Statistical tables were generated from the behavioral RSA correlation results.
+For each theoretical model (checkmate status, strategy type, visual similarity),
+we report Spearman correlation coefficients (r) with behavioral RDMs, 95%
+confidence intervals (bootstrapped using 10,000 iterations via pingouin),
+uncorrected p-values, and false discovery rate (FDR)-corrected p-values
+(Benjamini-Hochberg procedure, α=0.05). Results are presented separately for
+experts and novices to allow direct comparison of model fit between expertise
+levels.
+
+The output LaTeX table uses multicolumn headers to group expert and novice
+statistics, with columns for: correlation coefficient (r), 95% confidence
+interval, uncorrected p-value, and FDR-corrected p-value. Significance markers
+(*, **, ***) indicate FDR-corrected significance levels (p<0.05, p<0.01, p<0.001).
+
+Inputs
+------
+- correlation_results.pkl: Dictionary containing:
+  - 'expert': List of tuples (model_name, r, p, ci_low, ci_high) for experts
+  - 'novice': List of tuples (model_name, r, p, ci_low, ci_high) for novices
+  - 'expert_p_fdr': Dict mapping model names to FDR-corrected p-values (experts)
+  - 'novice_p_fdr': Dict mapping model names to FDR-corrected p-values (novices)
+  - 'model_columns': List of model names (e.g., ['check', 'strategy', 'visual'])
+  - 'alpha_fdr': FDR alpha level (default: 0.05)
+  - 'fdr_method': FDR correction method (default: 'fdr_bh')
+
+Outputs
+-------
+- tables/behavioral_rsa_correlations.tex: LaTeX table with multicolumn headers
+- tables/behavioral_rsa_correlations.csv: CSV version for reference
+
+Dependencies
+------------
+- common.report_utils: Table formatting utilities (create_correlation_table, generate_latex_table)
+- common.logging_utils: Logging setup
+- common.io_utils: Results directory finder
+
+Usage
+-----
+python chess-behavioral/81_table_behavioral_correlations.py
+
+Analysis 1 from manuscript: Supplementary Table, Methods Sec 3.5.3
 """
 
 import os
 import sys
 from pathlib import Path
 
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
-import pickle
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
-from common.report_utils import (
-    create_correlation_table,
-    generate_latex_table,
-)
-from common import CONFIG, MODEL_LABELS
-
-
-RESULTS_BASE = Path(__file__).parent / 'results'
-RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern='*_behavioral_rsa',
-    create_subdirs=['tables'],
-    require_exists=True,
-    verbose=True,
+from common import (
+    CONFIG,
+    MODEL_LABELS,
+    setup_script,
+    log_script_end,
+    generate_expert_novice_table,
 )
 
-extra = {"RESULTS_DIR": str(RESULTS_DIR)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
+# ============================================================================
+# Configuration & Setup
+# ============================================================================
+
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='behavioral_rsa',
+    output_subdirs=['tables'],
     log_name='tables_behavioral.log',
 )
+tables_dir = dirs['tables']
 
-tables_dir = RESULTS_DIR / 'tables'
+# ============================================================================
+# Load Correlation Results
+# ============================================================================
 
-with open(RESULTS_DIR / 'correlation_results.pkl', 'rb') as f:
-    corr = pickle.load(f)
+logger.info("Generating behavioral RSA correlation table (Experts vs Novices)...")
 
-expert = corr['expert']
-novice = corr['novice']
-model_columns = corr.get('model_columns', CONFIG.get('MODEL_COLUMNS', []))
-exp_p_fdr = corr.get('expert_p_fdr', {})
-nov_p_fdr = corr.get('novice_p_fdr', {})
+def _format_behavioral_correlations(data: dict):
+    from common.report_utils import create_correlation_table
+    return create_correlation_table(
+        expert_results=data['expert'],
+        novice_results=data['novice'],
+        model_labels=MODEL_LABELS,
+        exp_p_fdr=data.get('expert_p_fdr', {}),
+        nov_p_fdr=data.get('novice_p_fdr', {}),
+    )
 
-# Build DataFrame rows
-df = create_correlation_table(
-    expert_results=expert,
-    novice_results=novice,
-    model_labels=MODEL_LABELS,
-    exp_p_fdr=exp_p_fdr,
-    nov_p_fdr=nov_p_fdr,
-)
-
-# Multicolumn headers mapping
-multicolumn = {
-    'Experts': ['r_Experts', '95%_CI_Experts', 'p_Experts', 'pFDR_Experts'],
-    'Novices': ['r_Novices', '95%_CI_Novices', 'p_Novices', 'pFDR_Novices'],
-}
-
-tables_dir.mkdir(parents=True, exist_ok=True)
-tex_path = generate_latex_table(
-    df=df,
-    output_path=tables_dir / 'behavioral_rsa_correlations.tex',
+tex_path, csv_path = generate_expert_novice_table(
+    results_dir=results_dir,
+    output_dir=tables_dir,
+    table_name='behavioral_rsa_correlations',
     caption='Behavioral-model RSA correlations (Experts vs Novices).',
     label='tab:behavioral_rsa_correlations',
-    column_format='lcccc|cccc',
-    multicolumn_headers=multicolumn,
-    escape=False,
+    formatter_func=_format_behavioral_correlations,
+    pickle_name='correlation_results.pkl',
+    column_format='lSccc|Sccc',
+    manuscript_name='behavioral_rsa_correlations.tex',
     logger=logger,
 )
 
-csv_path = tables_dir / 'behavioral_rsa_correlations.csv'
-df.to_csv(csv_path, index=False)
-logger.info(f"Saved CSV table: {csv_path}")
+# ============================================================================
+# Finish
+# ============================================================================
 
 log_script_end(logger)
 logger.info(f"LaTeX table written to: {tex_path}")

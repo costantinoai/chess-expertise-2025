@@ -48,14 +48,18 @@ Usage
 python chess-behavioral/91_plot_behavioral_panels.py
 """
 
-import sys
 import os
+import sys
 import pickle
 from pathlib import Path
 
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-script_dir = Path(__file__).parent
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -69,8 +73,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from common import load_stimulus_metadata, MODEL_ORDER, MODEL_LABELS_PRETTY
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import setup_script, log_script_end
 from common.plotting import (
     apply_nature_rc,
     plot_rdm_on_ax,
@@ -81,6 +84,8 @@ from common.plotting import (
     compute_stimulus_palette,
     COLORS_EXPERT_NOVICE,
     PLOT_PARAMS,
+    PLOT_YLIMITS,
+    cm_to_inches,
     save_axes_svgs,
     save_panel_pdf,
     CMAP_BRAIN,
@@ -93,35 +98,20 @@ from common.plotting import (
 # Configuration and results
 # =============================================================================
 
-RESULTS_DIR_NAME = None  # Use latest results directory
-RESULTS_BASE = script_dir / "results"
-
-# Find latest behavioral RSA results directory
-# Creates 'figures' subdirectory if needed for saving outputs
-RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern="*_behavioral_rsa",  # Match behavioral analysis results
-    specific_name=RESULTS_DIR_NAME,
-    create_subdirs=["figures"],
-    require_exists=True,
-    verbose=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='behavioral_rsa',
+    output_subdirs=['figures'],
+    log_name='pylustrator_behavioral_layout.log',
 )
-
-FIGURES_DIR = RESULTS_DIR / "figures"
+FIGURES_DIR = dirs['figures']
 
 
 # =============================================================================
 # Setup logging
 # =============================================================================
 
-extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name="pylustrator_behavioral_layout.log",
-)
+RESULTS_DIR = results_dir  # maintain variable name used below
 
 
 # =============================================================================
@@ -343,6 +333,10 @@ plot_counts_on_ax(
     params=PLOT_PARAMS,
 )
 
+# Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
+ax_C1.set_xlim(-1, 41)  # Choice index range (kept local per user request)
+ax_C1.set_ylim(*PLOT_YLIMITS['behavioral_choice_counts'])  # Centralized choice count limits
+
 # -----------------------------------------------------------------------------
 # Panel C2: Stimulus Selection Frequency (Novices)
 # -----------------------------------------------------------------------------
@@ -368,6 +362,10 @@ plot_counts_on_ax(
     legend=legend_items,                       # Show checkmate vs non-checkmate legend
     params=PLOT_PARAMS,
 )
+
+# Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
+ax_C2.set_xlim(-1, 41)  # Choice index range (kept local per user request)
+ax_C2.set_ylim(*PLOT_YLIMITS['behavioral_choice_counts'])  # Centralized choice count limits
 
 # -----------------------------------------------------------------------------
 # Panel D: RSA Model Correlations
@@ -427,7 +425,7 @@ plot_grouped_bars_on_ax(
     group2_label="Novices",                           # Legend label
     group1_pvals=p_exp_ordered,                       # Expert FDR p-values for significance stars
     group2_pvals=p_nov_ordered,                       # Novice FDR p-values for significance stars
-    ylim=(-0.2, 1.0),                                 # Y-axis limits (correlation range)
+    ylim=PLOT_YLIMITS['behavioral_correlation'],      # Centralized behavioral correlation limits (was -0.2, 1.0)
     y_label=PLOT_PARAMS['ylabel_correlation_r'],      # Y-axis label (Spearman r)
     title="Behavioral-model RSA",
     subtitle="FDR corrected",
@@ -439,6 +437,9 @@ plot_grouped_bars_on_ax(
     visible_spines=['left','bottom'],
     params=PLOT_PARAMS,
 )
+
+# Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
+ax_D.set_ylim(*PLOT_YLIMITS['behavioral_rsa_models'])  # Centralized RSA model correlation limits
 
 # -----------------------------------------------------------------------------
 # Panel E: Symmetric Colorbar for RDM/DSM Panels
@@ -476,9 +477,8 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(16.820000/2.54, 15.610000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(16.82), cm_to_inches(15.61), forward=True)
 plt.figure(1).ax_dict["A1_RDM_Experts"].set(position=[0.3841, 0.6819, 0.2196, 0.2361])
 plt.figure(1).ax_dict["A1_RDM_Experts"].texts[0].set(position=(0.5, 1.064))
 plt.figure(1).ax_dict["A1_RDM_Experts"].texts[1].set(position=(0.5, 1.016))
@@ -497,18 +497,18 @@ plt.figure(1).ax_dict["B1_MDS_Experts"].texts[1].set(position=(0.5, 1.018))
 plt.figure(1).ax_dict["B2_MDS_Novices"].set(position=[0.6689, 0.3807, 0.2815, 0.2327])
 plt.figure(1).ax_dict["B2_MDS_Novices"].texts[0].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["B2_MDS_Novices"].texts[1].set(position=(0.5, 1.018))
-plt.figure(1).ax_dict["C1_Choice_Experts"].set(position=[0.04475, 0.2642, 0.204, 0.1883], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], xlim=(-1., 41.), yticks=[0., 100., 200., 300., 400.], yticklabels=['0', '100', '200', '300', '400'], ylim=(0., 450.))
+plt.figure(1).ax_dict["C1_Choice_Experts"].set(position=[0.04475, 0.2642, 0.204, 0.1883], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], yticks=[0., 100., 200., 300., 400.], yticklabels=['0', '100', '200', '300', '400'])
 plt.figure(1).ax_dict["C1_Choice_Experts"].set_position([0.065104, 0.073662, 0.296728, 0.237033])
 plt.figure(1).ax_dict["C1_Choice_Experts"].get_legend().set(visible=True)
 plt.figure(1).ax_dict["C1_Choice_Experts"].texts[0].set(position=(0.5, 1.046))
 plt.figure(1).ax_dict["C1_Choice_Experts"].texts[1].set(position=(0.5, 0.9879))
-plt.figure(1).ax_dict["C2_Choice_Novices"].set(position=[0.2739, 0.2642, 0.204, 0.186], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], xlim=(-1., 41.), ylabel='', yticks=[0., 100., 200., 300., 400.], yticklabels=['0', '100', '200', '300', '400'], ylim=(0., 450.))
+plt.figure(1).ax_dict["C2_Choice_Novices"].set(position=[0.2739, 0.2642, 0.204, 0.186], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], ylabel='', yticks=[0., 100., 200., 300., 400.], yticklabels=['0', '100', '200', '300', '400'])
 plt.figure(1).ax_dict["C2_Choice_Novices"].set_position([0.398501, 0.073662, 0.296728, 0.234166])
 plt.figure(1).ax_dict["C2_Choice_Novices"].get_legend().set(visible=False)
 plt.figure(1).ax_dict["C2_Choice_Novices"].texts[0].set(position=(0.5, 1.059))
 plt.figure(1).ax_dict["C2_Choice_Novices"].texts[1].set(position=(0.5, 1.))
 plt.figure(1).ax_dict["C2_Choice_Novices"].get_yaxis().get_label().set(text='')
-plt.figure(1).ax_dict["D_RSA_Models"].set(position=[0.5179, 0.2653, 0.1387, 0.1871], xticks=[0., 1., 2.], ylim=(-0.25, 0.8))
+plt.figure(1).ax_dict["D_RSA_Models"].set(position=[0.5179, 0.2653, 0.1387, 0.1871], xticks=[0., 1., 2.])
 plt.figure(1).ax_dict["D_RSA_Models"].set_position([0.753374, 0.075104, 0.201763, 0.235536])
 plt.figure(1).ax_dict["D_RSA_Models"].spines[['right', 'top']].set_visible(False)
 plt.figure(1).ax_dict["D_RSA_Models"].yaxis.labelpad = -0.262108
@@ -522,7 +522,8 @@ plt.figure(1).text(0.7288, 0.3347, 'd', transform=plt.figure(1).transFigure, fon
 #% end: automatic generated code from pylustrator
 
 # Display figures in pylustrator GUI for interactive layout adjustment
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================
