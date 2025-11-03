@@ -1,79 +1,145 @@
 #!/usr/bin/env python3
 """
-Generate LaTeX tables for RDM intercorrelation analysis.
+RDM Intercorrelation — LaTeX Table Generation
+==============================================
 
-This script loads results from 01_rdm_intercorrelation.py and generates
-publication-ready LaTeX tables for:
-1. Pairwise correlations between RDMs
-2. Partial correlations controlling for confounds
-3. Variance partitioning for each target RDM
+This script generates publication-ready LaTeX tables summarizing the relationships
+between different representational dissimilarity matrices (RDMs) using pairwise
+correlations, partial correlations, and variance partitioning.
 
-Tables are saved to tables/ subdirectory within the latest results folder.
+METHODS (Academic Manuscript Section)
+--------------------------------------
+Summary tables were generated to characterize the relationships between
+theoretical model RDMs (e.g., checkmate status, strategy type, visual similarity).
+Understanding how these RDMs relate to each other is critical for interpreting
+their unique and shared contributions to neural and behavioral representations.
+
+Three complementary analyses were performed:
+
+1. **Pairwise Correlations**: For each pair of model RDMs, we computed Spearman
+   rank correlations to quantify their similarity. Statistical significance was
+   assessed using permutation tests (10,000 iterations), and p-values were
+   corrected for multiple comparisons using the Benjamini-Hochberg false
+   discovery rate (FDR) procedure (α=0.05). The pairwise correlation matrix
+   provides an overview of which model RDMs share variance and which are
+   relatively independent.
+
+2. **Partial Correlations**: To isolate the unique relationship between pairs
+   of RDMs while controlling for confounding influences from other RDMs, we
+   computed partial Spearman correlations. For each target-predictor pair, we
+   controlled for all other model RDMs as covariates. This analysis reveals
+   whether pairwise correlations are driven by direct relationships or indirect
+   associations through third variables.
+
+3. **Variance Partitioning**: For each target RDM, we performed hierarchical
+   variance partitioning to decompose its total variance into components
+   attributable to each predictor RDM. We report:
+   - Full R²: Total variance explained by all predictors combined
+   - Unique variance: Variance explained exclusively by each predictor
+   - Shared variance: Variance explained jointly by multiple predictors
+   - Residual variance: Unexplained variance (1 - R²)
+
+   This analysis quantifies how much each model RDM uniquely contributes to
+   explaining others, versus how much is redundantly explained by multiple
+   models.
+
+Inputs
+------
+- pairwise_correlations.tsv: Symmetric correlation matrix (N×N model RDMs)
+- pairwise_correlations_long.tsv: Long-format pairwise correlations with p-values and FDR q-values
+- partial_correlations.tsv: Partial correlations controlling for other RDMs
+  - Columns: target, predictor, covariates, r_partial, p_partial, p_fdr
+- variance_partitioning_all.tsv: Variance components for each target RDM
+  - Columns: target, r2_full, unique_{model}, shared, residual
+
+Outputs
+-------
+- tables/table_pairwise_correlations.tex: Upper-triangle correlation matrix
+- tables/table_pairwise_correlations_p.tex: Long-format table with p-values
+- tables/table_partial_correlations.tex: Partial correlation table
+- tables/table_variance_partitioning.tex: Variance partitioning results
+
+Dependencies
+------------
+- common: CONFIG, logging_utils, io_utils
+- modules: pretty_model_label for display names
+
+Usage
+-----
+python chess-supplementary/rdm-intercorrelation/81_table_rdm_intercorr.py
+
+Supplementary Analysis: RDM intercorrelation and variance partitioning
 """
 
+import os
 import sys
 from pathlib import Path
-
-# Enable imports from repo root
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 import pandas as pd
-from common import CONFIG
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
+
+from common import CONFIG, setup_script, log_script_end
 from modules import pretty_model_label
 
 
-# === Find latest results directory ===
-results_base = Path(__file__).parent / "results"
-results_dir = find_latest_results_directory(
-    results_base,
-    pattern="*_rdm_intercorrelation",
-    create_subdirs=["tables"],
-    require_exists=True,
-    verbose=True,
-)
+# ============================================================================
+# Configuration & Setup
+# ============================================================================
 
-extra = {"RESULTS_DIR": str(results_dir)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name="table_rdm_intercorr.log",
+# Locate the latest RDM intercorrelation results directory
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='rdm_intercorrelation',
+    output_subdirs=['tables'],
+    log_name='table_rdm_intercorr.log',
 )
 
 logger.info("=" * 80)
 logger.info("GENERATING LATEX TABLES FOR RDM INTERCORRELATION")
 logger.info("=" * 80)
 
-# Create tables subdirectory
-tables_dir = results_dir / "tables"
+# Output directory for tables (created by find_latest_results_directory)
+tables_dir = dirs['tables']
 logger.info(f"Tables will be saved to: {tables_dir}")
 
-# === Load data ===
+# ============================================================================
+# Load Analysis Results
+# ============================================================================
+
 logger.info("")
 logger.info("Loading analysis results...")
 
-pairwise_file = results_dir / "pairwise_correlations.tsv"
-pairwise_long_file = results_dir / "pairwise_correlations_long.tsv"
-partial_file = results_dir / "partial_correlations.tsv"
-var_part_file = results_dir / "variance_partitioning_all.tsv"
+# Define paths to all input TSV files
+pairwise_file = results_dir / "pairwise_correlations.tsv"  # Symmetric correlation matrix
+pairwise_long_file = results_dir / "pairwise_correlations_long.tsv"  # Long format with p-values
+partial_file = results_dir / "partial_correlations.tsv"  # Partial correlations
+var_part_file = results_dir / "variance_partitioning_all.tsv"  # Variance partitioning
 
+# Ensure required pairwise correlations file exists
 if not pairwise_file.exists():
     raise FileNotFoundError(f"Pairwise correlations file not found: {pairwise_file}")
 
+# Load pairwise correlation matrix (required)
+# This is a symmetric N×N matrix where N = number of model RDMs
 pairwise_df = pd.read_csv(pairwise_file, sep='\t', index_col=0)
 logger.info(f"Loaded pairwise correlations: {pairwise_df.shape}")
 
+# Load long-format pairwise correlations with p-values (optional)
+# Contains columns: rdm1, rdm2, r, p_raw, p_fdr
 if pairwise_long_file.exists():
     pairwise_long_df = pd.read_csv(pairwise_long_file, sep='\t')
     logger.info(f"Loaded pairwise p-values: {pairwise_long_df.shape}")
 else:
     pairwise_long_df = None
 
+# Load partial correlations (optional)
+# Contains: target, predictor, covariates, r_partial, p_partial, p_fdr
 if partial_file.exists():
     partial_df = pd.read_csv(partial_file, sep='\t')
     logger.info(f"Loaded partial correlations: {partial_df.shape}")
@@ -81,6 +147,8 @@ else:
     partial_df = None
     logger.warning(f"Partial correlations file not found: {partial_file}")
 
+# Load variance partitioning results (optional)
+# Contains: target, r2_full, unique_{model}, shared, residual
 if var_part_file.exists():
     var_part_df = pd.read_csv(var_part_file, sep='\t')
     logger.info(f"Loaded variance partitioning: {var_part_df.shape}")
@@ -88,156 +156,152 @@ else:
     var_part_df = None
     logger.warning(f"Variance partitioning file not found: {var_part_file}")
 
-# === Table 1: Pairwise Correlations (matrix) ===
+# ============================================================================
+# Table 1: Pairwise Correlations (Matrix Format) - CSV only
+# ============================================================================
+
 logger.info("")
-logger.info("Generating Table 1: Pairwise RDM correlations...")
+logger.info("Generating pairwise RDM correlations CSV...")
 
+# Reorder models according to CONFIG['MODEL_ORDER'] if available
+# This ensures consistent ordering across analyses
 model_order = [m for m in CONFIG.get('MODEL_ORDER', []) if m in pairwise_df.index]
-model_order += [m for m in pairwise_df.index if m not in model_order]
-pairwise_df = pairwise_df.loc[model_order, model_order]
+model_order += [m for m in pairwise_df.index if m not in model_order]  # Add any remaining models
+pairwise_df = pairwise_df.loc[model_order, model_order]  # Reindex both rows and columns
 
+# Create pretty display labels for model names (e.g., "check" -> "Checkmate Status")
 pretty_labels = {key: pretty_model_label(key) for key in model_order}
 model_names = model_order
 
-# Only show upper triangle (since matrix is symmetric)
+# Build upper-triangle table (since correlation matrix is symmetric)
+# Only show correlations where i < j to avoid redundancy
 table1_data = []
 for i, model_i in enumerate(model_names):
-    row_data = {'RDM': pretty_labels.get(model_i, model_i.capitalize())}
+    row_data = {'RDM': pretty_labels.get(model_i, model_i.capitalize())}  # Row label
     for j, model_j in enumerate(model_names):
-        if i < j:
+        if i < j:  # Upper triangle: show correlation value
             r = pairwise_df.iloc[i, j]
             row_data[pretty_labels.get(model_j, model_j.capitalize())] = f"{r:.3f}"
-        else:
+        else:  # Lower triangle and diagonal: show dash
             row_data[pretty_labels.get(model_j, pretty_model_label(model_j))] = '-'
     table1_data.append(row_data)
 
+# Convert to DataFrame and save CSV
 table1_df = pd.DataFrame(table1_data)
+table1_file = tables_dir / "table_pairwise_correlations.csv"
+table1_df.to_csv(table1_file, index=False)
+logger.info(f"Saved pairwise correlations CSV to {table1_file}")
 
-# Generate LaTeX
-latex1 = table1_df.to_latex(
-    index=False,
-    escape=False,
-    caption='Pairwise Spearman correlations between model RDMs. Only upper triangle shown (matrix is symmetric).',
-    label='tab:rdm_pairwise_corr'
-)
+# ============================================================================
+# Table 1b: Pairwise Correlations with P-Values (Long Format) - CSV only
+# ============================================================================
 
-table1_file = tables_dir / "table_pairwise_correlations.tex"
-with open(table1_file, 'w') as f:
-    f.write(latex1)
-logger.info(f"Saved Table 1 to {table1_file}")
-
-# === Table 1b: Pairwise Correlations with p-values (long format) ===
+# If long-format p-values are available, create a second table with statistical info
 if pairwise_long_df is not None:
     logger.info("")
-    logger.info("Generating Table 1b: Pairwise correlations with p-values...")
+    logger.info("Generating pairwise correlations with p-values CSV...")
 
-    # Pretty names
+    # Format long-format table with pretty model names and p-values
     pairwise_long_df = pairwise_long_df.copy()
-    pairwise_long_df['RDM 1'] = pairwise_long_df['rdm1'].map(pretty_model_label)
-    pairwise_long_df['RDM 2'] = pairwise_long_df['rdm2'].map(pretty_model_label)
-    pairwise_long_df['r'] = pairwise_long_df['r'].round(3)
-    pairwise_long_df['p'] = pairwise_long_df['p_raw'].apply(lambda x: f"{x:.3g}")
-    if 'p_fdr' in pairwise_long_df.columns:
+    pairwise_long_df['RDM 1'] = pairwise_long_df['rdm1'].map(pretty_model_label)  # First RDM pretty name
+    pairwise_long_df['RDM 2'] = pairwise_long_df['rdm2'].map(pretty_model_label)  # Second RDM pretty name
+    pairwise_long_df['r'] = pairwise_long_df['r'].round(3)  # Round correlation to 3 decimals
+    pairwise_long_df['p'] = pairwise_long_df['p_raw'].apply(lambda x: f"{x:.3g}")  # Format raw p-value
+    if 'p_fdr' in pairwise_long_df.columns:  # Add FDR-corrected p-values if available
         pairwise_long_df['pFDR'] = pairwise_long_df['p_fdr'].apply(lambda x: f"{x:.3g}")
 
+    # Select columns to display in table
     display_cols = ['RDM 1','RDM 2','r','p'] + (['pFDR'] if 'pFDR' in pairwise_long_df.columns else [])
-    latex1b = pairwise_long_df[display_cols].to_latex(
-        index=False,
-        escape=False,
-        caption='Pairwise Spearman correlations between model RDMs with raw and FDR-corrected p-values.',
-        label='tab:rdm_pairwise_corr_p'
-    )
 
-    table1b_file = tables_dir / "table_pairwise_correlations_p.tex"
-    with open(table1b_file, 'w') as f:
-        f.write(latex1b)
-    logger.info(f"Saved Table 1b to {table1b_file}")
+    # Save CSV
+    table1b_file = tables_dir / "table_pairwise_correlations_p.csv"
+    pairwise_long_df[display_cols].to_csv(table1b_file, index=False)
+    logger.info(f"Saved pairwise correlations with p-values CSV to {table1b_file}")
 
-# === Table 2: Variance Partitioning ===
+# ============================================================================
+# Table 2: Variance Partitioning - CSV only
+# ============================================================================
+
+# If variance partitioning results are available, generate table
 if var_part_df is not None:
     logger.info("")
-    logger.info("Generating Table 2: Variance partitioning...")
+    logger.info("Generating variance partitioning CSV...")
 
-    # Identify unique and shared columns
+    # Identify columns containing unique variance for each predictor
+    # These columns are named 'unique_{model_name}'
     predictor_cols = [col for col in var_part_df.columns if col.startswith('unique_')]
-    predictor_names = [col.replace('unique_', '') for col in predictor_cols]
+    predictor_names = [col.replace('unique_', '') for col in predictor_cols]  # Extract model names
 
-    # Select relevant columns
+    # Select columns to include in table
+    # Order: target, full R², unique variance columns, shared variance, residual
     table2_cols = ['target', 'r2_full'] + predictor_cols + ['shared', 'residual']
     table2_df = var_part_df[table2_cols].copy()
 
-    # Rename columns for display
+    # Create pretty column names for display
     rename_map = {
-        'target': 'Target RDM',
-        'r2_full': 'Full $R^2$',
-        'shared': 'Shared',
-        'residual': 'Residual'
+        'target': 'Target RDM',  # RDM being explained
+        'r2_full': 'Full R^2',  # Total variance explained
+        'shared': 'Shared',  # Variance explained by multiple predictors
+        'residual': 'Residual'  # Unexplained variance (1 - R²)
     }
+    # Add unique variance columns with pretty predictor names
     for pred in predictor_names:
-        label = pretty_model_label(pred)
-        rename_map[f'unique_{pred}'] = f'Unique ({label})'
+        label = pretty_model_label(pred)  # Get pretty name (e.g., "check" -> "Checkmate Status")
+        rename_map[f'unique_{pred}'] = f'Unique ({label})'  # Format as "Unique (Pretty Name)"
 
+    # Apply column renaming
     table2_df = table2_df.rename(columns=rename_map)
 
-    # Capitalize target names
+    # Convert target RDM names to pretty format (e.g., "check" -> "Checkmate Status")
     table2_df['Target RDM'] = table2_df['Target RDM'].map(pretty_model_label)
 
-    # Generate LaTeX
-    latex2 = table2_df.to_latex(
-        index=False,
-        escape=False,
-        float_format='%.3f',
-        caption='Variance partitioning for each target RDM. Full $R^2$ shows total variance explained by all predictors. Unique values show variance explained exclusively by each predictor. Shared shows variance explained jointly by multiple predictors. Residual shows unexplained variance. All components sum to 1.0.',
-        label='tab:rdm_variance_partitioning'
-    )
+    # Save CSV
+    table2_file = tables_dir / "table_variance_partitioning.csv"
+    table2_df.to_csv(table2_file, index=False, float_format='%.3f')
+    logger.info(f"Saved variance partitioning CSV to {table2_file}")
 
-    table2_file = tables_dir / "table_variance_partitioning.tex"
-    with open(table2_file, 'w') as f:
-        f.write(latex2)
-    logger.info(f"Saved Table 2 to {table2_file}")
+# ============================================================================
+# Table 3: Partial Correlations - CSV only
+# ============================================================================
 
-# === Table 3: Partial Correlations (selected comparisons) ===
+# If partial correlation results are available, generate table
 if partial_df is not None:
     logger.info("")
-    logger.info("Generating Table 3: Partial correlations (selected)...")
+    logger.info("Generating partial correlations CSV...")
 
-    # For readability, only show partial correlations where target != predictor
-    # and organize by target
+    # Copy dataframe for formatting
+    # Partial correlations show the unique relationship between target and predictor
+    # after removing shared variance with covariates
     table3_df = partial_df.copy()
 
-    # Format for display
-    table3_df['Target RDM'] = table3_df['target'].map(pretty_model_label)
-    table3_df['Predictor'] = table3_df['predictor'].map(pretty_model_label)
-    table3_df['Controlled For'] = table3_df['covariates'].str.replace(',', ', ').str.title()
-    table3_df['Partial $r$'] = table3_df['r_partial'].apply(lambda x: f"{x:.3f}")
-    table3_df['$p$-value'] = table3_df['p_partial'].apply(lambda x: f"{x:.3g}")
-    if 'p_fdr' in table3_df.columns:
-        table3_df['$p_{FDR}$'] = table3_df['p_fdr'].apply(lambda x: f"{x:.3g}")
+    # Format columns with pretty model names
+    table3_df['Target RDM'] = table3_df['target'].map(pretty_model_label)  # Target being explained
+    table3_df['Predictor'] = table3_df['predictor'].map(pretty_model_label)  # Predictor of interest
+    table3_df['Controlled For'] = table3_df['covariates'].str.replace(',', ', ').str.title()  # Covariates
+    table3_df['Partial r'] = table3_df['r_partial'].apply(lambda x: f"{x:.3f}")  # Partial correlation
+    table3_df['p-value'] = table3_df['p_partial'].apply(lambda x: f"{x:.3g}")  # Raw p-value
+    if 'p_fdr' in table3_df.columns:  # Add FDR-corrected p-value if available
+        table3_df['pFDR'] = table3_df['p_fdr'].apply(lambda x: f"{x:.3g}")
 
-    # Select columns for table
-    cols = ['Target RDM', 'Predictor', 'Controlled For', 'Partial $r$', '$p$-value']
-    if '$p_{FDR}$' in table3_df.columns:
-        cols.append('$p_{FDR}$')
+    # Select columns to display in table
+    cols = ['Target RDM', 'Predictor', 'Controlled For', 'Partial r', 'p-value']
+    if 'pFDR' in table3_df.columns:
+        cols.append('pFDR')  # Add FDR column if present
     table3_display = table3_df[cols]
 
-    # Generate LaTeX
-    latex3 = table3_display.to_latex(
-        index=False,
-        escape=False,
-        caption='Partial Spearman correlations between RDMs controlling for confounding RDMs. Each row shows the correlation between target and predictor RDMs after partialing out the influence of covariates.',
-        label='tab:rdm_partial_corr'
-    )
+    # Save CSV
+    table3_file = tables_dir / "table_partial_correlations.csv"
+    table3_display.to_csv(table3_file, index=False)
+    logger.info(f"Saved partial correlations CSV to {table3_file}")
 
-    table3_file = tables_dir / "table_partial_correlations.tex"
-    with open(table3_file, 'w') as f:
-        f.write(latex3)
-    logger.info(f"Saved Table 3 to {table3_file}")
+# ============================================================================
+# Finish
+# ============================================================================
 
-# === Summary ===
 logger.info("")
 logger.info("=" * 80)
-logger.info("LaTeX table generation complete!")
-logger.info(f"Tables saved to: {tables_dir}")
+logger.info("CSV table generation complete!")
+logger.info(f"CSV files saved to: {tables_dir}")
 logger.info("=" * 80)
 
 log_script_end(logger)

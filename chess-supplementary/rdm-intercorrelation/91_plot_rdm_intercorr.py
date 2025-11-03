@@ -4,13 +4,17 @@ Generate RDM Intercorrelation Supplementary Figures (Pylustrator)
 =================================================================
 [docstring unchanged]
 """
+import os
 import sys
 from pathlib import Path
 
-# Add parent (repo root) to sys.path for 'common' and 'modules'
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
+# Ensure repo root is on sys.path for 'common' imports BEFORE importing CONFIG
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -23,12 +27,13 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+
+from common import setup_script, log_script_end
 from common.plotting import (
     apply_nature_rc,
     save_axes_svgs,
     figure_size,
+    cm_to_inches,
     save_panel_pdf,
 )
 from modules.plotting import (
@@ -42,26 +47,17 @@ from modules.plotting import (
 script_dir = Path(__file__).parent
 results_base = script_dir / "results"
 
-results_dir = find_latest_results_directory(
-    results_base,
-    pattern="*_rdm_intercorrelation",
-    create_subdirs=["figures"],
-    require_exists=True,
-    verbose=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='rdm_intercorrelation',
+    output_subdirs=['figures'],
+    log_name='pylustrator_rdm_intercorr.log',
 )
 
-figures_dir = results_dir / "figures"
+figures_dir = dirs['figures']
 panels_dir = figures_dir / "panels"
 panels_dir.mkdir(parents=True, exist_ok=True)
 
-extra = {"RESULTS_DIR": str(results_dir), "FIGURES_DIR": str(figures_dir)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=results_dir,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name="pylustrator_rdm_intercorr.log",
-)
 
 logger.info("=" * 80)
 logger.info("PLOTTING RDM INTERCORRELATION ANALYSIS")
@@ -140,6 +136,9 @@ for idx, target in enumerate(model_order, start=1):
         model_colors=model_colors,
         ylabel=(idx == 1),
     )
+    ax.legend(ncol=1, fontsize=5, frameon=False)
+
+
 
 # -----------------------------------------------------------------------------
 # Panel 2: Variance Partitioning (axes labeled "VarPart_*")
@@ -159,6 +158,7 @@ for idx, target in enumerate(model_order, start=1):
         ylabel=(idx == 1),
     )
 
+
 # Setup ax_dict for pylustrator (one figure containing both sets of axes)
 fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
@@ -167,9 +167,8 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 # =============================================================================
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(8.880000/2.54, 9.290000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(8.88), cm_to_inches(9.29), forward=True)
 plt.figure(1).ax_dict["Corr_check"].set(position=[0.7127, 0.596, 0.2641, 0.2949], yticks=[], yticklabels=[])
 plt.figure(1).ax_dict["Corr_check"].texts[0].set(position=(-0.1689, -0.1981))
 plt.figure(1).ax_dict["Corr_check"].texts[1].set(position=(0.8311, 0.3672))
@@ -185,11 +184,12 @@ plt.figure(1).ax_dict["Corr_visual"].texts[3].set(position=(1.149, -0.1896))
 plt.figure(1).ax_dict["Corr_visual"].text(-0.1044, 1.2331, 'a', transform=plt.figure(1).ax_dict["Corr_visual"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["Corr_visual"].texts[4].new
 plt.figure(1).ax_dict["VarPart_check"].set(position=[0.7127, 0.1209, 0.2641, 0.2949], yticks=[], yticklabels=[])
 plt.figure(1).ax_dict["VarPart_strategy"].set(position=[0.427, 0.1209, 0.2641, 0.2949], yticks=[], yticklabels=[])
-plt.figure(1).ax_dict["VarPart_strategy"].text(-0.1820, 1.2331, 'RDM Variance Explained', transform=plt.figure(1).ax_dict["VarPart_strategy"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["VarPart_strategy"].texts[4].new
+plt.figure(1).ax_dict["VarPart_strategy"].text(-0.1820, 1.2331, 'RDMs Variance Partitioning', transform=plt.figure(1).ax_dict["VarPart_strategy"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["VarPart_strategy"].texts[4].new
 plt.figure(1).ax_dict["VarPart_visual"].set(position=[0.1345, 0.1209, 0.2641, 0.2949], yticks=[0., 0.2, 0.4, 0.6, 0.8, 1.], yticklabels=['0.00', '0.20', '0.40', '0.60', '0.80', '1.00'])
 plt.figure(1).ax_dict["VarPart_visual"].text(-0.1044, 1.2331, 'b', transform=plt.figure(1).ax_dict["VarPart_visual"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["VarPart_visual"].texts[4].new
 #% end: automatic generated code from pylustrator
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 # =============================================================================
 # Save (combined figure)

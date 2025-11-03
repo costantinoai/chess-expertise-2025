@@ -181,7 +181,7 @@ def plot_variance_partition_bars(
         subtitle=f'{target_label}',
         xtick_labels=bar_labels,
         x_tick_rotation=30,
-        x_tick_align='center',
+        x_tick_align='right',
         visible_spines=['left','bottom'],
         params=PLOT_PARAMS,
     )
