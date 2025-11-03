@@ -1,24 +1,23 @@
 """
-Eyetracking decoding (experts vs novices) — separate analyses for xy and displacement features.
+Eyetracking decoding (experts vs novices) — separate analyses for XY and displacement features.
 
 METHODS
 =======
 
 Overview
 --------
-This analysis tests whether eyetracking time-series features discriminate chess
-experts from novices. Two feature sets are evaluated independently: (1) two-
-dimensional gaze coordinates (x, y), and (2) displacement from screen center.
-Features are constructed per run as fixed-length vectors by truncating to the
-minimum number of timepoints across runs.
+Tests whether eyetracking time-series features discriminate chess experts from
+novices. Two feature sets are evaluated independently: (1) two-dimensional gaze
+coordinates (x, y), and (2) displacement from screen center. Features are
+constructed per run as fixed-length vectors by truncating to the minimum number
+of timepoints across runs.
 
 Data
 ----
 - Eyetracking TSVs under BIDS derivatives:
-  CONFIG['BIDS_EYETRACK']/sub-XX/func/*eyetrack.tsv
-  with corresponding .json metadata files.
-- Participants file: CONFIG['BIDS_PARTICIPANTS'] (for expert labels).
-- N=40 participants (20 experts, 20 novices), 357 total runs.
+  CONFIG['BIDS_EYETRACK']/sub-XX/func/*eyetrack.tsv (with corresponding .json metadata)
+- Participants file: CONFIG['BIDS_PARTICIPANTS'] (expert labels)
+- N=40 participants (20 experts, 20 novices), 357 total runs
 
 Procedure
 ---------
@@ -29,22 +28,28 @@ Procedure
 3. For each feature set:
    - Truncate runs to common length (minimum across runs) and flatten per-run vectors.
    - Train linear SVM in StratifiedGroupKFold CV (k=20 folds, group=subject).
-   - Compute fold accuracies, mean accuracy, 95% CI via Student's t, and one-sample
-     t-test vs chance=0.5.
+   - Compute fold accuracies and aggregate out-of-fold predictions.
 
 Statistical Tests
 -----------------
-- One-sample t-test: Tests whether mean fold accuracy differs from chance (0.5).
-- 95% Confidence Interval: Computed using Student's t-distribution on fold accuracies.
+- Fold-wise test: One-sample t-test of mean fold accuracy vs chance (0.5), with
+  95% CI from t distribution across folds.
+- Pooled prediction test: Exact binomial test on pooled out-of-fold predictions
+  (successes = correct predictions; n = total predictions) vs p0=0.5. Binomial
+  95% CI reported using the Wilson method.
 
 Outputs
 -------
 Saved under results/<ts>_eyetracking_decoding/:
-- results_xy.json: metrics and predictions for xy features
+- results_xy.json: metrics and predictions for XY features
 - results_displacement.json: metrics and predictions for displacement features
-- fold_accuracies_xy.csv: per-fold accuracies for xy
+- fold_accuracies_xy.csv: per-fold accuracies for XY
 - fold_accuracies_displacement.csv: per-fold accuracies for displacement
 - copies of this script and logs
+
+JSON keys (per feature set):
+- mean_accuracy, ci_low, ci_high, p_value, p_value_ttest
+- pooled_accuracy, pooled_ci_low, pooled_ci_high, p_value_binomial, n_correct, n_total
 """
 
 import os
@@ -62,7 +67,10 @@ from sklearn.svm import SVC
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, roc_curve, auc
-from common.stats_utils import compute_mean_ci_and_ttest_vs_value
+from common.stats_utils import (
+    compute_mean_ci_and_ttest_vs_value,
+    binomial_test_from_predictions,
+)
 
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
@@ -127,7 +135,7 @@ def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
     y_prob = np.array(y_prob)
     fold_acc = np.array(fold_acc)
 
-    # Compute overall metrics
+    # Compute overall metrics (fold-wise mean and pooled prediction tests)
     mean_acc, ci_low, ci_high, t_stat, p_val = compute_mean_ci_and_ttest_vs_value(
         fold_acc, popmean=0.5, alternative='two-sided', confidence_level=0.95
     )
@@ -136,9 +144,18 @@ def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
     fpr, tpr, _ = roc_curve(y_true, y_prob)
     roc_auc = auc(fpr, tpr)
 
+    # Exact binomial test on pooled out-of-fold predictions
+    pooled_acc, pooled_lo, pooled_hi, p_binom, n_correct, n_total = binomial_test_from_predictions(
+        y_true, y_pred, p_null=0.5, alternative='two-sided', confidence_level=0.95, ci_method='wilson'
+    )
+
     logger.info(f"[{feature_label}] Mean accuracy: {mean_acc:.3f}, 95% CI: [{ci_low:.3f}, {ci_high:.3f}]")
     logger.info(f"[{feature_label}] t-test vs chance=0.5: t={t_stat:.3f}, p={p_val:.4f}")
     logger.info(f"[{feature_label}] Balanced accuracy: {balanced_acc:.3f}, F1: {f1:.3f}, ROC AUC: {roc_auc:.3f}")
+    logger.info(
+        f"[{feature_label}] Binomial test vs p0=0.5: n_correct={n_correct}/{n_total} "
+        f"(acc={pooled_acc:.3f}), p={p_binom:.4g}, CI=[{pooled_lo:.3f}, {pooled_hi:.3f}] (Wilson)"
+    )
 
     return {
         'feature_type': feature_label,
@@ -147,7 +164,14 @@ def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
         'ci_low': float(ci_low),
         'ci_high': float(ci_high),
         't_statistic': float(t_stat),
-        'p_value': float(p_val),
+        'p_value': float(p_val),            # Backward-compatible key (t-test p)
+        'p_value_ttest': float(p_val),      # Explicit t-test p-value
+        'pooled_accuracy': float(pooled_acc),
+        'pooled_ci_low': float(pooled_lo),
+        'pooled_ci_high': float(pooled_hi),
+        'p_value_binomial': float(p_binom),
+        'n_correct': int(n_correct),
+        'n_total': int(n_total),
         'balanced_accuracy': float(balanced_acc),
         'f1_score': float(f1),
         'roc_auc': float(roc_auc),

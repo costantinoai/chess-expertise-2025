@@ -53,10 +53,15 @@ import os
 import sys
 from pathlib import Path
 import json
-
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 script_dir = Path(__file__).parent
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,10 +72,10 @@ from common.plotting import (
     save_panel_pdf,
     figure_size,
     PLOT_PARAMS,
+    cm_to_inches,
     COLORS_WONG,
 )
-from common.io_utils import find_latest_results_directory
-from common.logging_utils import setup_analysis_in_dir, log_script_end
+from common import setup_script, log_script_end
 from common import CONFIG
 
 # Conditionally start pylustrator BEFORE creating any figures
@@ -87,20 +92,14 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 apply_nature_rc()  # Apply Nature journal style to all figures
 
 # Find latest results directory (fails if not found)
-RESULTS_DIR = find_latest_results_directory(
-    script_dir / 'results',
-    pattern='*_eyetracking_decoding',
-    create_subdirs=['figures'],
-    require_exists=True,
-    verbose=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='eyetracking_decoding',
+    output_subdirs=['figures'],
+    log_name='pylustrator_eyetracking.log',
 )
-FIGURES_DIR = RESULTS_DIR / 'figures'
-
-# Initialize logging in existing results directory
-config, out_dir, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-)
+RESULTS_DIR = results_dir
+FIGURES_DIR = dirs['figures']
 
 # Load decoding results for both feature representations
 # Each JSON contains: fold_accuracies (list), mean_accuracy, ci_low, ci_high, n_folds
@@ -147,8 +146,8 @@ ax = axes[0]
 x_jitter = np.random.default_rng(seed=42).normal(0, 0.02, size=len(xy_acc))
 ax.scatter(
     x_jitter, xy_acc,
-    alpha=0.6,                     # Semi-transparent for overlapping points
-    s=PLOT_PARAMS['marker_size'],  # Point size from central settings
+    alpha=PLOT_PARAMS['scatter_alpha'],  # Centralized scatter transparency (was 0.6)
+    s=PLOT_PARAMS['marker_size'],       # Point size from central settings
     color=COLORS_WONG['blue'],     # Blue color from central palette
     zorder=3,                      # Draw on top of lines/bands
     label='Fold accuracies'
@@ -167,8 +166,8 @@ ax.axhline(
 # Plot 95% confidence interval as shaded band
 ax.axhspan(
     xy_ci_low, xy_ci_high,
-    alpha=0.2,                     # Transparent band
-    color=COLORS_WONG['orange'],   # Orange (matches mean line)
+    alpha=PLOT_PARAMS['error_band_alpha'],  # Centralized error band transparency (was 0.2)
+    color=COLORS_WONG['orange'],            # Orange (matches mean line)
     zorder=1                       # Behind everything else
 )
 
@@ -201,8 +200,8 @@ ax = axes[1]
 x_jitter = np.random.default_rng(seed=42).normal(0, 0.02, size=len(disp_acc))
 ax.scatter(
     x_jitter, disp_acc,
-    alpha=0.6,
-    s=PLOT_PARAMS['marker_size'],  # Point size from central settings
+    alpha=PLOT_PARAMS['scatter_alpha'],  # Centralized scatter transparency (was 0.6)
+    s=PLOT_PARAMS['marker_size'],       # Point size from central settings
     color=COLORS_WONG['blue'],     # Blue (same as Panel A)
     zorder=3,
     label='Fold accuracies'
@@ -221,7 +220,7 @@ ax.axhline(
 # Plot 95% confidence interval as shaded band
 ax.axhspan(
     disp_ci_low, disp_ci_high,
-    alpha=0.2,
+    alpha=PLOT_PARAMS['error_band_alpha'],  # Centralized error band transparency (was 0.2)
     color=COLORS_WONG['orange'],
     zorder=1
 )
@@ -244,6 +243,20 @@ ax.set_title('Displacement', fontsize=PLOT_PARAMS['font_size_title'])
 ax.legend(loc='lower right', frameon=False, fontsize=PLOT_PARAMS['font_size_legend'])
 
 
+#% start: automatic generated code from pylustrator
+plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
+import matplotlib as mpl
+getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
+plt.figure(1).set_size_inches(cm_to_inches(8.18), cm_to_inches(4.94), forward=True)
+plt.figure(1).axes[0].set(position=[0.116, 0.0366, 0.3557, 0.7781])
+plt.figure(1).axes[0].set_position([0.125811, 0.039837, 0.385729, 0.775518])
+plt.figure(1).axes[1].set(position=[0.5061, 0.0366, 0.3557, 0.7781])
+plt.figure(1).axes[1].set_position([0.548726, 0.039837, 0.385729, 0.775518])
+plt.figure(1).axes[1].text(-0.9789, 1.1455, 'Classification of Participants From Eye Movement', transform=plt.figure(1).axes[1].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).axes[1].texts[0].new
+#% end: automatic generated code from pylustrator
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
+
 # =============================================================================
 # Save Figures (Individual Axes and Full Panel)
 # =============================================================================
@@ -260,13 +273,3 @@ logger.info(f"Saved figures to {FIGURES_DIR}")
 logger.info("✓ Panel: eyetracking decoding complete")
 
 log_script_end(logger)
-
-#% start: automatic generated code from pylustrator
-plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
-getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(8.900000/2.54, 5.000000/2.54, forward=True)
-plt.figure(1).axes[0].legend(loc=(0.4821, 0.7996), frameon=False)
-plt.figure(1).axes[1].legend(loc=(0.4821, 0.7996), frameon=False)
-#% end: automatic generated code from pylustrator
-plt.show()

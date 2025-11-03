@@ -11,11 +11,10 @@ Responsibilities
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import List, Tuple
 import json
 import re
 import pandas as pd
-import numpy as np
 
 from common import CONFIG
 from common.bids_utils import get_participants_with_expertise
