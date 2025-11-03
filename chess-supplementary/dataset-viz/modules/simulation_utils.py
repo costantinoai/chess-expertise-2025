@@ -17,7 +17,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_classification
 from sklearn.decomposition import PCA
-from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from scipy.interpolate import griddata, splprep, splev
 from matplotlib.colors import LinearSegmentedColormap

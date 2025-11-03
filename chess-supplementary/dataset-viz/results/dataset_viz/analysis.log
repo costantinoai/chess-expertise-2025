@@ -1,0 +1,15 @@
+2025-11-03 01:55:50 - INFO - Copied script to: /home/eik-tb/OneDrive_andreaivan.costantino@kuleuven.be/GitHub/chess-expertise-2025/chess-supplementary/dataset-viz/results/dataset_viz/91_plot_dataset_viz.py
+2025-11-03 01:55:50 - INFO - ================================================================================
+2025-11-03 01:55:50 - INFO - 91_plot_dataset_viz.py
+2025-11-03 01:55:50 - INFO - ================================================================================
+2025-11-03 01:55:50 - INFO - Participants: 40 total (20 experts, 20 novices)
+2025-11-03 01:55:50 - INFO - Stimuli: 40 boards
+2025-11-03 01:56:04 - INFO - ✓ Saved dataset grid figure
+2025-11-03 01:56:05 - INFO - ✓ Saved 3D manifold + ribbon figure
+2025-11-03 01:56:05 - INFO - ✓ Saved 3D separability figure
+2025-11-03 01:56:05 - INFO - ✓ Saved obs × voxel heatmap figure
+2025-11-03 01:56:05 - INFO - ✓ Saved ROI group legend (2 rows, normal colors)
+2025-11-03 01:56:05 - INFO - ✓ Saved ROI group legend (2 rows, colorblind colors)
+2025-11-03 01:56:05 - INFO - ✓ Saved ROI group legend (1 row, normal colors)
+2025-11-03 01:56:06 - INFO - ✓ Saved ROI group legend (1 row, colorblind colors)
+2025-11-03 01:56:06 - INFO - ✓ Panel: dataset visualization figures complete

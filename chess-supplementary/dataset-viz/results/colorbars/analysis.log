@@ -1,0 +1,9 @@
+2025-11-03 01:55:44 - INFO - Copied script to: /home/eik-tb/OneDrive_andreaivan.costantino@kuleuven.be/GitHub/chess-expertise-2025/chess-supplementary/dataset-viz/results/colorbars/91_plot_colorbars.py
+2025-11-03 01:55:44 - INFO - ================================================================================
+2025-11-03 01:55:44 - INFO - 91_plot_colorbars.py
+2025-11-03 01:55:44 - INFO - ================================================================================
+2025-11-03 01:55:44 - INFO - Participants: 40 total (20 experts, 20 novices)
+2025-11-03 01:55:44 - INFO - Stimuli: 40 boards
+2025-11-03 01:55:44 - INFO - Generating 0-0.1 colorbar...
+2025-11-03 01:55:45 - INFO - ✓ Saved 0-0.1 colorbar (horizontal)
+2025-11-03 01:55:45 - INFO - Loading neurosynth univariate zmaps...
