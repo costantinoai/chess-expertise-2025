@@ -43,15 +43,14 @@ Usage
 python chess-supplementary/rsa-rois/91_plot_rsa_rois.py
 """
 
+import os
 import sys
 from pathlib import Path
 import pickle
 import numpy as np
 
 # Add parent (repo root) to sys.path for 'common' and 'modules'
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -63,17 +62,24 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 
 import matplotlib.pyplot as plt
 from nibabel.freesurfer import io as fsio
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
 from common.neuro_utils import roi_values_to_surface_texture
 from common.plotting import (
     apply_nature_rc,
     plot_flat_pair,
     embed_figure_on_ax,
+    cm_to_inches,
     save_axes_svgs,
     save_panel_pdf,
 )
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
+
 from modules import RSA_TARGETS
 
 
@@ -82,29 +88,13 @@ from modules import RSA_TARGETS
 # =============================================================================
 # Find latest RSA ROI results directory and initialize logging
 
-script_dir = Path(__file__).parent
-results_base = script_dir / 'results'
-
-# Find latest results directory (fails if not found)
-results_dir = find_latest_results_directory(
-    results_base,
-    pattern='*_rsa_rois',
-    create_subdirs=['figures'],
-    require_exists=True,
-    verbose=True,
-)
-
-figures_dir = results_dir / 'figures'
-
-# Initialize logging in existing results directory
-extra = {"RESULTS_DIR": str(results_dir), "FIGURES_DIR": str(figures_dir)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='rsa_rois',
+    output_subdirs=['figures'],
     log_name='pylustrator_rsa_rois.log',
 )
+figures_dir = dirs['figures']
 
 apply_nature_rc()  # Apply Nature journal style to all figures
 
@@ -291,9 +281,8 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(18.290000/2.54, 16.890000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(18.29), cm_to_inches(16.89), forward=True)
 plt.figure(1).ax_dict["1_RSA_visual_similarity_all"].set(position=[0.01502, 0.6776, 0.4417, 0.2526])
 plt.figure(1).ax_dict["1_RSA_visual_similarity_all"].set_position([0.014904, 0.681734, 0.441677, 0.254154])
 plt.figure(1).ax_dict["1_RSA_visual_similarity_sig"].set(position=[0.5037, 0.6776, 0.4417, 0.2526])
@@ -309,7 +298,8 @@ plt.figure(1).ax_dict["3_RSA_checkmate_sig"].set_position([0.503633, -0.024041, 
 #% end: automatic generated code from pylustrator
 
 # Display figure in pylustrator GUI for interactive layout adjustment
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================

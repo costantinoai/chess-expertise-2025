@@ -1,88 +1,166 @@
 #!/usr/bin/env python3
 """
-Generate LaTeX tables for RSA ROI summary.
+RSA ROIs — LaTeX Table Generation (Experts vs Novices)
+=======================================================
 
-Loads rsa_group_stats.pkl from the latest rsa-rois run and produces
-per-target tables: ROI, Experts mean (95% CI), Novices mean (95% CI),
-Experts−Novices difference (95% CI), and FDR-corrected p-values.
+This script generates publication-ready LaTeX and CSV tables summarizing
+representational similarity analysis (RSA) results across all 180 bilateral
+cortical regions from the Glasser multimodal parcellation, comparing neural
+similarity structure between experts and novices.
+
+METHODS (Academic Manuscript Section)
+--------------------------------------
+Summary tables were generated from whole-brain RSA correlation results using
+all 180 bilateral cortical regions from the Glasser multimodal parcellation.
+This supplementary analysis provides comprehensive ROI-level coverage of neural
+representational similarity across the entire cortex.
+
+For each RSA target (theoretical model) and each of 180 ROIs, neural RDMs were
+correlated with model RDMs. Group-level statistics were computed by comparing
+expert and novice Fisher z-transformed correlation values.
+
+For each target and ROI, we report:
+
+1. **Expert mean correlation**: Mean Spearman correlation (Fisher z-transformed
+   for group analysis, then back-transformed for reporting) with 95% confidence
+   interval (computed using t-distribution).
+
+2. **Novice mean correlation**: Same as expert group.
+
+3. **Group difference (Δr)**: Computed as (Expert mean - Novice mean) with 95%
+   confidence interval.
+
+4. **Statistical significance**: Results from Welch's two-sample t-test
+   (scipy.stats.ttest_ind with equal_var=False) on Fisher z-transformed
+   correlations. P-values are corrected for multiple comparisons using the
+   Benjamini-Hochberg false discovery rate (FDR) procedure (α=0.05) across ROIs
+   within each target.
+
+5. **Effect size**: Cohen's d, quantifying the magnitude of expertise differences.
+
+Significance markers (*, **, ***) indicate FDR-corrected significance levels
+(p<0.05, p<0.01, p<0.001).
+
+Inputs
+------
+- rsa_group_stats.pkl: Nested dictionary containing (from group RSA analysis):
+  - 'rsa_corr': Dict mapping RSA targets to statistical blocks
+    - 'experts_desc': Expert group descriptive statistics (mean, CI, SEM)
+    - 'novices_desc': Novice group descriptive statistics
+    - 'welch_expert_vs_novice': Welch t-test results with FDR q-values
+    - 'label': Pretty label for the target
+
+Outputs
+-------
+- tables/rsa_{target}.tex: LaTeX table for each RSA target
+- tables/rsa_{target}.csv: CSV version for each target
+
+Dependencies
+------------
+- common.report_utils: format_roi_stats_table, generate_latex_table
+- common.bids_utils: load_roi_metadata
+- common.logging_utils: Logging setup
+- common.io_utils: Results directory finder
+- modules: RSA_TARGETS configuration
+
+Usage
+-----
+python chess-supplementary/rsa-rois/81_table_rsa_rois.py
+
+Supplementary Analysis: Whole-brain RSA (180 ROIs)
 """
 
+import os
 import sys
 from pathlib import Path
 import pickle
-import pandas as pd
 
-# Enable repo root imports
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
-from common import CONFIG
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import CONFIG, setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
 from common.report_utils import generate_latex_table, format_roi_stats_table
 from modules import RSA_TARGETS
 
+# ============================================================================
+# Configuration & Setup
+# ============================================================================
 
-results_base = Path(__file__).parent / 'results'
-results_dir = find_latest_results_directory(
-    results_base,
-    pattern='*_rsa_rois',
-    create_subdirs=['tables'],
-    require_exists=True,
-    verbose=True,
-)
-
-extra = {"RESULTS_DIR": str(results_dir)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
+# Locate the latest RSA ROIs results directory
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='rsa_rois',
+    output_subdirs=['tables'],
     log_name='tables_rsa_rois.log',
 )
+tables_dir = dirs['tables']
 
-tables_dir = results_dir / 'tables'
+# ============================================================================
+# Load RSA Group Statistics
+# ============================================================================
 
+logger.info("Loading RSA group statistics from pickle file...")
+
+# Load the rsa_group_stats.pkl file generated by group RSA analysis
+# This file contains RSA correlation results organized by target (180 ROIs)
 with open(results_dir / 'rsa_group_stats.pkl', 'rb') as f:
     index = pickle.load(f)
 
+# Load ROI metadata (names, hemisphere, anatomical grouping)
+# This uses the full 180-region Glasser parcellation
 roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_180'])
+
+# Extract list of RSA targets from configuration
 targets = list(RSA_TARGETS.keys())
+logger.info(f"Found {len(targets)} RSA targets: {targets}")
 
+# ============================================================================
+# Generate Tables for Each RSA Target
+# ============================================================================
 
+# Create one table per RSA target showing ROI-level results
 for tgt in targets:
+    # Skip if target not in results
     if 'rsa_corr' not in index or tgt not in index['rsa_corr']:
+        logger.warning(f"Skipping target {tgt}: not found in results")
         continue
+
+    logger.info(f"Generating table for RSA target: {tgt}")
+
+    # Extract statistical blocks for this target
+    # Contains expert/novice descriptives and Welch t-test results
     blocks = index['rsa_corr'][tgt]
-    df = format_roi_stats_table(
-        blocks['welch_expert_vs_novice'],
-        blocks['experts_desc'],
-        blocks['novices_desc'],
-        roi_info,
-    )
+
+    # Get pretty label for this target (e.g., "check" -> "Checkmate Status")
     tgt_label = blocks.get('label', tgt)
 
-    multicolumn = {
-        'Experts': ['Expert_mean', 'Expert_CI'],
-        'Novices': ['Novice_mean', 'Novice_CI'],
-        'Experts−Novices': ['Delta_mean', 'Delta_CI'],
-    }
-    tex_path = tables_dir / f'rsa_{tgt}.tex'
-    csv_path = tables_dir / f'rsa_{tgt}.csv'
-
-    _ = generate_latex_table(
-        df=df,
-        output_path=tex_path,
-        caption=f'RSA ROI summary — {tgt_label}.',
+    # Use shared ROI table generator
+    from common.table_utils import generate_roi_table_from_blocks
+    tex_path, csv_path = generate_roi_table_from_blocks(
+        blocks=blocks,
+        roi_info=roi_info,
+        output_dir=tables_dir,
+        table_name=f'rsa_{tgt}',
+        caption=(
+            f'RSA ROI summary — {tgt_label}. '
+            'Table reports group means with 95% CIs, expert–novice differences '
+            "(Welch's t-based 95% CIs), and both raw and FDR-corrected p-values."
+        ),
         label=f'tab:rsa_{tgt}',
-        column_format='lcc|cc|cc|c',
-        multicolumn_headers=multicolumn,
-        escape=False,
+        column_format='lSc|Sc|Sc|cc',
+        csv_only=True,  # Only generate CSV (no manuscript .tex file)
         logger=logger,
     )
-    df.to_csv(csv_path, index=False)
-    logger.info(f"Saved RSA table for {tgt}: {tex_path}")
+    logger.info(f"Saved RSA CSV for {tgt}: {csv_path}")
+
+# ============================================================================
+# Finish
+# ============================================================================
 
 log_script_end(logger)

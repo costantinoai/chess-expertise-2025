@@ -186,6 +186,10 @@ with open(out_dir / "rsa_group_stats.pkl", "wb") as f:
     pickle.dump(group_index, f)
 logger.info(f"Saved group statistics → {out_dir / 'rsa_group_stats.pkl'}")
 
+# Save ROI metadata with Harvard-Oxford labels for table generation
+roi_info.to_csv(out_dir / "roi_info_with_ho_labels.tsv", sep="\t", index=False)
+logger.info(f"Saved ROI metadata with Harvard-Oxford labels → {out_dir / 'roi_info_with_ho_labels.tsv'}")
+
 logger.info("Analysis complete. Results in: %s", out_dir)
 logger.info("=" * 80)
 log_script_end(logger)
