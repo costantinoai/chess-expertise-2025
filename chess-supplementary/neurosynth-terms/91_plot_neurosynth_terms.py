@@ -43,13 +43,18 @@ Usage
 python chess-supplementary/neurosynth-terms/91_plot_neurosynth_terms.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
-
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 script_dir = Path(__file__).parent
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -66,6 +71,7 @@ from common.plotting import (
     plot_flat_pair,
     compute_ylim_range,
     embed_figure_on_ax,
+    cm_to_inches,
     save_axes_svgs,
     save_panel_pdf,
     CMAP_BRAIN,
@@ -73,9 +79,8 @@ from common.plotting import (
 from common.neuro_utils import project_volume_to_surfaces
 from common.logging_utils import setup_analysis, log_script_end
 
-import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-neurosynth')))
-from modules.io_utils import load_term_maps, reorder_by_term
+from modules.io_utils import load_term_maps
 
 # Conditionally start pylustrator BEFORE creating any figures
 if CONFIG['ENABLE_PYLUSTRATOR']:
@@ -215,9 +220,8 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(14.000000/2.54, 12.490000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(14.00), cm_to_inches(12.49), forward=True)
 plt.figure(1).ax_dict["01_Glass_working_memory"].set(position=[0.01445, 0.7842, 0.2713, 0.1338])
 plt.figure(1).ax_dict["01_Glass_working_memory"].set_position([0.015449, 0.784281, 0.290045, 0.133629])
 plt.figure(1).ax_dict["01_Glass_working_memory"].text(0.4438, 0.9560, 'Term 1: Working Memory', transform=plt.figure(1).ax_dict["01_Glass_working_memory"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["01_Glass_working_memory"].texts[0].new
@@ -272,7 +276,8 @@ plt.figure(1).texts[0].set_position([0.403544, 0.957698])
 #% end: automatic generated code from pylustrator
 
 # Display figure in pylustrator GUI for interactive layout adjustment
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================
