@@ -345,20 +345,22 @@ def plot_flat_pair(
 
     # Add anatomical direction labels if requested
     if show_directions:
-        # Font size for direction labels (large for visibility)
-        dir_font_size = 40
+        # Font size for direction labels (increased for better visibility on flat projections)
+        dir_font_size = 50  # Was 40, increased for better readability
         dir_font = dict(
-            size=dir_font_size, family=PLOT_PARAMS["font_family"], color="lightgray"
+            size=dir_font_size,
+            family=PLOT_PARAMS["font_family"],
+            color="darkgray"  # Was "lightgray", darker for better contrast
         )
 
         # Vertical center of the plot area (where P should go)
         vcenter = 0.5
 
         # Horizontal positions
-        # Left A: at left edge
-        left_a_x = 0.01
-        # Right A: at right edge
-        right_a_x = 0.99
+        # Left A: at left edge (moved further left for better positioning)
+        left_a_x = 0.005  # Was 0.01
+        # Right A: at right edge (moved further right for better positioning)
+        right_a_x = 0.995  # Was 0.99
         # P: centered between the two hemispheres
         p_x = 0.5
 
@@ -584,8 +586,8 @@ def embed_figure_on_ax(ax, fig, title: str = "", subtitle: str = None):
 
     # Detect figure type and render appropriately
     if hasattr(fig, "savefig"):
-        # Matplotlib figure
-        fig.savefig(buf, format="png", dpi=300, bbox_inches="tight")
+        # Matplotlib figure - DRY: use centralized DPI
+        fig.savefig(buf, format="png", dpi=PLOT_PARAMS['dpi'], bbox_inches="tight")
         plt.close(fig)
     elif hasattr(fig, "write_image"):
         # Plotly figure
@@ -801,7 +803,7 @@ def plot_pial_views_triplet(
     fig, axes = plt.subplots(
         nrows=len(views),
         ncols=1,
-        figsize=(4, 3 * len(views)),
+        figsize=(3, 3 * len(views)),  # narrower width; 3×6 for 2 rows per guidance
         subplot_kw={'projection': '3d'}
     )
 
@@ -835,7 +837,8 @@ def plot_pial_views_triplet(
         # Make room for the suptitle
         plt.subplots_adjust(top=0.9)
 
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.01)  # try 0.0–0.2 depending on overlap
+    # Use negative vertical spacing to bring rows closer together
+    # Tight layout is avoided here because it can override custom hspace
+    plt.subplots_adjust(hspace=-0.6)
 
     return fig

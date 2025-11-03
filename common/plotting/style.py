@@ -12,17 +12,45 @@ Provides:
 
 from typing import Tuple, Optional, Literal
 import matplotlib
-import matplotlib.pyplot as plt
 import seaborn as sns
 
 # =============================================================================
 # Physical Constants
 # =============================================================================
 
-_MM = 1 / 25.4  # Millimeters to inches
+CM_TO_INCHES = 1 / 2.54  # Centimeters to inches conversion factor
+# Internal millimeter-to-inches for sizing helpers that accept mm
+MM_TO_INCHES = 1 / 25.4
+_MM = MM_TO_INCHES
 _NATURE_SINGLE_COL_MM = 89.0
 _NATURE_DOUBLE_COL_MM = 183.0
 _NATURE_MAX_HEIGHT_MM = 170.0
+
+
+def cm_to_inches(cm: float) -> float:
+    """
+    Convert centimeters to inches for figure sizing.
+
+    Pylustrator and our panel templates use centimeters for figure dimensions,
+    while matplotlib requires inches. This helper ensures consistent conversion
+    across plotting scripts (DRY principle).
+
+    Parameters
+    ----------
+    cm : float
+        Size in centimeters
+
+    Returns
+    -------
+    float
+        Size in inches (cm / 2.54)
+
+    Examples
+    --------
+    >>> from common.plotting import cm_to_inches
+    >>> fig.set_size_inches(cm_to_inches(18.0), cm_to_inches(12.0))
+    """
+    return float(cm) * CM_TO_INCHES
 
 # =============================================================================
 # Font Hierarchy (Nature: 5-7pt, panel labels 8pt exception)
@@ -69,6 +97,7 @@ PLOT_PARAMS = {
     'bar_linewidth': _BASE_LINEWIDTH,
     'plot_linewidth': _BASE_LINEWIDTH,
     'comparison_linewidth': _BASE_LINEWIDTH * _COMPARISON_LINE_FRACTION,
+    'reference_line_width': _BASE_LINEWIDTH * 2.5,  # 0.75pt for zero/reference lines (DRY: was hardcoded as 0.75)
 
     # Tick parameters
     'tick_major_size': 3.0,
@@ -79,11 +108,17 @@ PLOT_PARAMS = {
 
     # Marker size for scatter/MDS (Matplotlib scatter 's' in points^2)
     'marker_size': 8.0,
-    'line_alpha': 0.5,
+
+    # Alpha/transparency presets by element type (DRY: eliminates hardcoded alphas)
+    'line_alpha': 0.5,                      # Generic line elements
+    'bar_alpha': 0.7,                       # Bar chart fills
+    'reference_line_alpha': 0.6,            # Zero reference lines (axhline at y=0)
+    'comparison_line_alpha': 0.3,           # Comparison/chance-level reference lines
+    'error_band_alpha': 0.2,                # Confidence interval bands (fill_between)
+    'scatter_alpha': 0.6,                   # Scatter plot point transparency
 
     # Bar parameters
     'target_bar_width_mm': _TARGET_BAR_WIDTH_MM,
-    'bar_alpha': 0.7,
     'bar_edgecolor': 'black',
     'bar_hatch_novice': '////',
 
@@ -111,6 +146,95 @@ PLOT_PARAMS = {
 
     # Canonical labels (DRY)
     'ylabel_correlation_r': 'Correlation (r)',
+}
+
+# =============================================================================
+# Y-Axis Limit Presets by Analysis Type
+# =============================================================================
+#
+# Consistent y-axis limits for bar plots of the same analysis type.
+# These ensure visual comparability across figures and consistency within
+# analysis categories (e.g., all RSA plots have same scale).
+#
+# **Usage Guidelines:**
+# - Apply these limits during plot creation (before Pylustrator adjustments)
+# - Use None to allow automatic limit computation
+# - Brain surface plots should ALWAYS use automatic computation (not listed here)
+# - If a limit is None, do NOT call set_ylim() - let matplotlib auto-scale
+#
+# **Not Included Here (kept hardcoded in their respective scripts):**
+# - decoding_eyetracking: (0, 1.0) - script-specific, kept local
+# - rdm_intercorr_full: (-1, 1) - full correlation range, kept in module
+# - rdm_reliability: (0, 1.05) - reliability metric, kept in module
+# - scatter_jitter xlim: (-0.15, 0.15) - plot-specific, kept local
+#
+# =============================================================================
+
+PLOT_YLIMITS = {
+    # -------------------------------------------------------------------------
+    # RSA (Representational Similarity Analysis) - Neural Pattern Correlations
+    # All RSA plots show Spearman correlation (r) between model and neural RDMs
+    # -------------------------------------------------------------------------
+    'rsa_neural': (-0.06, 0.25),
+    # Used by: chess-mvpa/92_plot_mvpa_rsa.py (ROI-based RSA)
+    #          chess-mvpa/93_plot_mvpa_decoding.py (RSA panel in decoding figure)
+    # Range: Slightly below zero to capture negative correlations, up to r=0.25
+
+    'rsa_neural_rois_finer': (-0.02, 0.18),
+    # Used by: chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
+    # Range: Tighter range for finer-grained ROI analysis
+
+    'rsa_neurosynth_corr': (-0.15, 0.19),
+    # Used by: chess-neurosynth/92_plot_neurosynth_rsa.py (term correlation bars)
+    #          chess-neurosynth/91_plot_neurosynth_univariate.py (within-group)
+    # Range: Meta-analytic term correlations (within Expert or Novice group)
+    # NOTE: Surface plots in same scripts use auto-computed limits (not this)
+
+    'rsa_neurosynth_diff': (-0.15, 0.35),
+    # Used by: chess-neurosynth/92_plot_neurosynth_rsa.py (difference bars)
+    #          chess-neurosynth/91_plot_neurosynth_univariate.py (Expert - Novice)
+    # Range: Asymmetric to capture larger positive differences
+    # NOTE: Surface plots in same scripts use auto-computed limits (not this)
+
+    # -------------------------------------------------------------------------
+    # Decoding (Classification Accuracy - Above Chance Level)
+    # Decoding plots show SVM classification accuracy minus chance level
+    # -------------------------------------------------------------------------
+    'decoding': (-0.06, 0.25),
+    # Used by: chess-mvpa/93_plot_mvpa_decoding.py (ROI-based decoding)
+    # Range: Chance-subtracted accuracy, same scale as rsa_neural for comparison
+
+    'decoding_rois_finer': (-0.02, 0.18),
+    # Used by: chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
+    # Range: Finer-grained ROI decoding, same scale as rsa_neural_rois_finer
+
+    # -------------------------------------------------------------------------
+    # Behavioral Measures
+    # Behavioral correlations and choice patterns
+    # -------------------------------------------------------------------------
+    'behavioral_correlation': (-0.2, 1.0),
+    # Used by: chess-behavioral/91_plot_behavioral_panels.py (RDM correlations)
+    # Range: Partial correlation range, accommodates negative and strong positive
+
+    'behavioral_choice_counts': (0, 450),
+    # Used by: chess-behavioral/91_plot_behavioral_panels.py (choice histograms)
+    # Range: Choice frequency counts across 40 stimuli
+
+    'behavioral_rsa_models': (-0.25, 0.8),
+    # Used by: chess-behavioral/91_plot_behavioral_panels.py (model comparison)
+    # Range: RSA model fit correlations
+
+    # -------------------------------------------------------------------------
+    # Neurosynth Meta-Analytic Correlations (Univariate Activation)
+    # Correlations between univariate activation and meta-analytic term maps
+    # -------------------------------------------------------------------------
+    'neurosynth_univariate_corr': (-0.15, 0.19),
+    # Used by: chess-neurosynth/91_plot_neurosynth_univariate.py (term correlations)
+    # Range: Within-group correlations with meta-analytic maps
+
+    'neurosynth_univariate_diff': (-0.15, 0.35),
+    # Used by: chess-neurosynth/91_plot_neurosynth_univariate.py (group differences)
+    # Range: Expert - Novice differences, asymmetric for positive effects
 }
 
 # =============================================================================

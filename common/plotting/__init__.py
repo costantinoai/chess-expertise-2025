@@ -16,6 +16,9 @@ All files complete and ready to use!
 # Style and configuration
 from .style import (
     PLOT_PARAMS,
+    PLOT_YLIMITS,
+    CM_TO_INCHES,
+    cm_to_inches,
     apply_nature_rc,
     figure_size,
     auto_bar_figure_size,
@@ -89,6 +92,9 @@ from .surfaces import (
 __all__ = [
     # Style
     'PLOT_PARAMS',
+    'PLOT_YLIMITS',
+    'CM_TO_INCHES',
+    'cm_to_inches',
     'apply_nature_rc',
     'figure_size',
     'auto_bar_figure_size',

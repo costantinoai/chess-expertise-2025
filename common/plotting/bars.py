@@ -309,7 +309,7 @@ def plot_grouped_bars_on_ax(
     group2_values: Optional[List[float]] = None,
     group2_cis: Optional[List[Tuple[float, float]]] = None,
     group2_color: Optional[Union[str, List[str]]] = None,
-    group1_label: str = "Group 1",
+    group1_label: Union[str, List[str]] = "Group 1",
     group2_label: str = "Group 2",
     group1_pvals: Optional[List[float]] = None,
     group2_pvals: Optional[List[float]] = None,
@@ -319,7 +319,6 @@ def plot_grouped_bars_on_ax(
     show_errorbars: bool = True,
     add_value_labels: bool = False,
     value_label_format: str = '.2f',
-    # Optional DRY formatting controls (applied if provided)
     y_label: Optional[str] = None,
     title: Optional[str] = None,
     subtitle: Optional[str] = None,
@@ -334,75 +333,42 @@ def plot_grouped_bars_on_ax(
     params: dict = None
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
-    Plot bars on an existing axes (for multi-panel figures).
+    Plot grouped or single bar charts on an existing Axes.
 
-    Handles both single-group and grouped (two-group) bar plots.
-    This is the core plotting function containing all bar plotting logic.
+    Supports:
+    - Standard grouped bar plots (two groups side-by-side)
+    - Single-group plots with per-bar colors and auto-generated
+      color legends using `_apply_color_legend_from_bars`.
 
     Parameters
     ----------
     ax : matplotlib.axes.Axes
-        Axes to plot on
+        Axis to draw the bars on.
     x_positions : np.ndarray
-        X positions for bars
-    group1_values : List[float]
-        Bar heights for group 1 (or only group if single-group)
-    group1_cis : List[Tuple[float, float]]
-        Confidence intervals (lower, upper) for group 1
-    group1_color : str or List[str]
-        Colors for group 1 bars. Can be:
-        - str: Single color for all bars
-        - List[str]: One color per position (length must match x_positions)
-    group2_values, group2_cis, group2_color : optional
-        Group 2 data. If None, creates single-group plot.
-    group1_label, group2_label : str
-        Labels for legend
-    group1_pvals, group2_pvals : List[float], optional
-        P-values for within-group significance (stars above each group's bars)
-    comparison_pvals : List[float], optional
-        P-values for between-group comparisons (stars with connecting lines)
-        Only used in grouped mode.
-    ylim : Tuple[float, float], optional
-        Y-axis limits (ymin, ymax). NEW parameter for shared ranges across panels.
-    bar_width_multiplier : float, default=1.0
-        Multiplier for bar width. Use 2.0 for single-group plots to make bars wider.
-    show_errorbars : bool, default=True
-        If True, show error bars. If False, skip error bars (useful for simple bar plots).
-    add_value_labels : bool, default=False
-        If True, add numeric value labels on top of bars.
-    value_label_format : str, default='.2f'
-        Format string for value labels (e.g., '.2f' for 2 decimal places).
-    params : dict, optional
-        Plotting parameters
+        X positions for bars.
+    group1_values : list of float
+        Heights for the first group (or the only group if single).
+    group1_color : str or list of str
+        Bar colors for group 1. Can be one color or a list per bar.
+    group1_label : str or list of str
+        Legend label(s). If list, must correspond to unique colors.
+    show_legend : bool, optional
+        Whether to show a legend (auto-suppressed if one was drawn manually).
+    params : dict
+        Style parameters including bar width, colors, fonts, etc.
 
     Returns
     -------
     np.ndarray or tuple
-        Single-group: returns group1_yerr
-        Grouped: returns (group1_yerr, group2_yerr)
+        Error bars (yerr arrays) for group 1 or (group1, group2) if grouped.
 
     Notes
     -----
-    Hatching behavior in grouped mode:
-    - Group 1 bars are always solid
-    - Group 2 bars are hatched ONLY when both groups share the same colors
-    - When groups have different colors, no hatching is applied
-    - This ensures visual distinction without redundant hatching
-
-    Examples
-    --------
-    # Single-group (difference plot)
-    >>> plot_grouped_bars_on_ax(
-    ...     ax, x_pos, diff_vals, diff_cis, roi_colors,
-    ...     group1_pvals=pvals, bar_width_multiplier=2.0
-    ... )
-
-    # Two-group comparison
-    >>> plot_grouped_bars_on_ax(
-    ...     ax, x_pos, exp_vals, exp_cis, roi_colors,
-    ...     group2_values=nov_vals, group2_cis=nov_cis, group2_color=roi_colors,
-    ...     comparison_pvals=pvals, ylim=(0, 1)
-    ... )
+    - If `group1_color` and `group1_label` are lists, the function will
+      call `_apply_color_legend_from_bars()` to generate a legend with
+      exact styling taken from the actual bars.
+    - If `show_legend=True` but the internal color legend is created,
+      `_apply_dry_formatting()` is instructed *not* to rebuild it.
     """
     from .style import PLOT_PARAMS
     if params is None:
@@ -411,215 +377,308 @@ def plot_grouped_bars_on_ax(
     import matplotlib.ticker as mticker
     ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.2f'))
 
-    bw = params['target_bar_width_mm'] * bar_width_multiplier  # Will be converted to data units
     n_items = len(x_positions)
     is_grouped = group2_values is not None
 
-    # Validate color inputs
+    # === Validate color input consistency ===
     if isinstance(group1_color, list) and len(group1_color) != n_items:
         raise ValueError(
-            f"group1_color list length ({len(group1_color)}) must match "
-            f"number of x_positions ({n_items})"
+            f"group1_color list length ({len(group1_color)}) must match number of x_positions ({n_items})"
         )
     if is_grouped and isinstance(group2_color, list) and len(group2_color) != n_items:
         raise ValueError(
-            f"group2_color list length ({len(group2_color)}) must match "
-            f"number of x_positions ({n_items})"
+            f"group2_color list length ({len(group2_color)}) must match number of x_positions ({n_items})"
         )
 
-    # Convert CIs to yerr format (or create dummy zero-width error bars)
+    # === Convert confidence intervals to yerr arrays ===
     if group1_cis is None:
         group1_cis = [(v, v) for v in group1_values]
     g1_yerr = _convert_ci_to_yerr(group1_cis, group1_values)
 
-    # Bar width in data coordinates (EXACTLY matching main branch)
-    # Main branch: bw = params['bar_width'] = 0.5
-    # Offset = ±bw/2, so bars are side-by-side with no gap
-    bw = 0.35 * bar_width_multiplier  # Slightly smaller than main (0.5) for Nature style
+    # === Set a "Nature-style" narrow bar width ===
+    bw = 0.35 * bar_width_multiplier
 
+    # ---------------------------------------------------------------------
+    # GROUPED MODE: Two sets of bars (side-by-side)
+    # ---------------------------------------------------------------------
     if is_grouped:
-        # === GROUPED MODE: Two groups side-by-side ===
         if group2_cis is None:
             group2_cis = [(v, v) for v in group2_values]
         g2_yerr = _convert_ci_to_yerr(group2_cis, group2_values)
 
-        # Determine if hatching is needed (only when colors are the same)
         use_hatch = _should_use_hatching(group1_color, group2_color)
 
-        # Group 1 bars (solid) - EXACTLY matching main branch
-        bars1 = ax.bar(x_positions - bw/2, group1_values,
-               width=bw, color=group1_color,
-               edgecolor=params['bar_edgecolor'],
-               linewidth=params['bar_linewidth'],
-               alpha=params['bar_alpha'],
-               label=group1_label)
+        # Draw both bar groups
+        bars1 = ax.bar(
+            x_positions - bw/2, group1_values,
+            width=bw, color=group1_color,
+            edgecolor=params['bar_edgecolor'],
+            linewidth=params['bar_linewidth'],
+            alpha=params['bar_alpha'],
+            label=group1_label if isinstance(group1_label, str) else "Group 1",
+        )
+        bars2 = ax.bar(
+            x_positions + bw/2, group2_values,
+            width=bw, color=group2_color,
+            edgecolor=params['bar_edgecolor'],
+            linewidth=params['bar_linewidth'],
+            alpha=params['bar_alpha'],
+            hatch=params['bar_hatch_novice'] if use_hatch else None,
+            label=group2_label,
+        )
 
-        # Group 1 error bars - EXACTLY matching main branch
+        # Optional: add error bars for both groups
         if show_errorbars:
             ax.errorbar(x_positions - bw/2, group1_values, yerr=g1_yerr,
                         fmt='none', ecolor='black',
                         elinewidth=params['errorbar_linewidth'],
                         capsize=params['errorbar_capsize'], zorder=2)
-
-        # Group 2 bars (hatched only if colors are the same) - EXACTLY matching main branch
-        bars2 = ax.bar(x_positions + bw/2, group2_values,
-               width=bw, color=group2_color,
-               edgecolor=params['bar_edgecolor'],
-               linewidth=params['bar_linewidth'],
-               alpha=params['bar_alpha'],
-               hatch=params['bar_hatch_novice'] if use_hatch else None,
-               label=group2_label)
-
-        # Group 2 error bars - EXACTLY matching main branch
-        if show_errorbars:
             ax.errorbar(x_positions + bw/2, group2_values, yerr=g2_yerr,
                         fmt='none', ecolor='black',
                         elinewidth=params['errorbar_linewidth'],
                         capsize=params['errorbar_capsize'], zorder=2)
 
-        # Add value labels if requested
+        # Optional numeric labels on bars
         if add_value_labels:
             for bar, val in zip(bars1, group1_values):
-                if not np.isnan(val):
-                    height = bar.get_height()
-                    offset = 0.04 if height >= 0 else -0.04
-                    va = 'bottom' if height >= 0 else 'top'
-                    ax.text(bar.get_x() + bar.get_width() / 2, height + offset,
-                            f'{val:{value_label_format}}',
-                            ha='center', va=va, fontsize=params['font_size_tick'] - 1)
+                if np.isfinite(val):
+                    h = bar.get_height()
+                    off = 0.04 if h >= 0 else -0.04
+                    va = 'bottom' if h >= 0 else 'top'
+                    ax.text(bar.get_x() + bar.get_width()/2, h + off,
+                            f'{val:{value_label_format}}', ha='center', va=va,
+                            fontsize=params['font_size_tick'] - 1)
             for bar, val in zip(bars2, group2_values):
-                if not np.isnan(val):
-                    height = bar.get_height()
-                    offset = 0.04 if height >= 0 else -0.04
-                    va = 'bottom' if height >= 0 else 'top'
-                    ax.text(bar.get_x() + bar.get_width() / 2, height + offset,
-                            f'{val:{value_label_format}}',
-                            ha='center', va=va, fontsize=params['font_size_tick'] - 1)
+                if np.isfinite(val):
+                    h = bar.get_height()
+                    off = 0.04 if h >= 0 else -0.04
+                    va = 'bottom' if h >= 0 else 'top'
+                    ax.text(bar.get_x() + bar.get_width()/2, h + off,
+                            f'{val:{value_label_format}}', ha='center', va=va,
+                            fontsize=params['font_size_tick'] - 1)
 
-        # Within-group significance stars
+        # Significance annotations
         if group1_pvals is not None:
-            _add_significance_stars(
-                ax, x_positions - bw/2, group1_values, g1_yerr, group1_pvals, params
-            )
+            _add_significance_stars(ax, x_positions - bw/2, group1_values, g1_yerr, group1_pvals, params)
         if group2_pvals is not None:
-            _add_significance_stars(
-                ax, x_positions + bw/2, group2_values, g2_yerr, group2_pvals, params
-            )
-
-        # Between-group comparison stars
+            _add_significance_stars(ax, x_positions + bw/2, group2_values, g2_yerr, group2_pvals, params)
         if comparison_pvals is not None:
-            _add_significance_stars(
-                ax, x_positions, group1_values, g1_yerr, comparison_pvals, params,
-                comparison_mode=True,
-                group2_values=group2_values,
-                group2_yerr=g2_yerr,
-                bar_width=bw
-            )
+            _add_significance_stars(ax, x_positions, group1_values, g1_yerr,
+                                    comparison_pvals, params, comparison_mode=True,
+                                    group2_values=group2_values, group2_yerr=g2_yerr, bar_width=bw)
 
-        # Apply ylim (auto-calculate if not provided)
+        # Axis limits and zero line
         if ylim is not None:
             ax.set_ylim(ylim)
         else:
             auto_ymin, auto_ymax = _calculate_auto_ylim(
-                group1_values, g1_yerr,
-                pvals=group1_pvals,
-                group2_values=group2_values,
-                group2_yerr=g2_yerr,
-                group2_pvals=group2_pvals,
-                comparison_pvals=comparison_pvals,
-                params=params
-            )
+                group1_values, g1_yerr, pvals=group1_pvals,
+                group2_values=group2_values, group2_yerr=g2_yerr,
+                group2_pvals=group2_pvals, comparison_pvals=comparison_pvals,
+                params=params)
             ax.set_ylim(auto_ymin, auto_ymax)
-
-        # Add zero reference line (always, for all bar plots)
-        ax.axhline(0, color='gray', linestyle=':', linewidth=0.75, alpha=0.6, zorder=1)
-
-        # Optional DRY formatting
-        _apply_dry_formatting(
-            ax, x_positions,
-            y_label=y_label,
-            title=title,
-            subtitle=subtitle,
-            xtick_labels=xtick_labels,
-            x_label_colors=x_label_colors,
-            x_tick_rotation=x_tick_rotation,
-            x_tick_align=x_tick_align,
-            hide_xticklabels=hide_xticklabels,
-            show_legend=show_legend,
-            legend_loc=legend_loc,
-            visible_spines=visible_spines,
-            params=params,
+        # Baseline (zero) - DRY: use centralized alpha and linewidth
+        ax.axhline(
+            0,
+            color='gray',
+            linestyle=':',
+            linewidth=params['reference_line_width'],  # Was 0.75
+            alpha=params['reference_line_alpha'],      # Was 0.6
+            zorder=1
         )
 
+        # Unified DRY formatting (spines, titles, ticks, etc.)
+        _apply_dry_formatting(
+            ax, x_positions,
+            y_label=y_label, title=title, subtitle=subtitle,
+            xtick_labels=xtick_labels, x_label_colors=x_label_colors,
+            x_tick_rotation=x_tick_rotation, x_tick_align=x_tick_align,
+            hide_xticklabels=hide_xticklabels,
+            show_legend=show_legend, legend_loc=legend_loc,
+            visible_spines=visible_spines, params=params,
+        )
         return g1_yerr, g2_yerr
 
+    # ---------------------------------------------------------------------
+    # SINGLE-GROUP MODE: One set of bars (with optional per-color legend)
+    # ---------------------------------------------------------------------
     else:
-        # === SINGLE-GROUP MODE: One set of bars ===
-        # Bars (centered, wider if multiplier > 1) - EXACTLY matching main branch
-        bars = ax.bar(x_positions, group1_values,
-               width=bw, color=group1_color,
-               edgecolor=params['bar_edgecolor'],
-               linewidth=params['bar_linewidth'],
-               alpha=params['bar_alpha'],
-               label=group1_label)
+        bars = ax.bar(
+            x_positions, group1_values,
+            width=bw, color=group1_color,
+            edgecolor=params['bar_edgecolor'],
+            linewidth=params['bar_linewidth'],
+            alpha=params['bar_alpha'],
+            label=group1_label if isinstance(group1_label, str) else None,
+        )
 
-        # Error bars - EXACTLY matching main branch
+        # Optional error bars
         if show_errorbars:
             ax.errorbar(x_positions, group1_values, yerr=g1_yerr,
                         fmt='none', ecolor='black',
                         elinewidth=params['errorbar_linewidth'],
                         capsize=params['errorbar_capsize'], zorder=2)
 
-        # Add value labels if requested
-        if add_value_labels:
-            for bar, val in zip(bars, group1_values):
-                if not np.isnan(val):
-                    height = bar.get_height()
-                    offset = 0.04 if height >= 0 else -0.04
-                    va = 'bottom' if height >= 0 else 'top'
-                    ax.text(bar.get_x() + bar.get_width() / 2, height + offset,
-                            f'{val:{value_label_format}}',
-                            ha='center', va=va, fontsize=params['font_size_tick'] - 1)
-
-        # Significance stars - EXACTLY matching main branch
-        if group1_pvals is not None:
-            _add_significance_stars(
-                ax, x_positions, group1_values, g1_yerr, group1_pvals, params
+        # --- NEW FEATURE: Per-color legend from real bars ---
+        legend_was_drawn = False
+        if isinstance(group1_color, list) and isinstance(group1_label, list):
+            legend_was_drawn = _apply_color_legend_from_bars(
+                ax=ax,
+                bars=bars,
+                per_bar_colors=group1_color,
+                per_color_labels=group1_label,
+                legend_loc=legend_loc,
+                params=params,
             )
 
-        # Apply ylim (auto-calculate if not provided)
+        # Optional numeric labels on bars
+        if add_value_labels:
+            for bar, val in zip(bars, group1_values):
+                if np.isfinite(val):
+                    h = bar.get_height()
+                    off = 0.04 if h >= 0 else -0.04
+                    va = 'bottom' if h >= 0 else 'top'
+                    ax.text(bar.get_x() + bar.get_width()/2, h + off,
+                            f'{val:{value_label_format}}',
+                            ha='center', va=va,
+                            fontsize=params['font_size_tick'] - 1)
+
+        # Significance stars
+        if group1_pvals is not None:
+            _add_significance_stars(ax, x_positions, group1_values, g1_yerr, group1_pvals, params)
+
+        # Auto or fixed Y limits
         if ylim is not None:
             ax.set_ylim(ylim)
         else:
             auto_ymin, auto_ymax = _calculate_auto_ylim(
-                group1_values, g1_yerr,
-                pvals=group1_pvals,
-                params=params
+                group1_values, g1_yerr, pvals=group1_pvals, params=params
             )
             ax.set_ylim(auto_ymin, auto_ymax)
 
-        # Add zero reference line (always, for all bar plots)
-        ax.axhline(0, color='gray', linestyle=':', linewidth=0.75, alpha=0.6, zorder=1)
+        # Baseline (zero) - DRY: use centralized alpha and linewidth
+        ax.axhline(
+            0,
+            color='gray',
+            linestyle=':',
+            linewidth=params['reference_line_width'],  # Was 0.75
+            alpha=params['reference_line_alpha'],      # Was 0.6
+            zorder=1
+        )
 
-        # Optional DRY formatting
+        # --- Final formatting ---
+        # If legend was already drawn (using bar artists), suppress rebuilding it.
         _apply_dry_formatting(
             ax, x_positions,
-            y_label=y_label,
-            title=title,
-            subtitle=subtitle,
-            xtick_labels=xtick_labels,
-            x_label_colors=x_label_colors,
-            x_tick_rotation=x_tick_rotation,
-            x_tick_align=x_tick_align,
+            y_label=y_label, title=title, subtitle=subtitle,
+            xtick_labels=xtick_labels, x_label_colors=x_label_colors,
+            x_tick_rotation=x_tick_rotation, x_tick_align=x_tick_align,
             hide_xticklabels=hide_xticklabels,
-            show_legend=show_legend,
+            show_legend=(False if legend_was_drawn else show_legend),
             legend_loc=legend_loc,
-            visible_spines=visible_spines,
-            params=params,
+            visible_spines=visible_spines, params=params,
         )
 
         return g1_yerr
 
+def _apply_color_legend_from_bars(
+    ax,
+    bars,
+    per_bar_colors: List[str],
+    per_color_labels: List[str],
+    legend_loc: str,
+    params: dict,
+) -> bool:
+    """
+    Internal utility to build a legend from the *actual bar rectangles*
+    when each bar has its own color, but we only want one legend entry
+    per unique color (e.g., "Exp > Nov", "Nov > Exp").
+
+    This ensures the legend exactly matches the bar style — including
+    alpha, edgecolor, linewidth, and hatch — because the handles are the
+    original bar artists, not generic proxy patches.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes object to which the legend will be added.
+    bars : list of matplotlib.patches.Rectangle
+        Bar artists returned by `ax.bar(...)`.
+    per_bar_colors : list of str
+        List of facecolors used for each bar (same length as `bars`).
+    per_color_labels : list of str
+        List of legend labels corresponding to *unique colors*.
+        Must have the same length as the number of unique colors in
+        `per_bar_colors` (asserted).
+    legend_loc : str
+        Matplotlib legend location string (e.g., 'upper right').
+    params : dict
+        Plotting parameter dictionary. Should include font sizes and
+        any custom legend style options, e.g.:
+        - 'font_size_legend'
+        - 'legend_frameon'
+
+    Returns
+    -------
+    bool
+        True if a legend was successfully created; False if skipped
+        (e.g., due to invalid input types).
+
+    Notes
+    -----
+    - The function preserves the first appearance order of unique colors.
+    - Only the *first* bar for each color keeps its label;
+      all subsequent bars are hidden from the legend (`"_nolegend_"`).
+    - If the provided label count doesn’t match the number of unique
+      colors, a ValueError is raised.
+    """
+    # === Validate input types ===
+    if not isinstance(per_bar_colors, list) or not isinstance(per_color_labels, list):
+        # Only activate this logic when both colors and labels are lists.
+        return False
+    if len(per_bar_colors) != len(bars):
+        raise ValueError(
+            f"per_bar_colors length ({len(per_bar_colors)}) must match number of bars ({len(bars)})."
+        )
+
+    # === Determine unique colors and the first bar for each color ===
+    unique_colors: List[str] = []
+    first_rect_for_color = {}
+    for rect, color in zip(bars, per_bar_colors):
+        if color not in first_rect_for_color:
+            first_rect_for_color[color] = rect
+            unique_colors.append(color)
+
+    # === Validate label count ===
+    if len(per_color_labels) != len(unique_colors):
+        raise ValueError(
+            f"Number of legend labels ({len(per_color_labels)}) must equal number of unique colors ({len(unique_colors)})."
+        )
+
+    # === Assign labels to bars ===
+    color_to_label = {c: lab for c, lab in zip(unique_colors, per_color_labels)}
+    seen = set()
+    for rect, color in zip(bars, per_bar_colors):
+        if color not in seen:
+            # Assign the legend label only to the first occurrence
+            rect.set_label(color_to_label[color])
+            seen.add(color)
+        else:
+            # Hide subsequent bars of the same color from the legend
+            rect.set_label("_nolegend_")
+
+    # === Build and draw the legend using real bar rectangles ===
+    handles = [first_rect_for_color[c] for c in unique_colors]
+    labels = [color_to_label[c] for c in unique_colors]
+    ax.legend(
+        handles=handles,
+        labels=labels,
+        loc=legend_loc,
+        frameon=params.get("legend_frameon", False),
+        fontsize=params.get("font_size_legend", None),
+    )
+
+    return True
 
 def _apply_dry_formatting(
     ax,
@@ -863,8 +922,15 @@ def plot_grouped_bars_with_ci(
     label_axes(ax, ylabel=ylabel, params=params)
 
     if add_zero_line:
-        ax.axhline(0, color='black', linestyle='--',
-                  linewidth=params['plot_linewidth'], alpha=0.3, zorder=1)
+        # Comparison reference line - DRY: use centralized alpha
+        ax.axhline(
+            0,
+            color='black',
+            linestyle='--',
+            linewidth=params['plot_linewidth'],
+            alpha=params['comparison_line_alpha'],  # Was 0.3
+            zorder=1
+        )
 
     set_axis_title(ax, title, subtitle=subtitle, params=params)
 
