@@ -81,8 +81,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pickle
-from typing import Dict, List, Tuple
-from scipy import stats
+from typing import Dict, List
 
 # Get absolute paths
 script_path = os.path.realpath(__file__)
@@ -235,7 +234,7 @@ def _bootstrap_p_two_sided(samples: np.ndarray, null: float = 0.0) -> float:
 
 config, output_dir, logger = setup_analysis(
     analysis_name="behavioral_split_half",
-    results_base=Path("results"),
+    results_base=Path(script_dir) / "results",
     script_file=__file__,
 )
 
