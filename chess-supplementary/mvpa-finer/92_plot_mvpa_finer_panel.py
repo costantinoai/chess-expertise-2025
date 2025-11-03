@@ -92,6 +92,8 @@ from common.plotting import (
     plot_rdm_on_ax,
     compute_stimulus_palette,
     PLOT_PARAMS,
+    PLOT_YLIMITS,
+    cm_to_inches,
     save_axes_svgs,
     save_panel_pdf,
 )
@@ -224,14 +226,14 @@ apply_nature_rc()  # Apply Nature journal style to all figures
 # Find latest RSA and SVM decoding results directories (separate analyses)
 RESULTS_DIR_RSA = find_latest_results_directory(
     RESULTS_BASE,
-    pattern='*_mvpa_finer_group_rsa',
+    pattern='mvpa_finer_group_rsa',
     create_subdirs=['figures'],
     require_exists=True,
     verbose=True
 )
 RESULTS_DIR_SVM = find_latest_results_directory(
     RESULTS_BASE,
-    pattern='*_mvpa_finer_group_decoding',
+    pattern='mvpa_finer_group_decoding',
     create_subdirs=['figures'],
     require_exists=True,
     verbose=True
@@ -328,8 +330,8 @@ for target in FINE_TARGETS:
     x = np.arange(len(roi_names))      # X-positions for bars
 
     # Compute y-axis limits with padding for clean visualization
-    ylim_rsa = (-.02, .18)
-    ylim_svm = (-.02, .18)
+    ylim_rsa = PLOT_YLIMITS['rsa_neural_rois_finer']  # Centralized finer ROI RSA limits (was -.02, .18)
+    ylim_svm = PLOT_YLIMITS['decoding_rois_finer']    # Centralized finer ROI decoding limits (was -.02, .18)
 
     # -----------------------------------------------------------------------------
     # Panel A: RSA Correlation Barplot (Experts vs Novices)
@@ -433,9 +435,8 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 # Display figure in pylustrator GUI for interactive layout adjustment
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(18.260000/2.54, 23.930000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(18.26), cm_to_inches(23.93), forward=True)
 plt.figure(1).ax_dict["RDM_0_strategy_half"].set(position=[0.4555, 0.6875, 0.08276, 0.06322])
 plt.figure(1).ax_dict["RDM_1_check_n_half"].set(position=[0.4555, 0.4895, 0.08276, 0.06322])
 plt.figure(1).ax_dict["RDM_2_total_pieces_half"].set(position=[0.4555, 0.09723, 0.08276, 0.06322])
@@ -454,7 +455,9 @@ plt.figure(1).ax_dict["SVM_3_legal_moves_half"].set(position=[0.05909, 0.2821, 0
 plt.figure(1).ax_dict["SVM_4_motif_half"].set(position=[0.05909, 0.8742, 0.378, 0.08568])
 plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.2045, 1.2943, 'Brain Decoding (Checkmate board only)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[6].new
 #% end: automatic generated code from pylustrator
-plt.show()
+from common import CONFIG as _CONFIG_FOR_SHOW
+if _CONFIG_FOR_SHOW['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================

@@ -19,7 +19,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 script_dir = Path(__file__).parent
 
 import numpy as np
-import pandas as pd
 
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
@@ -34,7 +33,6 @@ from common.report_utils import write_group_stats_outputs
 
 from modules.mvpa_io import (
     find_subject_tsvs,
-    load_subject_tsv,
     build_group_dataframe,
 )
 from modules.mvpa_group import (

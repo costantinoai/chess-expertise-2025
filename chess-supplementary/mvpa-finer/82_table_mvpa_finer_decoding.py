@@ -1,88 +1,168 @@
 #!/usr/bin/env python3
 """
-MVPA-Finer Decoding — LaTeX tables (Experts vs Novices)
+MVPA-Finer Decoding — LaTeX Table Generation (Experts vs Novices)
+==================================================================
 
-Loads mvpa_group_stats.pkl from the latest MVPA finer decoding group analysis and
-produces per-target LaTeX tables with group means (95% CI) and FDR p-values.
-Values are reported as (accuracy − chance).
+This script generates publication-ready LaTeX and CSV tables summarizing
+multi-voxel pattern analysis (MVPA) decoding accuracy results using support
+vector machine (SVM) classifiers with a finer-grained ROI parcellation (180
+bilateral regions from the Glasser multimodal parcellation), comparing expert
+and novice groups.
+
+METHODS (Academic Manuscript Section)
+--------------------------------------
+Summary tables were generated from ROI-level MVPA decoding results using a
+finer-grained anatomical parcellation. This supplementary analysis extends the
+main MVPA decoding analysis by using all 180 bilateral cortical regions from
+the Glasser multimodal parcellation, providing higher spatial resolution than
+the main 22-ROI analysis.
+
+For each classification target (e.g., check vs non-check, strategy type),
+linear SVM classifiers with L2 regularization were trained using leave-one-run-
+out cross-validation (LOOCV) within each participant. Decoding accuracies were
+averaged across cross-validation folds to obtain per-subject, per-ROI accuracy
+estimates.
+
+Group-level statistics were computed by comparing expert and novice accuracies
+within each ROI. Following standard practice, chance-level performance was
+subtracted from all reported accuracies to facilitate interpretation (accuracy −
+chance). Chance level was determined by the classification task (e.g., 0.5 for
+binary classification, 1/n for n-way classification).
+
+For each target and ROI, we report:
+
+1. **Expert mean (accuracy − chance)**: Mean above-chance accuracy with 95%
+   confidence interval (computed using t-distribution).
+
+2. **Novice mean (accuracy − chance)**: Same as expert group.
+
+3. **Statistical significance**: Results from Welch's two-sample t-test
+   (scipy.stats.ttest_ind with equal_var=False) comparing expert and novice
+   accuracies. P-values are corrected for multiple comparisons using the
+   Benjamini-Hochberg false discovery rate (FDR) procedure (α=0.05) across ROIs
+   within each target.
+
+Significance markers (*, **, ***) indicate FDR-corrected significance levels
+(p<0.05, p<0.01, p<0.001).
+
+Inputs
+------
+- mvpa_group_stats.pkl: Nested dictionary containing (from 03_mvpa_finer_group_decoding.py):
+  - 'svm': Dict mapping classification targets to statistical blocks
+    - 'experts_desc': Expert group descriptive statistics (mean, CI, SEM)
+    - 'novices_desc': Novice group descriptive statistics
+    - 'welch_expert_vs_novice': Welch t-test results with FDR q-values
+    - 'chance': Chance-level performance (float)
+
+Outputs
+-------
+- tables/mvpa_finer_svm_{target}.tex: LaTeX table for each classification target
+- tables/mvpa_finer_svm_{target}.csv: CSV version for each target
+
+Dependencies
+------------
+- common.report_utils: format_roi_stats_table, generate_latex_table
+- common.bids_utils: load_roi_metadata
+- common.logging_utils: Logging setup
+- common.io_utils: Results directory finder
+
+Usage
+-----
+python chess-supplementary/mvpa-finer/82_table_mvpa_finer_decoding.py
+
+Supplementary Analysis: MVPA decoding with finer-grained parcellation (180 ROIs)
 """
 
-import os
 import sys
 from pathlib import Path
 import pickle
-import pandas as pd
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Add repo root for 'common' module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
-from common.report_utils import generate_latex_table, format_roi_stats_table
 from common import CONFIG
+from common.report_utils import format_roi_stats_table, save_table_with_manuscript_copy
+from common.formatters import format_ci, format_p_cell, shorten_roi_name
 
+# ============================================================================
+# Configuration & Setup
+# ============================================================================
 
-RESULTS_BASE = Path(__file__).parent / 'results'
-RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern='*_mvpa_finer_group_decoding',
-    create_subdirs=['tables'],
-    require_exists=True,
-    verbose=True,
-)
-
-extra = {"RESULTS_DIR": str(RESULTS_DIR)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
+# Locate the latest MVPA finer decoding group results directory
+# This script reads from the most recent timestamped results folder
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='mvpa_finer_group_decoding',
+    output_subdirs=['tables'],
     log_name='tables_mvpa_finer_decoding.log',
 )
+RESULTS_DIR = results_dir
+tables_dir = dirs['tables']
 
-tables_dir = RESULTS_DIR / 'tables'
+# ============================================================================
+# Load MVPA Group Statistics
+# ============================================================================
 
+logger.info("Loading MVPA finer group statistics from pickle file...")
+
+# Load the mvpa_group_stats.pkl file generated by 03_mvpa_finer_group_decoding.py
+# This file contains SVM decoding accuracy results organized by target (180 ROIs)
 with open(RESULTS_DIR / 'mvpa_group_stats.pkl', 'rb') as f:
     index = pickle.load(f)
 
+# Load ROI metadata (names, hemisphere, anatomical grouping)
+# Note: This uses the full 180-region Glasser parcellation
 roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
-targets = sorted(index.get('svm', {}).keys())
 
+# Extract list of classification targets (e.g., 'check', 'strategy')
+targets = sorted(index.get('svm', {}).keys())
+logger.info(f"Found {len(targets)} decoding targets: {targets}")
+
+# ============================================================================
+# Generate Tables for Each Decoding Target
+# ============================================================================
+
+# Create one table per decoding target showing ROI-level results
 for tgt in targets:
+    logger.info(f"Generating table for decoding target: {tgt}")
+
+    # Extract statistical blocks for this target
+    # Contains expert/novice descriptives, Welch t-test results, and chance level
     blocks = index['svm'][tgt]
-    chance = float(blocks.get('chance', 0.0))
+    chance = float(blocks.get('chance', 0.0))  # Chance-level accuracy for this task
+
+    # Format the statistical results into a publication-ready DataFrame
+    # Subtract chance from all accuracy values to show above-chance performance
+    # This function:
+    # 1. Subtracts chance from expert and novice mean accuracies
+    # 2. Formats means with 95% CIs: "mean (CI_low, CI_high)"
+    # 3. Adds FDR-corrected significance markers (*, **, ***)
+    # 4. Joins with ROI metadata for pretty region names
     df = format_roi_stats_table(
-        blocks['welch_expert_vs_novice'],
-        blocks['experts_desc'],
-        blocks['novices_desc'],
-        roi_info,
-        subtract_chance=chance,
+        blocks['welch_expert_vs_novice'],  # Welch t-test results with FDR q-values
+        blocks['experts_desc'],  # Expert descriptive statistics (raw accuracy)
+        blocks['novices_desc'],  # Novice descriptive statistics (raw accuracy)
+        roi_info,  # ROI metadata (names, hemisphere)
+        subtract_chance=chance,  # Subtract chance level from all values
     )
+
+    # Rename columns to explicitly indicate chance subtraction
+    # This makes it clear that values represent above-chance accuracy
     df = df.rename(columns={
-        'Expert_mean': 'Expert_mean_minusChance',
-        'Expert_CI': 'Expert_CI_minusChance',
-        'Novice_mean': 'Novice_mean_minusChance',
-        'Novice_CI': 'Novice_CI_minusChance',
+        'Expert_mean': 'Expert_mean_minusChance',  # Expert (accuracy − chance)
+        'Expert_CI': 'Expert_CI_minusChance',  # 95% CI for expert
+        'Novice_mean': 'Novice_mean_minusChance',  # Novice (accuracy − chance)
+        'Novice_CI': 'Novice_CI_minusChance',  # 95% CI for novice
     })
-    multicolumn = {
-        'Experts (acc−chance)': ['Expert_mean_minusChance', 'Expert_CI_minusChance'],
-        'Novices (acc−chance)': ['Novice_mean_minusChance', 'Novice_CI_minusChance'],
-    }
-    tex = generate_latex_table(
-        df=df,
-        output_path=tables_dir / f'mvpa_finer_svm_{tgt}.tex',
-        caption=f'MVPA finer decoding (ROI-level) — target: {tgt}.',
-        label=f'tab:mvpa_finer_svm_{tgt}',
-        column_format='lcc|cc|c',
-        multicolumn_headers=multicolumn,
-        escape=False,
-        logger=logger,
-    )
+
+    # Save CSV only (no manuscript .tex file)
     csv_path = tables_dir / f'mvpa_finer_svm_{tgt}.csv'
     df.to_csv(csv_path, index=False)
-    logger.info(f"Saved decoding finer table for {tgt}: {tex}")
+    logger.info(f"Saved decoding finer CSV for {tgt}: {csv_path}")
+
+# ============================================================================
+# Finish
+# ============================================================================
 
 log_script_end(logger)
-

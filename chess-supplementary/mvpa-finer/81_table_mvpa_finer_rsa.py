@@ -1,81 +1,151 @@
 #!/usr/bin/env python3
 """
-MVPA-Finer RSA — LaTeX tables (Experts vs Novices)
+MVPA-Finer RSA — LaTeX Table Generation (Experts vs Novices)
+=============================================================
 
-Loads mvpa_group_stats.pkl from the latest MVPA finer RSA group analysis and
-produces per-target LaTeX tables with Experts/Novices means (95% CI), group
-differences (95% CI), and FDR-corrected p-values.
+This script generates publication-ready LaTeX and CSV tables summarizing
+multi-voxel pattern analysis (MVPA) representational similarity analysis (RSA)
+results using a finer-grained ROI parcellation (180 bilateral regions from the
+Glasser multimodal parcellation), comparing neural similarity structure between
+experts and novices.
+
+METHODS (Academic Manuscript Section)
+--------------------------------------
+Summary tables were generated from ROI-level MVPA RSA correlation results using
+a finer-grained anatomical parcellation. This supplementary analysis extends the
+main MVPA RSA analysis by using all 180 bilateral cortical regions from the
+Glasser multimodal parcellation, providing higher spatial resolution than the
+main 22-ROI analysis.
+
+For each RSA target (theoretical model) and each of 180 ROIs, neural RDMs were
+correlated with model RDMs. Group-level statistics were computed by comparing
+expert and novice Fisher z-transformed correlation values.
+
+For each target and ROI, we report:
+
+1. **Expert mean correlation**: Mean Spearman correlation (Fisher z-transformed
+   for group analysis, then back-transformed for reporting) with 95% confidence
+   interval (computed using t-distribution).
+
+2. **Novice mean correlation**: Same as expert group.
+
+3. **Group difference (Δr)**: Computed as (Expert mean - Novice mean) with 95%
+   confidence interval.
+
+4. **Statistical significance**: Results from Welch's two-sample t-test
+   (scipy.stats.ttest_ind with equal_var=False) on Fisher z-transformed
+   correlations. P-values are corrected for multiple comparisons using the
+   Benjamini-Hochberg false discovery rate (FDR) procedure (α=0.05) across ROIs
+   within each target.
+
+5. **Effect size**: Cohen's d, quantifying the magnitude of expertise differences.
+
+Significance markers (*, **, ***) indicate FDR-corrected significance levels
+(p<0.05, p<0.01, p<0.001).
+
+Inputs
+------
+- mvpa_group_stats.pkl: Nested dictionary containing (from 02_mvpa_finer_group_rsa.py):
+  - 'rsa_corr': Dict mapping RSA targets to statistical blocks
+    - 'experts_desc': Expert group descriptive statistics (mean, CI, SEM)
+    - 'novices_desc': Novice group descriptive statistics
+    - 'welch_expert_vs_novice': Welch t-test results with FDR q-values
+
+Outputs
+-------
+- tables/mvpa_finer_rsa_{target}.tex: LaTeX table for each RSA target
+- tables/mvpa_finer_rsa_{target}.csv: CSV version for each target
+
+Dependencies
+------------
+- common.report_utils: format_roi_stats_table, generate_latex_table
+- common.bids_utils: load_roi_metadata
+- common.logging_utils: Logging setup
+- common.io_utils: Results directory finder
+
+Usage
+-----
+python chess-supplementary/mvpa-finer/81_table_mvpa_finer_rsa.py
+
+Supplementary Analysis: MVPA RSA with finer-grained parcellation (180 ROIs)
 """
 
-import os
 import sys
 from pathlib import Path
 import pickle
-import pandas as pd
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Add repo root for 'common' module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
-from common.report_utils import generate_latex_table, format_roi_stats_table
 from common import CONFIG
 
+# ============================================================================
+# Configuration & Setup
+# ============================================================================
 
-RESULTS_BASE = Path(__file__).parent / 'results'
-RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern='*_mvpa_finer_group_rsa',
-    create_subdirs=['tables'],
-    require_exists=True,
-    verbose=True,
-)
-
-extra = {"RESULTS_DIR": str(RESULTS_DIR)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
+# Locate the latest MVPA finer RSA group results directory
+# This script reads from the most recent timestamped results folder
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='mvpa_finer_group_rsa',
+    output_subdirs=['tables'],
     log_name='tables_mvpa_finer_rsa.log',
 )
+RESULTS_DIR = results_dir
+tables_dir = dirs['tables']
 
-tables_dir = RESULTS_DIR / 'tables'
+# ============================================================================
+# Load MVPA Group Statistics
+# ============================================================================
 
+logger.info("Loading MVPA finer group statistics from pickle file...")
+
+# Load the mvpa_group_stats.pkl file generated by 02_mvpa_finer_group_rsa.py
+# This file contains RSA correlation results organized by target (180 ROIs)
 with open(RESULTS_DIR / 'mvpa_group_stats.pkl', 'rb') as f:
     index = pickle.load(f)
 
+# Load ROI metadata (names, hemisphere, anatomical grouping)
+# Note: This uses the full 180-region Glasser parcellation (ROI_GLASSER_22 is a typo in original)
 roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
-targets = sorted(index.get('rsa_corr', {}).keys())
 
+# Extract list of RSA targets (e.g., 'check', 'strategy', 'visual')
+targets = sorted(index.get('rsa_corr', {}).keys())
+logger.info(f"Found {len(targets)} RSA targets: {targets}")
+
+# ============================================================================
+# Generate Tables for Each RSA Target
+# ============================================================================
+
+# Create one table per RSA target showing ROI-level results
 for tgt in targets:
+    logger.info(f"Generating table for RSA target: {tgt}")
+
+    # Extract statistical blocks for this target
+    # Contains expert/novice descriptives and Welch t-test results
     blocks = index['rsa_corr'][tgt]
-    df = format_roi_stats_table(
-        blocks['welch_expert_vs_novice'],
-        blocks['experts_desc'],
-        blocks['novices_desc'],
-        roi_info,
-    )
-    multicolumn = {
-        'Experts': ['Expert_mean', 'Expert_CI'],
-        'Novices': ['Novice_mean', 'Novice_CI'],
-        'Experts−Novices': ['Delta_mean', 'Delta_CI'],
-    }
-    tex = generate_latex_table(
-        df=df,
-        output_path=tables_dir / f'mvpa_finer_rsa_{tgt}.tex',
-        caption=f'MVPA finer RSA (ROI-level) — target: {tgt}.',
+
+    from common.table_utils import generate_roi_table_from_blocks
+    tex, csv = generate_roi_table_from_blocks(
+        blocks=blocks,
+        roi_info=roi_info,
+        output_dir=tables_dir,
+        table_name=f'mvpa_finer_rsa_{tgt}',
+        caption=(
+            f'MVPA finer RSA (ROI-level) — target: {tgt}. '
+            'Table reports group means with 95% CIs, expert–novice differences '
+            "(Welch's t-based 95% CIs), and both raw and FDR-corrected p-values."
+        ),
         label=f'tab:mvpa_finer_rsa_{tgt}',
-        column_format='lcc|cc|cc|c',
-        multicolumn_headers=multicolumn,
-        escape=False,
+        column_format='lSc|Sc|Sc|cc',
+        csv_only=True,  # Only generate CSV (no manuscript .tex file)
         logger=logger,
     )
-    csv_path = tables_dir / f'mvpa_finer_rsa_{tgt}.csv'
-    df.to_csv(csv_path, index=False)
-    logger.info(f"Saved RSA finer table for {tgt}: {tex}")
+    logger.info(f"Saved RSA finer CSV for {tgt}: {csv}")
+
+# ============================================================================
+# Finish
+# ============================================================================
 
 log_script_end(logger)
-
