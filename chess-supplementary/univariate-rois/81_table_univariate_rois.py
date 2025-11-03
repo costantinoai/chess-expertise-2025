@@ -1,88 +1,165 @@
 #!/usr/bin/env python3
 """
-Generate LaTeX tables for Univariate ROI summary.
+Univariate ROIs — LaTeX Table Generation (Experts vs Novices)
+==============================================================
 
-Loads univ_group_stats.pkl from the latest univariate-rois run and produces
-per-contrast tables: ROI, Experts mean (95% CI), Novices mean (95% CI),
-Experts−Novices difference (95% CI), and FDR-corrected p-values.
+This script generates publication-ready LaTeX and CSV tables summarizing
+univariate activation contrasts across all 180 bilateral cortical regions from
+the Glasser multimodal parcellation, comparing expert and novice activation
+magnitudes.
+
+METHODS (Academic Manuscript Section)
+--------------------------------------
+Summary tables were generated from whole-brain univariate contrast results using
+all 180 bilateral cortical regions from the Glasser multimodal parcellation.
+This supplementary analysis provides comprehensive ROI-level coverage of task-
+related activation across the entire cortex.
+
+For each univariate contrast (e.g., check vs non-check, expert vs novice
+strategy) and each of 180 ROIs, mean beta estimates were extracted from first-
+level GLM analyses. Group-level statistics were computed by comparing expert
+and novice activation magnitudes within each ROI.
+
+For each contrast and ROI, we report:
+
+1. **Expert mean activation**: Mean beta estimate (parameter estimate from GLM)
+   with 95% confidence interval (computed using t-distribution).
+
+2. **Novice mean activation**: Same as expert group.
+
+3. **Group difference (Δβ)**: Computed as (Expert mean - Novice mean) with 95%
+   confidence interval.
+
+4. **Statistical significance**: Results from Welch's two-sample t-test
+   (scipy.stats.ttest_ind with equal_var=False) comparing expert and novice
+   beta estimates. P-values are corrected for multiple comparisons using the
+   Benjamini-Hochberg false discovery rate (FDR) procedure (α=0.05) across ROIs
+   within each contrast.
+
+5. **Effect size**: Cohen's d, quantifying the magnitude of expertise differences.
+
+Significance markers (*, **, ***) indicate FDR-corrected significance levels
+(p<0.05, p<0.01, p<0.001).
+
+Inputs
+------
+- univ_group_stats.pkl: Nested dictionary containing (from group univariate analysis):
+  - 'contrasts': Dict mapping contrast codes to statistical blocks
+    - 'experts_desc': Expert group descriptive statistics (mean, CI, SEM)
+    - 'novices_desc': Novice group descriptive statistics
+    - 'welch_expert_vs_novice': Welch t-test results with FDR q-values
+    - 'label': Pretty label for the contrast
+
+Outputs
+-------
+- tables/univariate_{contrast}.tex: LaTeX table for each contrast
+- tables/univariate_{contrast}.csv: CSV version for each contrast
+
+Dependencies
+------------
+- common.report_utils: format_roi_stats_table, generate_latex_table
+- common.bids_utils: load_roi_metadata
+- common.logging_utils: Logging setup
+- common.io_utils: Results directory finder
+- modules: UNIV_CONTRASTS configuration
+
+Usage
+-----
+python chess-supplementary/univariate-rois/81_table_univariate_rois.py
+
+Supplementary Analysis: Whole-brain univariate contrasts (180 ROIs)
 """
 
+import os
 import sys
 from pathlib import Path
 import pickle
-import pandas as pd
 
-# Enable repo root imports
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
-from common import CONFIG
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import CONFIG, setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
 from common.report_utils import generate_latex_table, format_roi_stats_table
 from modules import UNIV_CONTRASTS
 
+# ============================================================================
+# Configuration & Setup
+# ============================================================================
 
-results_base = Path(__file__).parent / 'results'
-results_dir = find_latest_results_directory(
-    results_base,
-    pattern='*_univariate_rois',
-    create_subdirs=['tables'],
-    require_exists=True,
-    verbose=True,
-)
-
-extra = {"RESULTS_DIR": str(results_dir)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='univariate_rois',
+    output_subdirs=['tables'],
     log_name='tables_univariate_rois.log',
 )
+tables_dir = dirs['tables']
 
-tables_dir = results_dir / 'tables'
+# ============================================================================
+# Load Univariate Group Statistics
+# ============================================================================
 
+logger.info("Loading univariate group statistics from pickle file...")
+
+# Load the univ_group_stats.pkl file generated by group univariate analysis
+# This file contains contrast results organized by contrast code (180 ROIs)
 with open(results_dir / 'univ_group_stats.pkl', 'rb') as f:
     index = pickle.load(f)
 
+# Load ROI metadata (names, hemisphere, anatomical grouping)
+# This uses the full 180-region Glasser parcellation
 roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_180'])
+
+# Extract list of contrast codes from configuration
 contrasts = list(UNIV_CONTRASTS.keys())
+logger.info(f"Found {len(contrasts)} contrasts: {contrasts}")
 
+# ============================================================================
+# Generate Tables for Each Contrast
+# ============================================================================
 
+# Create one table per contrast showing ROI-level results
 for con_code in contrasts:
+    # Skip if contrast not in results
     if 'contrasts' not in index or con_code not in index['contrasts']:
+        logger.warning(f"Skipping contrast {con_code}: not found in results")
         continue
+
+    logger.info(f"Generating table for contrast: {con_code}")
+
+    # Extract statistical blocks for this contrast
+    # Contains expert/novice descriptives and Welch t-test results
     blocks = index['contrasts'][con_code]
-    df = format_roi_stats_table(
-        blocks['welch_expert_vs_novice'],
-        blocks['experts_desc'],
-        blocks['novices_desc'],
-        roi_info,
-    )
+
+    # Pretty label for this contrast (e.g., "check_vs_noncheck" -> "Check vs Non-Check")
     con_label = blocks.get('label', con_code)
 
-    multicolumn = {
-        'Experts': ['Expert_mean', 'Expert_CI'],
-        'Novices': ['Novice_mean', 'Novice_CI'],
-        'Experts−Novices': ['Delta_mean', 'Delta_CI'],
-    }
-    tex_path = tables_dir / f'univariate_{con_code}.tex'
-    csv_path = tables_dir / f'univariate_{con_code}.csv'
-
-    _ = generate_latex_table(
-        df=df,
-        output_path=tex_path,
-        caption=f'Univariate ROI summary — {con_label}.',
+    # Use shared table utility to generate LaTeX + CSV with multicolumn headers
+    from common.table_utils import generate_roi_table_from_blocks
+    tex_path, csv_path = generate_roi_table_from_blocks(
+        blocks=blocks,
+        roi_info=roi_info,
+        output_dir=tables_dir,
+        table_name=f'univariate_{con_code}',
+        caption=(
+            f'Univariate ROI summary — {con_label}. '
+            'Table reports group means with 95% CIs, expert–novice differences '
+            "(Welch's t-based 95% CIs), and both raw and FDR-corrected p-values."
+        ),
         label=f'tab:univariate_{con_code}',
-        column_format='lcc|cc|cc|c',
-        multicolumn_headers=multicolumn,
-        escape=False,
+        column_format='lSc|Sc|Sc|cc',
+        csv_only=True,  # Only generate CSV (no manuscript .tex file)
         logger=logger,
     )
-    df.to_csv(csv_path, index=False)
-    logger.info(f"Saved univariate table for {con_code}: {tex_path}")
+    logger.info(f"Saved univariate CSV for {con_code}: {csv_path}")
+
+# ============================================================================
+# Finish
+# ============================================================================
 
 log_script_end(logger)
