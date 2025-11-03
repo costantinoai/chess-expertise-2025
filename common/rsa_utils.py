@@ -12,7 +12,7 @@ analyses, ensuring consistent methodology.
 
 import numpy as np
 import pandas as pd
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Dict
 from .stats_utils import correlate_vectors_bootstrap
 
 

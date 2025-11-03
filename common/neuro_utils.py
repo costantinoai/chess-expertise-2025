@@ -15,11 +15,8 @@ import numpy as np
 import nibabel as nib
 from nibabel.freesurfer import io as fsio
 from pathlib import Path
-from typing import List, Union, Tuple, Dict, Optional
+from typing import Union, Tuple, Dict, Optional
 from .bids_utils import load_roi_metadata
-from .spm_utils import _get_beta_filename, _get_spm_dir
-import scipy.io as sio
-import re
 import logging
 import pandas as pd
 from .constants import CONFIG
@@ -1090,7 +1087,7 @@ def project_volume_to_surfaces(
     """
     from nilearn import surface, datasets
 
-    fsavg = datasets.fetch_surf_fsaverage()
+    fsavg = datasets.fetch_surf_fsaverage('fsaverage7')
 
     textures = []
     for surf_name in surfaces:

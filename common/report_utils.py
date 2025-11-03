@@ -13,7 +13,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-from .formatters import format_pvalue_latex, format_ci
+from .formatters import format_ci, format_p_cell, shorten_roi_name
 import logging
 
 
@@ -227,7 +227,11 @@ def generate_latex_table(
     column_format: Optional[str] = None,
     multicolumn_headers: Optional[Dict[str, List[str]]] = None,
     escape: bool = False,
-    logger: Optional[logging.Logger] = None
+    logger: Optional[logging.Logger] = None,
+    manuscript_name: Optional[str] = None,
+    wrap_with_resizebox: bool = True,
+    use_booktabs: bool = True,
+    na_rep: str = "--",
 ) -> Path:
     """
     Generate a publication-ready LaTeX table from a DataFrame.
@@ -258,6 +262,9 @@ def generate_latex_table(
         Set to False if using LaTeX math mode (e.g., $\\it{r}$)
     logger : logging.Logger, optional
         Logger instance for logging progress
+    manuscript_name : str, optional
+        If provided, also copy the table to CONFIG['MANUSCRIPT_TABLES_DIR']
+        using this filename (e.g., 'roi_maps_rsa.tex')
 
     Returns
     -------
@@ -313,13 +320,35 @@ def generate_latex_table(
         column_format = "l" + "c" * (len(df.columns) - 1)
 
     # Generate basic LaTeX table
-    latex_table = df.to_latex(
-        index=False,
-        caption=caption,
-        label=label,
-        escape=escape,
-        column_format=column_format
-    )
+    try:
+        latex_table = df.to_latex(
+            index=False,
+            caption=caption,
+            label=label,
+            escape=escape,
+            column_format=column_format,
+            na_rep=na_rep,
+            multicolumn=True,
+            multicolumn_format='c',
+            bold_rows=False,
+            longtable=False,
+            # booktabs is accepted in recent pandas; guard with try
+            booktabs=use_booktabs,
+        )
+    except TypeError:
+        # Fallback if pandas version lacks some args
+        latex_table = df.to_latex(
+            index=False,
+            caption=caption,
+            label=label,
+            escape=escape,
+            column_format=column_format,
+            na_rep=na_rep,
+            multicolumn=True,
+            multicolumn_format='c',
+            bold_rows=False,
+            longtable=False,
+        )
 
     # Add multicolumn headers if provided
     if multicolumn_headers is not None:
@@ -327,12 +356,17 @@ def generate_latex_table(
             latex_table, df.columns.tolist(), multicolumn_headers
         )
 
-    # Save to file
-    with open(output_path, 'w') as f:
-        f.write(latex_table)
+    # Optionally wrap tabular in a resizebox for consistent page width
+    if wrap_with_resizebox:
+        latex_table = _wrap_tabular_with_resizebox(latex_table)
 
-    if logger:
-        logger.info(f"LaTeX table saved to: {output_path}")
+    # Save to file (and optionally to manuscript folder)
+    save_table_with_manuscript_copy(
+        latex_table,
+        output_path,
+        manuscript_name=manuscript_name,
+        logger=logger
+    )
 
     return output_path
 
@@ -374,7 +408,7 @@ def create_correlation_table(
             'strategy': 'Strategy'
         }
 
-    # Build rows using formatters
+    # Build rows using formatters (numeric columns remain numeric for siunitx)
     df_rows = []
     for exp_res, nov_res in zip(expert_results, novice_results):
         key = exp_res[0]
@@ -383,17 +417,17 @@ def create_correlation_table(
         nr, npv, ncl, nch = nov_res[1:]
         row = {
             'Model': label_pretty,
-            'r_Experts': f"{er:.3f}",
+            'r_Experts': float(er),
             '95%_CI_Experts': format_ci(ecl, ech, precision=3, latex=False),
-            'p_Experts': f"{ep:.3e}",
-            'r_Novices': f"{nr:.3f}",
+            'p_Experts': format_p_cell(ep),
+            'r_Novices': float(nr),
             '95%_CI_Novices': format_ci(ncl, nch, precision=3, latex=False),
-            'p_Novices': f"{npv:.3e}",
+            'p_Novices': format_p_cell(npv),
         }
         if isinstance(exp_p_fdr, dict) and key in exp_p_fdr:
-            row['pFDR_Experts'] = f"{exp_p_fdr[key]:.3e}"
+            row['pFDR_Experts'] = format_p_cell(exp_p_fdr[key])
         if isinstance(nov_p_fdr, dict) and key in nov_p_fdr:
-            row['pFDR_Novices'] = f"{nov_p_fdr[key]:.3e}"
+            row['pFDR_Novices'] = format_p_cell(nov_p_fdr[key])
         df_rows.append(row)
 
     return pd.DataFrame(df_rows)
@@ -424,7 +458,8 @@ def format_roi_stats_table(
     Combines Welch t-test results with per-group descriptives (mean, CI) and
     ROI metadata (pretty names) into a publication-ready DataFrame with
     columns: ROI, Expert_mean, Expert_CI, Novice_mean, Novice_CI, Delta_mean,
-    Delta_CI, pFDR.
+    Delta_CI, p_raw, pFDR. Both raw and FDR-corrected p-values are included
+    to satisfy the correlation reporting policy.
 
     Parameters
     ----------
@@ -468,36 +503,111 @@ def format_roi_stats_table(
         right_on='roi_id',
         how='left'
     )
-    df['ROI'] = df['pretty_name'].str.replace('\\n', ' ', regex=False)
+    df['ROI'] = df['pretty_name'].map(shorten_roi_name)
 
     # Helper to format (mean, ci_low, ci_high) triplets
     def _fmt_triplet(t):
         m, lo, hi = t
         if pd.isna(m) or pd.isna(lo) or pd.isna(hi):
-            return '--', '[--, --]'
-        m_adj = m - subtract_chance
-        lo_adj = lo - subtract_chance
-        hi_adj = hi - subtract_chance
-        return f"{m_adj:.3f}", f"[{lo_adj:.3f}, {hi_adj:.3f}]"
+            return float('nan'), '[--, --]'
+        m_adj = float(m - subtract_chance)
+        lo_adj = float(lo - subtract_chance)
+        hi_adj = float(hi - subtract_chance)
+        return m_adj, f"[{lo_adj:.3f}, {hi_adj:.3f}]"
 
     # Format expert and novice descriptives
     exp_vals, exp_cis = zip(*(_fmt_triplet(t) for t in exp_desc)) if exp_desc else ([], [])
     nov_vals, nov_cis = zip(*(_fmt_triplet(t) for t in nov_desc)) if nov_desc else ([], [])
 
-    # Build output DataFrame
+    # Build output DataFrame (include both raw and FDR-corrected p-values)
     df_out = pd.DataFrame({
         'ROI': df['ROI'],
         'Expert_mean': list(exp_vals),
         'Expert_CI': list(exp_cis),
         'Novice_mean': list(nov_vals),
         'Novice_CI': list(nov_cis),
-        'Delta_mean': df['mean_diff'].map(lambda v: '--' if pd.isna(v) else f"{v:.3f}"),
+        'Delta_mean': df['mean_diff'].astype(float),
         'Delta_CI': pd.Series(zip(df['ci95_low'], df['ci95_high'])).map(
-            lambda x: '[--, --]' if any(pd.isna(list(x))) else f"[{x[0]:.3f}, {x[1]:.3f}]"
+            lambda x: '[--, --]' if any(pd.isna(list(x))) else f"[{float(x[0]):.3f}, {float(x[1]):.3f}]"
         ),
-        'pFDR': df['p_val_fdr'].map(lambda p: '--' if pd.isna(p) else f"{p:.3e}"),
+        'p_raw': df['p_val'].map(lambda p: format_p_cell(p) if pd.notna(p) else '--'),
+        'pFDR': df['p_val_fdr'].map(lambda p: format_p_cell(p) if pd.notna(p) else '--'),
     })
     return df_out
+
+
+def save_table_with_manuscript_copy(
+    latex_table: str,
+    output_path: Path,
+    manuscript_name: Optional[str] = None,
+    logger: Optional[logging.Logger] = None
+) -> Path:
+    """
+    Save a LaTeX table to results directory and optionally copy to manuscript folder.
+
+    This function saves the LaTeX table to the specified output path and, if
+    MANUSCRIPT_TABLES_DIR is configured and exists, also copies it to the
+    manuscript tables folder for automatic inclusion in the LaTeX manuscript.
+
+    Parameters
+    ----------
+    latex_table : str
+        The complete LaTeX table code to save
+    output_path : Path
+        Primary save location (in results/tables/)
+    manuscript_name : str, optional
+        Name for the manuscript copy (e.g., 'rsa_main_dims.tex').
+        If None, no manuscript copy is created.
+    logger : logging.Logger, optional
+        Logger instance for logging progress
+
+    Returns
+    -------
+    Path
+        Path to the primary saved table file
+
+    Notes
+    -----
+    - Always saves to output_path (results directory)
+    - If manuscript_name is provided and MANUSCRIPT_TABLES_DIR exists, also
+      copies to manuscript folder
+    - If MANUSCRIPT_TABLES_DIR is configured but doesn't exist, logs a warning
+      and skips manuscript copy
+
+    Example
+    -------
+    >>> from common import CONFIG
+    >>> latex_code = r"\\begin{table}...\\end{table}"
+    >>> save_table_with_manuscript_copy(
+    ...     latex_code,
+    ...     Path("results/tables/mvpa_rsa_summary.tex"),
+    ...     manuscript_name="rsa_main_dims.tex",
+    ...     logger=logger
+    ... )
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Save to primary location (results directory)
+    with open(output_path, 'w') as f:
+        f.write(latex_table)
+
+    if logger:
+        logger.info(f"LaTeX table saved to: {output_path}")
+
+    # Copy to manuscript tables directory (configured consolidated location)
+    from . import CONFIG
+    manuscript_dir = CONFIG.get('MANUSCRIPT_TABLES_DIR')
+    if (manuscript_dir is not None) and (manuscript_name is not None):
+        manuscript_dir = Path(manuscript_dir)
+        manuscript_dir.mkdir(parents=True, exist_ok=True)
+        manuscript_path = manuscript_dir / manuscript_name
+        with open(manuscript_path, 'w') as f:
+            f.write(latex_table)
+        if logger:
+            logger.info(f"Table copied to manuscript: {manuscript_path}")
+
+    return output_path
 
 
 __all__ = [
@@ -508,6 +618,7 @@ __all__ = [
     'save_latex_table',
     'save_results_metadata',
     'format_roi_stats_table',
+    'save_table_with_manuscript_copy',
 ]
 
 
@@ -647,6 +758,19 @@ def _add_multicolumn_headers(
     new_header_row = " & ".join(new_header_parts) + " \\\\"
     lines[header_idx + 2] = new_header_row
 
+    return '\n'.join(lines)
+
+
+def _wrap_tabular_with_resizebox(latex_table: str) -> str:
+    """Wrap the tabular environment with a resizebox to match page width."""
+    lines = latex_table.split('\n')
+    # Find begin/end tabular
+    begin_idx = next((i for i, ln in enumerate(lines) if ln.strip().startswith('\\begin{tabular}')), None)
+    end_idx = next((i for i, ln in enumerate(lines) if ln.strip().startswith('\\end{tabular}')), None)
+    if begin_idx is None or end_idx is None:
+        return latex_table
+    lines.insert(begin_idx, r"\resizebox{\linewidth}{!}{%")
+    lines.insert(end_idx + 2, r"}")
     return '\n'.join(lines)
 
 

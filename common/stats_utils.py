@@ -7,7 +7,7 @@ including Welch t-tests, FDR correction, effect sizes, and confidence intervals.
 
 import numpy as np
 import pandas as pd
-from typing import Tuple, Optional
+from typing import Tuple
 from scipy.stats import ttest_ind, ttest_1samp
 from statsmodels.stats.multitest import multipletests
 from pingouin import compute_effsize
@@ -203,6 +203,106 @@ def compute_mean_ci_and_ttest_vs_value(
             raise ValueError(f"Invalid alternative: {alternative}")
 
     return (mean, float(ci_low), float(ci_high), t_stat, float(p_val))
+
+
+def binomial_test_accuracy(
+    successes: int,
+    n_trials: int,
+    p_null: float = 0.5,
+    alternative: str = 'two-sided',
+    confidence_level: float = 0.95,
+    ci_method: str = 'wilson',
+):
+    """
+    Exact binomial test for accuracy vs a null proportion, with CI.
+
+    Parameters
+    ----------
+    successes : int
+        Number of correct predictions (successes)
+    n_trials : int
+        Total number of predictions (trials)
+    p_null : float, default=0.5
+        Null hypothesis success probability (chance level)
+    alternative : {'two-sided','greater','less'}, default='two-sided'
+        Alternative hypothesis direction
+    confidence_level : float, default=0.95
+        Confidence level for binomial proportion CI
+    ci_method : {'wilson','exact','jeffreys'}, default='wilson'
+        Method for proportion CI (Wilson recommended for accuracy proportions)
+
+    Returns
+    -------
+    (accuracy, ci_low, ci_high, p_value)
+
+    Notes
+    -----
+    - Uses scipy.stats.binomtest for the exact test and CI computation.
+    - Wilson CI is recommended for binomial proportions due to good coverage.
+    """
+    import numpy as np
+    from scipy.stats import binomtest
+
+    if n_trials <= 0:
+        return (np.nan, np.nan, np.nan, np.nan)
+    if successes < 0 or successes > n_trials:
+        raise ValueError("successes must be in [0, n_trials]")
+
+    res = binomtest(k=successes, n=n_trials, p=p_null, alternative=alternative)
+    ci = res.proportion_ci(confidence_level=confidence_level, method=ci_method)
+    accuracy = successes / n_trials
+    return (float(accuracy), float(ci.low), float(ci.high), float(res.pvalue))
+
+
+def binomial_test_from_predictions(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    p_null: float = 0.5,
+    alternative: str = 'two-sided',
+    confidence_level: float = 0.95,
+    ci_method: str = 'wilson',
+):
+    """
+    Perform an exact binomial test on pooled out-of-sample predictions.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Ground-truth binary labels (0/1 or False/True)
+    y_pred : array-like
+        Predicted binary labels (0/1 or False/True)
+    p_null : float, default=0.5
+        Null hypothesis success probability
+    alternative : {'two-sided','greater','less'}, default='two-sided'
+        Alternative hypothesis direction
+    confidence_level : float, default=0.95
+        Confidence level for binomial proportion CI
+    ci_method : {'wilson','exact','jeffreys'}, default='wilson'
+        Method for proportion CI
+
+    Returns
+    -------
+    (accuracy, ci_low, ci_high, p_value, successes, n_trials)
+
+    Notes
+    -----
+    - Treats each pooled out-of-fold prediction as a Bernoulli trial.
+    - For cross-validated decoding, this complements fold-wise t-tests.
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    if y_true.shape != y_pred.shape:
+        raise ValueError("y_true and y_pred must have the same shape")
+    mask = np.isfinite(y_true) & np.isfinite(y_pred)
+    y_true = y_true[mask]
+    y_pred = y_pred[mask]
+    successes = int(np.sum(y_true == y_pred))
+    n_trials = int(y_true.size)
+    acc, lo, hi, p = binomial_test_accuracy(
+        successes, n_trials, p_null=p_null, alternative=alternative,
+        confidence_level=confidence_level, ci_method=ci_method
+    )
+    return (acc, lo, hi, p, successes, n_trials)
 
 
 def apply_fdr_correction(
@@ -546,12 +646,17 @@ def variance_partitioning_rdms(
 __all__ = [
     'welch_ttest',
     'compute_group_mean_and_ci',
+    'compute_mean_ci_and_ttest_vs_value',
+    'binomial_test_accuracy',
+    'binomial_test_from_predictions',
     'apply_fdr_correction',
     'compute_cohens_d',
-    'format_pvalue',
     'correlate_vectors_bootstrap',
     'partial_correlation_rdms',
     'variance_partitioning_rdms',
+    'ci_to_errorbar_format',
+    'per_roi_welch_and_fdr',
+    'per_roi_one_sample_vs_value',
 ]
 
 
