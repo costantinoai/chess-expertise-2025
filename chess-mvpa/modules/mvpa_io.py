@@ -14,7 +14,6 @@ from typing import Dict, Iterable, List, Tuple
 import pandas as pd
 import re
 import numpy as np
-import logging
 
 from common.io_utils import sanitize_matlab_varnames, find_subject_tsvs
 from common.bids_utils import to_sub_id

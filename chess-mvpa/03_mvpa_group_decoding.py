@@ -84,7 +84,7 @@ Statistical Assumptions and Limitations
 
 Outputs
 -------
-All results are saved to results/<timestamp>_mvpa_group_decoding/:
+All results are saved to results/mvpa_group/:
 - <target>_experts_vs_chance.csv: Expert vs chance statistics per ROI
 - <target>_novices_vs_chance.csv: Novice vs chance statistics per ROI
 - <target>_experts_vs_novices.csv: Group comparison statistics per ROI
@@ -97,14 +97,12 @@ import sys
 from pathlib import Path
 import pickle
 import numpy as np
-import pandas as pd
 
 # Add parent (repo root) to sys.path for 'common'
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
-from common import CONFIG
-from common.logging_utils import setup_analysis, log_script_end
+from common import CONFIG, setup_or_reuse_analysis_dir, log_script_end
 from common.bids_utils import (
     get_participants_with_expertise,
     load_roi_metadata,
@@ -113,11 +111,9 @@ from common.bids_utils import (
 )
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
-from common.io_utils import resolve_latest_dir
 
 from modules.mvpa_io import (
     find_subject_tsvs,
-    load_subject_tsv,
     build_group_dataframe,
 )
 from modules.mvpa_group import (
@@ -138,10 +134,8 @@ from modules.mvpa_group import (
 # Main workflow
 # -----------------------------------------------------------------------------
 
-config, out_dir, logger = setup_analysis(
-    analysis_name="mvpa_group_decoding",
-    results_base=script_dir / "results",
-    script_file=__file__,
+results_dir, logger, _ = setup_or_reuse_analysis_dir(
+    __file__, analysis_name="mvpa_group"
 )
 
 # Locate the subject-level MVPA decoding results directory. Subject-level SVM decoding was
@@ -227,13 +221,22 @@ for tgt in targets:
 # Save results as human-readable CSVs (one per target per test type) for inspection
 # and as pickle files for downstream plotting scripts.
 for tgt, blocks in method_results.items():
-    write_group_stats_outputs(out_dir, "svm", tgt, blocks)
+    write_group_stats_outputs(results_dir, "svm", tgt, blocks)
 
-artifact_index["svm"] = method_results
-
-with open(out_dir / "mvpa_group_stats.pkl", "wb") as f:
-    pickle.dump(artifact_index, f)
+# Merge with existing artifact index if present (single unified folder)
+artifact_index_path = results_dir / "mvpa_group_stats.pkl"
+if artifact_index_path.exists():
+    try:
+        with open(artifact_index_path, "rb") as f:
+            prev = pickle.load(f)
+    except Exception:
+        prev = {}
+else:
+    prev = {}
+prev["svm"] = method_results
+with open(artifact_index_path, "wb") as f:
+    pickle.dump(prev, f)
 
 logger.info("Saved group statistics artifacts (decoding)")
 log_script_end(logger)
-logger.info(f"All outputs saved to: {out_dir}")
+logger.info(f"All outputs saved to: {results_dir}")

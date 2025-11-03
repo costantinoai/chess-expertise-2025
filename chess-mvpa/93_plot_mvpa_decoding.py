@@ -25,10 +25,9 @@ Panel: MVPA Decoding + RSA + RDM Multi-Panel Figure
 
 Inputs
 ------
-- *_mvpa_group_decoding/mvpa_group_stats.pkl: SVM decoding statistics
-  - ['svm'][target_name]['welch_expert_vs_novice']: Decoding accuracy per ROI
-- *_mvpa_group_rsa/mvpa_group_stats.pkl: RSA correlation statistics
-  - ['rsa_corr'][target_name]['welch_expert_vs_novice']: RSA correlations per ROI
+- *_mvpa_group/mvpa_group_stats.pkl: Unified MVPA statistics
+  - SVM decoding: ['svm'][target_name]['welch_expert_vs_novice']
+  - RSA correlations: ['rsa_corr'][target_name]['welch_expert_vs_novice']
 - Each contains: ROI_Label, mean_diff, p_val_fdr, group means and CIs
 - ROI metadata from CONFIG['ROI_GLASSER_22']
 - Stimulus metadata from CONFIG['STIMULI_FILE'] for model RDM construction
@@ -46,14 +45,19 @@ Usage
 python chess-mvpa/93_plot_mvpa_decoding.py
 """
 
-import sys
 import os
+import sys
 import pickle
 from pathlib import Path
-
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -65,7 +69,7 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 
 import numpy as np
 import matplotlib.pyplot as plt
-from common.logging_utils import setup_analysis_in_dir, log_script_end
+from common import setup_script, log_script_end
 from common.io_utils import find_latest_results_directory
 from common.bids_utils import load_roi_metadata, load_stimulus_metadata
 from common.rsa_utils import create_model_rdm
@@ -73,9 +77,10 @@ from common.plotting import (
     apply_nature_rc,
     plot_grouped_bars_on_ax,
     plot_rdm_on_ax,
-    compute_ylim_range,
     compute_stimulus_palette,
     PLOT_PARAMS,
+    PLOT_YLIMITS,
+    cm_to_inches,
     save_axes_svgs,
     save_panel_pdf,
 )
@@ -115,57 +120,30 @@ RSA_TITLES = {
 
 # Find latest MVPA group decoding results directory
 # Creates 'figures' subdirectory if needed for saving outputs
-DECODING_RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern="*_mvpa_group_decoding",  # Match MVPA group decoding analysis results
-    specific_name=RESULTS_DIR_NAME,
-    create_subdirs=["figures"],
-    require_exists=True,
-    verbose=True,
+dec_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='mvpa_group',
+    output_subdirs=['figures'],
+    log_name='pylustrator_mvpa_decoding.log',
 )
+DECODING_RESULTS_DIR = dec_dir
 
-# Find latest MVPA group RSA results directory (for RSA correlation data)
-RSA_RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern="*_mvpa_group_rsa",  # Match MVPA group RSA analysis results
-    specific_name=None,  # Use latest
-    create_subdirs=[],
-    require_exists=True,
-    verbose=True,
-)
-
-# Save outputs to decoding directory
+# Save outputs to the unified MVPA group directory
 RESULTS_DIR = DECODING_RESULTS_DIR
-FIGURES_DIR = RESULTS_DIR / "figures"
+FIGURES_DIR = dirs['figures']
 
 
 # =============================================================================
 # Setup logging
 # =============================================================================
 
-extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name="pylustrator_mvpa_decoding.log",
-)
 
-# Load group-level MVPA statistics from both directories
-# Decoding: group_stats['svm'][target_name]['welch_expert_vs_novice']
-# RSA: group_stats['rsa_corr'][target_name]['welch_expert_vs_novice']
-# Each contains: ROI_Label, mean_diff, p_val_fdr, group means and CIs
-logger.info("Loading MVPA decoding group statistics...")
-with open(DECODING_RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
-    decoding_stats = pickle.load(f)
-
-logger.info("Loading MVPA RSA group statistics...")
-with open(RSA_RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
-    rsa_stats = pickle.load(f)
-
-# Merge both into single dict
-group_stats = {**decoding_stats, **rsa_stats}
+# Load group-level MVPA statistics from unified directory
+# group_stats['svm'][target_name]['welch_expert_vs_novice'] (decoding)
+# group_stats['rsa_corr'][target_name]['welch_expert_vs_novice'] (RSA)
+logger.info("Loading MVPA RSA + SVM group statistics from unified directory...")
+with open(RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
+    group_stats = pickle.load(f)
 
 # Load ROI metadata for Glasser 22-region parcellation
 # Contains: roi_id, pretty_name, color, group/family information
@@ -249,7 +227,7 @@ for idx, tgt in enumerate(MAIN_TARGETS):
         group1_label='Experts',               # Legend label
         group2_label='Novices',               # Legend label
         comparison_pvals=data['pvals'],       # FDR p-values for significance stars
-        ylim=(-0.06, 0.25),                       # Y-axis limits (0 to 25% above chance)
+        ylim=PLOT_YLIMITS['decoding'],        # Centralized decoding limits (was -0.06, 0.25)
         y_label='Accuracy - chance',          # Y-axis label
         subtitle=SVM_TITLES[tgt],                # Panel title
         xtick_labels=roi_names,               # ROI names on x-axis
@@ -284,7 +262,7 @@ all_vals = []
 for d in rsa_data.values():
     all_vals.extend(d['exp_means'])  # Expert mean correlations
     all_vals.extend(d['nov_means'])  # Novice mean correlations
-ylim_rsa = (-0.06, 0.25)
+# Note: Using centralized PLOT_YLIMITS['rsa_neural'] instead of local ylim_rsa
 
 # Create one RSA panel for each target (Visual Similarity, Strategy, Checkmate)
 for idx, tgt in enumerate(MAIN_TARGETS):
@@ -319,7 +297,7 @@ for idx, tgt in enumerate(MAIN_TARGETS):
         group1_label='Experts',               # Legend label
         group2_label='Novices',               # Legend label
         comparison_pvals=data['pvals'],       # FDR p-values for significance stars
-        ylim=ylim_rsa,                        # Shared y-axis limits
+        ylim=PLOT_YLIMITS['rsa_neural'],      # Centralized RSA neural limits (was ylim_rsa)
         y_label=PLOT_PARAMS['ylabel_correlation_r'],  # Y-axis label (Spearman r)
         subtitle=RSA_TITLES[tgt],                # Panel title
         xtick_labels=roi_names,               # ROI names on x-axis
@@ -383,9 +361,8 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(21.260000/2.54, 16.080000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(21.26), cm_to_inches(16.08), forward=True)
 plt.figure(1).ax_dict["RDM_1_visual_similarity"].set(position=[0.4499, 0.7901, 0.0929, 0.1228])
 plt.figure(1).ax_dict["RDM_1_visual_similarity"].text(0.4306, 1.3739, 'b', transform=plt.figure(1).ax_dict["RDM_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["RDM_1_visual_similarity"].texts[0].new
 plt.figure(1).ax_dict["RDM_2_strategy"].set(position=[0.3778, 0.5618, 0.07887, 0.09863])
@@ -411,7 +388,8 @@ plt.figure(1).ax_dict["SVM_3_checkmate"].set_position([0.052843, 0.141295, 0.360
 #% end: automatic generated code from pylustrator
 
 # Display figures in pylustrator GUI for interactive layout adjustment
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================

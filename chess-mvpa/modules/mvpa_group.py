@@ -24,14 +24,6 @@ from common.stats_utils import (
 from common.group_stats import get_descriptives_per_roi
 
 
-def _compute_descriptives_per_roi(
-    data: np.ndarray,
-    confidence_level: float = 0.95,
-) -> List[Tuple[float, float, float]]:
-    """Compat shim: delegates to common.group_stats.get_descriptives_per_roi."""
-    return get_descriptives_per_roi(data, confidence_level=confidence_level)
-
-
 def compute_per_roi_group_comparison(
     expert_data: np.ndarray,
     novice_data: np.ndarray,
@@ -75,8 +67,8 @@ def compute_per_roi_group_comparison(
     welch_results.insert(0, "ROI_Name", roi_names)
 
     # Compute descriptive statistics for both groups
-    expert_desc = _compute_descriptives_per_roi(expert_data, confidence_level)
-    novice_desc = _compute_descriptives_per_roi(novice_data, confidence_level)
+    expert_desc = get_descriptives_per_roi(expert_data, confidence_level=confidence_level)
+    novice_desc = get_descriptives_per_roi(novice_data, confidence_level=confidence_level)
 
     return {
         'test_results': welch_results,
@@ -144,8 +136,8 @@ def compute_per_roi_vs_chance_tests(
     )
 
     # Compute descriptive statistics for both groups
-    expert_desc = _compute_descriptives_per_roi(expert_data, confidence_level)
-    novice_desc = _compute_descriptives_per_roi(novice_data, confidence_level)
+    expert_desc = get_descriptives_per_roi(expert_data, confidence_level=confidence_level)
+    novice_desc = get_descriptives_per_roi(novice_data, confidence_level=confidence_level)
 
     return (
         {'test_results': experts_vs_chance, 'desc': expert_desc},

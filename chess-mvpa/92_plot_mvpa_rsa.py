@@ -41,14 +41,19 @@ Usage
 python chess-mvpa/92_plot_mvpa_rsa.py
 """
 
-import sys
 import os
+import sys
 import pickle
 from pathlib import Path
-
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -60,14 +65,15 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 
 import numpy as np
 import matplotlib.pyplot as plt
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
 from common.plotting import (
     apply_nature_rc,
     plot_grouped_bars_on_ax,
     compute_ylim_range,
     PLOT_PARAMS,
+    PLOT_YLIMITS,
+    cm_to_inches,
     save_axes_svgs,
     save_panel_pdf,
     embed_figure_on_ax,
@@ -111,32 +117,20 @@ RSA_TITLES = {
 # Load MVPA RSA results
 # =============================================================================
 
-# Find latest MVPA group RSA results directory
-# Creates 'figures' subdirectory if needed for saving outputs
-RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern="*_mvpa_group_rsa",  # Match MVPA group RSA analysis results
-    specific_name=RESULTS_DIR_NAME,
-    create_subdirs=["figures"],
-    require_exists=True,
-    verbose=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='mvpa_group',
+    output_subdirs=['figures'],
+    log_name='pylustrator_mvpa_rsa.log',
 )
-
-FIGURES_DIR = RESULTS_DIR / "figures"
+RESULTS_DIR = results_dir
+FIGURES_DIR = dirs['figures']
 
 
 # =============================================================================
 # Setup logging
 # =============================================================================
 
-extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name="pylustrator_mvpa_rsa.log",
-)
 
 # Load group-level MVPA statistics
 # Dict structure: group_stats['rsa_corr'][target_name]['welch_expert_vs_novice']
@@ -209,7 +203,7 @@ for idx, tgt in enumerate(MAIN_TARGETS):
         group1_label='Experts',               # Legend label
         group2_label='Novices',               # Legend label
         comparison_pvals=data['pvals'],       # FDR p-values for significance stars
-        ylim=(-.06, .25),                        # Shared y-axis limits
+        ylim=PLOT_YLIMITS['rsa_neural'],      # Centralized RSA neural limits (was -.06, .25)
         y_label=PLOT_PARAMS['ylabel_correlation_r'],  # Y-axis label (Spearman r)
         subtitle=RSA_TITLES[tgt],                # Panel title
         xtick_labels=roi_names,               # ROI names on x-axis
@@ -339,9 +333,8 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(11.430000/2.54, 16.000000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(11.43), cm_to_inches(16.00), forward=True)
 plt.figure(1).ax_dict["RSA_1_visual_similarity"].set(position=[0.07572, 0.7997, 0.4217, 0.1421])
 plt.figure(1).ax_dict["RSA_1_visual_similarity"].set_position([0.119538, 0.790607, 0.665730, 0.148551])
 plt.figure(1).ax_dict["RSA_2_strategy"].set(position=[0.07572, 0.5055, 0.4217, 0.1421])
@@ -363,7 +356,8 @@ plt.figure(1).texts[0].set_position([0.365780, 0.982855])
 #% end: automatic generated code from pylustrator
 
 # Display figures in pylustrator GUI for interactive layout adjustment
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 
 # =============================================================================

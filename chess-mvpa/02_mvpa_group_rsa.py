@@ -86,7 +86,7 @@ Statistical Assumptions and Limitations
 
 Outputs
 -------
-All results are saved to results/<timestamp>_mvpa_group_rsa/:
+All results are saved to results/mvpa_group/:
 - <target>_experts_vs_chance.csv: Expert vs zero statistics per ROI
 - <target>_novices_vs_chance.csv: Novice vs zero statistics per ROI
 - <target>_experts_vs_novices.csv: Group comparison statistics per ROI
@@ -103,15 +103,13 @@ import pickle
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
-from common import CONFIG
-from common.logging_utils import setup_analysis, log_script_end
+from common import CONFIG, setup_or_reuse_analysis_dir, log_script_end
 from common.bids_utils import (
     get_participants_with_expertise,
     load_roi_metadata,
 )
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
-from common.io_utils import resolve_latest_dir
 
 from modules.mvpa_io import (
     find_subject_tsvs,
@@ -135,10 +133,8 @@ from modules.mvpa_group import (
 # Main workflow
 # -----------------------------------------------------------------------------
 
-config, out_dir, logger = setup_analysis(
-    analysis_name="mvpa_group_rsa",
-    results_base=script_dir / "results",
-    script_file=__file__,
+results_dir, logger, _ = setup_or_reuse_analysis_dir(
+    __file__, analysis_name="mvpa_group"
 )
 
 # Locate subject-level RSA correlation results. At the subject level, neural RDMs
@@ -220,13 +216,22 @@ for tgt in targets:
 
 # Save results as human-readable CSVs and pickle files for plotting
 for tgt, blocks in method_results.items():
-    write_group_stats_outputs(out_dir, "rsa_corr", tgt, blocks)
+    write_group_stats_outputs(results_dir, "rsa_corr", tgt, blocks)
 
-artifact_index["rsa_corr"] = method_results
-
-with open(out_dir / "mvpa_group_stats.pkl", "wb") as f:
-    pickle.dump(artifact_index, f)
+# Merge with existing artifact index if present (single unified folder)
+artifact_index_path = results_dir / "mvpa_group_stats.pkl"
+if artifact_index_path.exists():
+    try:
+        with open(artifact_index_path, "rb") as f:
+            prev = pickle.load(f)
+    except Exception:
+        prev = {}
+else:
+    prev = {}
+prev["rsa_corr"] = method_results
+with open(artifact_index_path, "wb") as f:
+    pickle.dump(prev, f)
 
 logger.info("Saved group statistics artifacts (RSA)")
 log_script_end(logger)
-logger.info(f"All outputs saved to: {out_dir}")
+logger.info(f"All outputs saved to: {results_dir}")
