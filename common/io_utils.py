@@ -4,8 +4,8 @@ Input/output utilities for loading and saving analysis results.
 This module provides centralized functions for finding and managing results
 directories, copying scripts, and handling file I/O across all analyses.
 
-Functions are designed to work with the standardized timestamped results
-directory structure: results/<YYYYMMDD-HHMMSS>_<analysis_name>/
+Functions work with a stable results directory structure without timestamps:
+results/<analysis_name>/
 """
 
 from pathlib import Path
@@ -27,7 +27,7 @@ def find_latest_results_directory(
     Find or validate a results directory and optionally create subdirectories.
 
     This function handles all common results directory use cases:
-    1. Find the most recent timestamped directory matching a pattern
+    1. Find a directory matching a pattern (when using exact names)
     2. Validate a specific named directory exists
     3. Create standard subdirectories (e.g., 'figures', 'tables')
 
@@ -63,8 +63,9 @@ def find_latest_results_directory(
 
     Notes
     -----
-    - Directories should be named with timestamp prefix: YYYYMMDD-HHMMSS_name
-    - Sorting is alphanumeric, so timestamp format ensures correct ordering
+    - Directories are stable (no timestamps). Use exact names for 'pattern',
+      e.g., 'behavioral_rsa', 'mvpa_group'. Sorting is retained for backward
+      compatibility if multiple matches exist.
     - Subdirectories are created with parents=True, exist_ok=True
     - This replaces the old pattern of manually checking, creating subdirs, etc.
 
@@ -466,7 +467,7 @@ def find_subject_tsvs(method_dir: Path) -> List[Path]:
         method_dir/sub-XX/*.tsv
     Returns one TSV per subject (first in lexical order when multiple found).
     """
-    logger = logging.getLogger(__name__)
+    logging.getLogger(__name__)
     tsvs: List[Path] = []
     method_dir = Path(method_dir)
     for sub_dir in sorted(method_dir.glob("sub-*")):

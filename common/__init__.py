@@ -75,6 +75,7 @@ from .plotting import (
 
 # Logging and setup
 from .logging_utils import setup_analysis, setup_analysis_in_dir, log_script_end
+from .script_utils import setup_script, setup_or_reuse_analysis_dir
 
 # IO utilities
 from .io_utils import find_latest_results_directory
@@ -86,6 +87,11 @@ from .report_utils import (
     generate_latex_table,
     create_correlation_table,
     save_results_metadata,
+)
+from .table_utils import (
+    load_results_pickle,
+    generate_expert_novice_table,
+    generate_roi_table_from_blocks,
 )
 
 # BIDS utilities
@@ -156,6 +162,8 @@ __all__ = [
     'setup_analysis',
     'setup_analysis_in_dir',
     'log_script_end',
+    'setup_script',
+    'setup_or_reuse_analysis_dir',
     # IO utilities
     'find_latest_results_directory',
     # Reporting
@@ -164,6 +172,9 @@ __all__ = [
     'generate_latex_table',
     'create_correlation_table',
     'save_results_metadata',
+    'load_results_pickle',
+    'generate_expert_novice_table',
+    'generate_roi_table_from_blocks',
     # BIDS utilities
     'get_subject_list',
     'load_participants_tsv',

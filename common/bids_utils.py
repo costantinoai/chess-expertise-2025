@@ -12,7 +12,7 @@ Dependencies
 
 import pandas as pd
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import Dict
 import warnings
 
 from .constants import CONFIG

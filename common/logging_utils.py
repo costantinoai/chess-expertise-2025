@@ -17,12 +17,38 @@ Or use the all-in-one setup:
 
 import logging
 import sys
-import shutil
+import os
 import warnings
 import numpy as np
 from pathlib import Path
 from datetime import datetime
 from .io_utils import copy_script_to_results
+
+
+def _get_log_level_from_env():
+    """
+    Get logging level from CHESS_LOG_LEVEL environment variable.
+
+    Returns
+    -------
+    int
+        logging.DEBUG, logging.INFO, logging.WARNING, or logging.ERROR
+        Defaults to logging.INFO if not set or invalid
+
+    Examples
+    --------
+    export CHESS_LOG_LEVEL=DEBUG    # Verbose config dumps
+    export CHESS_LOG_LEVEL=INFO     # Normal operation (default)
+    export CHESS_LOG_LEVEL=WARNING  # Quiet mode
+    """
+    level_str = os.environ.get('CHESS_LOG_LEVEL', 'INFO').upper()
+    level_map = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+    }
+    return level_map.get(level_str, logging.INFO)
 
 
 def log_dataset_summary(logger: logging.Logger) -> None:
@@ -49,7 +75,7 @@ def log_dataset_summary(logger: logging.Logger) -> None:
         logger.warning(f"Could not compute participant summary: {e}")
 
 
-def setup_logging(log_file=None, level=logging.INFO, console=True):
+def setup_logging(log_file=None, level=None, console=True):
     """
     Set up logging with consistent formatting for file and console output.
 
@@ -57,8 +83,9 @@ def setup_logging(log_file=None, level=logging.INFO, console=True):
     ----------
     log_file : str or Path, optional
         Path to log file. If None, only console logging is used.
-    level : int, default=logging.INFO
+    level : int, optional
         Logging level (e.g., logging.DEBUG, logging.INFO, logging.WARNING)
+        If None, reads from CHESS_LOG_LEVEL environment variable (default: INFO)
     console : bool, default=True
         Whether to also log to console (in addition to file)
 
@@ -73,6 +100,12 @@ def setup_logging(log_file=None, level=logging.INFO, console=True):
     - Creates parent directories for log_file if they don't exist
     - If log_file is provided, logs to both file and console (unless console=False)
     - Logger name is set to 'chess_analysis'
+    - Respects CHESS_LOG_LEVEL environment variable (DEBUG, INFO, WARNING, ERROR)
+
+    Environment Variables
+    ---------------------
+    CHESS_LOG_LEVEL : str
+        Set logging verbosity: DEBUG (verbose), INFO (default), WARNING, ERROR
 
     Example
     -------
@@ -83,10 +116,14 @@ def setup_logging(log_file=None, level=logging.INFO, console=True):
     >>> output_dir.mkdir(parents=True, exist_ok=True)
     >>> logger = setup_logging(output_dir / "analysis.log")
     >>> logger.info("Analysis started")
-    >>> logger.debug("Debug information")
+    >>> logger.debug("Debug information")  # Only shown if CHESS_LOG_LEVEL=DEBUG
     >>> logger.warning("Warning message")
     >>> logger.error("Error message")
     """
+    # Use environment variable if level not explicitly provided
+    if level is None:
+        level = _get_log_level_from_env()
+
     # Create logger
     logger = logging.getLogger('chess_analysis')
     logger.setLevel(level)
@@ -128,6 +165,9 @@ def log_script_start(logger, script_path, config_dict=None):
     """
     Log the start of a script with configuration information.
 
+    Logs concise header at INFO level. Full configuration is logged at DEBUG level.
+    Use CHESS_LOG_LEVEL=DEBUG to see complete config dumps.
+
     Parameters
     ----------
     logger : logging.Logger
@@ -147,16 +187,22 @@ def log_script_start(logger, script_path, config_dict=None):
     >>> config = {'RANDOM_SEED': 42, 'N_FOLDS': 5}
     >>> log_script_start(logger, __file__, config)
     """
+    # Concise header at INFO level
     logger.info("=" * 80)
-    logger.info(f"Script: {Path(script_path).name}")
-    logger.info(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"{Path(script_path).name}")
     logger.info("=" * 80)
 
+    # Full configuration dump at DEBUG level only
     if config_dict is not None:
-        logger.info("Configuration:")
+        # Extract key parameters for INFO-level summary
+        seed = config_dict.get('RANDOM_SEED', 'N/A')
+        logger.debug(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.debug(f"Random seed: {seed}")
+        logger.debug("-" * 80)
+        logger.debug("Full configuration:")
         for key, value in config_dict.items():
-            logger.info(f"  {key}: {value}")
-        logger.info("-" * 80)
+            logger.debug(f"  {key}: {value}")
+        logger.debug("-" * 80)
 
 
 def log_script_end(logger):
@@ -179,7 +225,7 @@ def log_script_end(logger):
     >>> log_script_end(logger)
     """
     logger.info("=" * 80)
-    logger.info(f"Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 80)
 
 
@@ -194,7 +240,7 @@ def setup_analysis(
     All-in-one setup for analysis scripts.
 
     This function handles all common initialization tasks:
-    1. Creates timestamped output directory
+    1. Creates or reuses a stable output directory results/<analysis_name>
     2. Sets up logging (file + console)
     3. Suppresses warnings
     4. Sets random seed
@@ -229,7 +275,7 @@ def setup_analysis(
 
     Notes
     -----
-    - Creates directory: {results_base}/{YYYYMMDD-HHMMSS}_{analysis_name}/
+    - Creates directory: {results_base}/{analysis_name}/ (no timestamp)
     - Sets random seed from RANDOM_SEED constant
     - Logs all configuration parameters from constants.py
     - Suppresses warnings by default (FutureWarning, UserWarning)
@@ -265,8 +311,8 @@ def setup_analysis(
     results_base = Path(results_base)
     results_base.mkdir(parents=True, exist_ok=True)
 
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_dir = results_base / f"{run_id}_{analysis_name}"
+    # Stable directory without timestamp; overwrite on reruns is allowed
+    output_dir = results_base / analysis_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 2. Set up logging

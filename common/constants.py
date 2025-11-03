@@ -32,6 +32,21 @@ _DATA_DIR = _REPO_ROOT / "data"  # Local data assets (repo-internal, not primary
 _EXTERNAL_DATA_ROOT = Path("/media/costantino_ai/eik-T9/manuscript-data")
 
 # ============================================================================
+# Final Results Output (Figures and Tables for Manuscript)
+# ============================================================================
+# Central location in repo for final publication-ready outputs.
+# save_panel_pdf() and save_table_with_manuscript_copy() automatically copy
+# outputs here. This folder is gitignored (regenerable from analysis scripts).
+# Set to None to disable automatic copying.
+_FINAL_RESULTS_DIR = _REPO_ROOT / "results-bundle"
+_MANUSCRIPT_FIGURES_DIR = _FINAL_RESULTS_DIR / "figures"
+_MANUSCRIPT_TABLES_DIR = _FINAL_RESULTS_DIR / "tables"
+
+# Optional always-on bundle (non-timestamped) for consolidated outputs
+# Note: manuscript outputs (PDF panels, LaTeX tables) are consolidated under
+# results-bundle/. No other consolidated copies are made.
+
+# ============================================================================
 # Intermediate Path Construction (private - build CONFIG paths from these)
 # ============================================================================
 
@@ -72,6 +87,17 @@ CONFIG = {
     # All analysis inputs live in this external directory
     'EXTERNAL_DATA_ROOT': _EXTERNAL_DATA_ROOT,  # Base directory for all inputs
     'NEUROSYNTH_ROOT': _NEUROSYNTH_ROOT,
+
+    # ========================================================================
+    # Final Results Output (Figures and Tables)
+    # ========================================================================
+    # Central repository location (./final_results/) for publication-ready outputs.
+    # save_panel_pdf() and save_table_with_manuscript_copy() automatically copy
+    # final PDFs and LaTeX tables here. Gitignored but in repo (regenerable).
+    # Set to None to disable automatic copying.
+    'FINAL_RESULTS_DIR': _FINAL_RESULTS_DIR,
+    'MANUSCRIPT_FIGURES_DIR': _MANUSCRIPT_FIGURES_DIR,  # ./final_results/figures
+    'MANUSCRIPT_TABLES_DIR': _MANUSCRIPT_TABLES_DIR,    # ./final_results/tables
 
     # --- ROI Definitions ---
     'ROI_ROOT': _ROI_ROOT,                                      # Base ROI directory
