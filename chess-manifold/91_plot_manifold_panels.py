@@ -53,13 +53,19 @@ Usage
 python chess-manifold/91_plot_manifold_panels.py
 """
 
-import sys
 import os
+import sys
 import pickle
 from pathlib import Path
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
+
+# Ensure repo root is on sys.path for 'common' imports
+_cur = os.path.dirname(__file__)
+for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
+    _cand = os.path.abspath(_up)
+    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
+        sys.path.insert(0, _cand)
+        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -72,8 +78,7 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import setup_script, log_script_end
 from common.plotting import (
     apply_nature_rc,
     set_axis_title,
@@ -85,6 +90,7 @@ from common.plotting import (
     PLOT_PARAMS,
     CMAP_BRAIN,
     CMAP_SEQUENTIAL,
+    cm_to_inches,
     save_axes_svgs,
     save_panel_pdf,
     create_roi_group_legend,
@@ -107,25 +113,14 @@ from modules.plotting import (
 RESULTS_DIR_NAME = None
 RESULTS_BASE = script_dir / "results"
 
-RESULTS_DIR = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern="*_manifold",
-    specific_name=RESULTS_DIR_NAME,
-    create_subdirs=["figures"],
-    require_exists=True,
-    verbose=True,
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='manifold',
+    output_subdirs=['figures'],
+    log_name='pylustrator_manifold_panels.log',
 )
-
-FIGURES_DIR = RESULTS_DIR / "figures"
-
-extra = {"RESULTS_DIR": str(RESULTS_DIR), "FIGURES_DIR": str(FIGURES_DIR)}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name="pylustrator_manifold_panels.log",
-)
+RESULTS_DIR = results_dir
+FIGURES_DIR = dirs['figures']
 
 
 # =============================================================================
@@ -180,7 +175,7 @@ order_rois = stats_results.sort_values('ROI_Label')['ROI_Label'].tolist()
 # Get formatted ROI names, colors, and label colors (gray for non-significant)
 # Uses DRY helper that merges roi_info with stats and applies significance coloring
 roi_names, roi_colors, label_colors = format_roi_labels_and_colors(
-    stats_results.sort_values('ROI_Label'), roi_info, alpha=config['ALPHA']
+    stats_results.sort_values('ROI_Label'), roi_info, alpha=CONFIG['ALPHA']
 )
 
 # Extract FDR-corrected p-values for significance annotation (stars on bars)
@@ -292,9 +287,8 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 # Pylustrator layout code for this panel
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
-import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(8.900000/2.54, 8.740000/2.54, forward=True)
+plt.figure(1).set_size_inches(cm_to_inches(8.90), cm_to_inches(8.74), forward=True)
 plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].set(position=[0.1116, 0.2957, 0.867, 0.2766])
 plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].texts[14].set(position=(0.5, 1.151))
 plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].texts[15].set(position=(0.5, 1.065))
@@ -458,9 +452,8 @@ fig2.ax_dict = {ax.get_label(): ax for ax in fig2.axes}
 # Pylustrator layout code for this panel
 #% start: automatic generated code from pylustrator
 plt.figure(2).ax_dict = {ax.get_label(): ax for ax in plt.figure(2).axes}
-import matplotlib as mpl
 getattr(plt.figure(2), '_pylustrator_init', lambda: ...)()
-plt.figure(2).set_size_inches(18.290000/2.54, 13.310000/2.54, forward=True)
+plt.figure(2).set_size_inches(cm_to_inches(18.29), cm_to_inches(13.31), forward=True)
 plt.figure(2).ax_dict["A_PR_Matrix"].set(position=[0.1148, 0.3461, 0.3517, 0.6051])
 plt.figure(2).ax_dict["A_PR_Matrix"].text(-0.0313, 1.0304, 'a', transform=plt.figure(2).ax_dict["A_PR_Matrix"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(2).ax_dict["A_PR_Matrix"].texts[0].new
 plt.figure(2).ax_dict["B_PCA_Projection"].set(position=[0.5306, 0.6619, 0.288, 0.2465])
@@ -612,9 +605,8 @@ fig3.ax_dict = {ax.get_label(): ax for ax in fig3.axes}
 # Pylustrator layout code for this panel
 #% start: automatic generated code from pylustrator
 plt.figure(3).ax_dict = {ax.get_label(): ax for ax in plt.figure(3).axes}
-import matplotlib as mpl
 getattr(plt.figure(3), '_pylustrator_init', lambda: ...)()
-plt.figure(3).set_size_inches(18.300000/2.54, 5.150000/2.54, forward=True)
+plt.figure(3).set_size_inches(cm_to_inches(18.30), cm_to_inches(5.15), forward=True)
 plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].set(position=[0.06032, 0.1735, 0.244, 0.7121])
 plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].texts[0].set(position=(0.5, 1.084))
 plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].texts[1].set(position=(0.5, 1.018))
@@ -634,6 +626,7 @@ logger.info("✓ Panel 3: PR vs voxel size scatters complete")
 # =============================================================================
 # Show all figures for interactive editing
 # =============================================================================
-plt.show()
+if CONFIG['ENABLE_PYLUSTRATOR']:
+    plt.show()
 
 log_script_end(logger)

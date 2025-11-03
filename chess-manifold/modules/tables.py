@@ -10,11 +10,17 @@ generate_pr_results_table : Create multi-column LaTeX table with group compariso
 """
 
 import logging
+import sys
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
+
+# Add repo root to path for common imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from common.report_utils import save_table_with_manuscript_copy
+from common.formatters import format_ci as fmt_ci_global, format_p_cell, shorten_roi_name
 
 logger = logging.getLogger(__name__)
 
@@ -69,20 +75,20 @@ def generate_pr_results_table(
     """
     # Helper formatting functions
     def fmt_val(v: float) -> str:
-        """Format value to 2 decimals or '--' if NaN."""
-        return "--" if np.isnan(v) else f"{v:.2f}"
+        """Format value to 3 decimals or '--' if NaN."""
+        return "--" if np.isnan(v) else f"{float(v):.3f}"
 
     def fmt_ci(low: float, high: float) -> str:
-        """Format confidence interval."""
+        """Format confidence interval to 3 decimals."""
         if np.isnan(low) or np.isnan(high):
             return "[--, --]"
-        return f"[{low:.2f}, {high:.2f}]"
+        return fmt_ci_global(float(low), float(high), precision=3, latex=False)
 
     def fmt_p(p: float) -> str:
-        """Format p-value for LaTeX."""
+        """Format p-value cell (APA style)."""
         if np.isnan(p):
             return "--"
-        return "$<.001$" if p < 0.001 else f"${p:.3f}$"
+        return format_p_cell(float(p))
 
     # Merge data sources
     # Get expert and novice stats
@@ -113,14 +119,11 @@ def generate_pr_results_table(
     table_rows = []
     for _, expert_row in expert_stats.iterrows():
         roi_label = expert_row['ROI_Label']
-        roi_name = expert_row['pretty_name'].replace('\n', ' ')  # Remove newlines for table
+        roi_name = shorten_roi_name(expert_row['pretty_name'])
 
         # Get corresponding novice and stats rows
         novice_row = novice_stats[novice_stats['ROI_Label'] == roi_label].iloc[0]
         stats_row = stats_with_names[stats_with_names['ROI_Label'] == roi_label].iloc[0]
-
-        # Select p-value
-        p_val = stats_row['p_val_fdr'] if use_fdr else stats_row['p_val']
 
         table_rows.append({
             'ROI': roi_name,
@@ -130,19 +133,21 @@ def generate_pr_results_table(
             'Novice_CI': fmt_ci(novice_row['ci_low'], novice_row['ci_high']),
             'Delta_mean': fmt_val(stats_row['mean_diff']),
             'Delta_CI': fmt_ci(stats_row['ci95_low'], stats_row['ci95_high']),
-            'p_value': fmt_p(p_val),
+            'p_value': f"{fmt_p(stats_row['p_val'])} / {fmt_p(stats_row['p_val_fdr'])}",
         })
 
     table_df = pd.DataFrame(table_rows)
 
     # ========== Generate LaTeX Table ==========
-    p_label = "$p_{\\mathrm{FDR}}$" if use_fdr else "$p$"
+    # Label for significance column (raw/FDR combined as text)
+    p_label = '$p$/$p_{\\mathrm{FDR}}$' if use_fdr else '$p$'
+    # Two significance columns: raw and FDR-corrected p-values
 
     latex_header = (
         "\\begin{table}[p]\n"
         "\\centering\n"
         "\\resizebox{\\linewidth}{!}{%\n"
-        "\\begin{tabular}{lcc|cc|cc|c}\n"
+        "\\begin{tabular}{lSc|Sc|Sc|c}\n"
         "\\toprule\n"
         "\\multirow{2}{*}{ROI}\n"
         "  & \\multicolumn{2}{c|}{Experts}\n"
@@ -165,15 +170,13 @@ def generate_pr_results_table(
         for _, row in table_df.iterrows()
     )
 
-    p_caption = "FDR-corrected $p$-values" if use_fdr else "raw $p$-values"
     latex_footer = (
         "\n\\bottomrule\n"
         "\\end{tabular}\n"
         "}\n"
-        "\\caption{Participation Ratio (PR) by ROI: "
-        "group means with 95\\% confidence intervals, "
-        "group differences (Expert $-$ Novice) from Welch's $t$-tests, "
-        f"and {p_caption}.}}\n"
+        "\\caption{Participation Ratio (PR) by ROI: group means with 95\\% confidence intervals, "
+        "group differences (Expert $-$ Novice) from Welch's $t$-tests (t-based CIs), and both raw and "
+        "FDR-corrected $p$-values (reported as $p$/$p_{\\mathrm{FDR}}$).}\n"
         "\\label{tab:pr_results}\n"
         "\\end{table}\n"
     )
@@ -186,10 +189,15 @@ def generate_pr_results_table(
     tex_path = output_dir / filename_tex
     csv_path = output_dir / filename_csv
 
-    tex_path.write_text(latex_table)
-    table_df.to_csv(csv_path, index=False)
+    # Save LaTeX table with manuscript copy
+    save_table_with_manuscript_copy(
+        latex_table,
+        tex_path,
+        manuscript_name='pr_ttest.tex',  # Copy to final_results/tables/
+        logger=logger
+    )
 
-    logger.info(f"Saved LaTeX table: {tex_path}")
+    table_df.to_csv(csv_path, index=False)
     logger.info(f"Saved CSV table: {csv_path}")
 
     return tex_path, csv_path
