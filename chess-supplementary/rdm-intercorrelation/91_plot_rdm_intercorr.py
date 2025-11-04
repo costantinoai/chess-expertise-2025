@@ -2,7 +2,6 @@
 """
 Generate RDM Intercorrelation Supplementary Figures (Pylustrator)
 =================================================================
-[docstring unchanged]
 """
 import os
 import sys

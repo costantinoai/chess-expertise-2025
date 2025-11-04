@@ -21,7 +21,7 @@ from common.plotting import plot_grouped_bars_on_ax, lighten_color, PLOT_PARAMS
 _SHORT_LABELS = {
     'visual': 'Visual',
     'strategy': 'Strategy',
-    'check': 'Check',
+    'check': 'Checkmate',
 }
 
 
