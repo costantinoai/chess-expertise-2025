@@ -59,16 +59,7 @@ We recommend using a virtual environment:
 
 ```bash
 # Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# On Linux/Mac:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
-
-# Option A: Use conda/mamba (recommended)
-mamba env create -f environment.yml   # or: conda env create -f environment.yml
+conda env create -f environment.yml
 conda activate chess-expertise
 
 # Option B: Use pip in virtualenv
@@ -83,8 +74,7 @@ install the following TeX packages:
 Debian/Ubuntu:
 
 ```bash
-sudo apt -y install texlive-science \
-                 texlive-latex-extra texlive-latex-recommended texlive-fonts-recommended
+sudo apt -y install texlive-science texlive-latex-extra texlive-latex-recommended texlive-fonts-recommended
 ```
 
 Quick checks:
@@ -100,7 +90,7 @@ See docs/TABLES.md for details on the table style policy and validation.
 
 ### Install MATLAB Dependencies (Optional)
 
-If running subject-level MVPA analyses:
+If running subject-level GLM and/or MVPA analyses:
 
 1. Install [SPM12](https://www.fil.ion.ucl.ac.uk/spm/software/spm12/)
 2. Install [CoSMoMVPA](http://www.cosmomvpa.org/)
@@ -110,11 +100,9 @@ If running subject-level MVPA analyses:
 
 ### Download Data
 
-**Download link**: [PLACEHOLDER - Data will be available on OpenNeuro/OSF]
+**Download link**: [PLACEHOLDER - Data will be available on OpenNeuro/OSF upon publication/request]
 
-The dataset is organized according to the Brain Imaging Data Structure (BIDS) specification.
-
-**Dataset size**: ~XX GB (raw fMRI data + derivatives)
+The (minimal) dataset is organized according to the Brain Imaging Data Structure (BIDS) specification.
 
 ### Data Organization
 
@@ -146,21 +134,9 @@ After downloading, extract the data and organize as follows (see also Folder Set
         └── eyetracking/                    # Eye-tracking data
 ```
 
-### Alternative: Use Symbolic Links
-
-If you have the data stored elsewhere, create a symbolic link:
-
-```bash
-# Linux/Mac
-ln -s /path/to/your/BIDS/data /path/to/chess-expertise-2025/data/BIDS
-
-# Windows (run as Administrator)
-mklink /D "C:\path\to\chess-expertise-2025\data\BIDS" "D:\path\to\your\BIDS\data"
-```
-
 ## Folder Setup
 
-All analyses read their inputs from a single external data root. Configure this once and all paths are derived from it.
+All analyses read their inputs from a **single external data root**. Configure this once and all paths are derived from it.
 
 1) Choose a folder on your system to hold all inputs:
 
@@ -182,13 +158,9 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 # Do not edit BIDS_ROOT directly — it is derived from the external root
 ```
 
-Note: do not rely on environment variables or implicit defaults. All paths are explicit and validated at runtime.
-
-Default for this repo: `_EXTERNAL_DATA_ROOT` is already set to `/media/costantino_ai/eik-T9/manuscript-data`. If your data lives elsewhere, update this path.
-
 ## Expected Inputs
 
-The repository expects the following files and layout under `_EXTERNAL_DATA_ROOT` (current default: `/media/costantino_ai/eik-T9/manuscript-data`). Adjust the root path in `common/constants.py` if your data lives elsewhere.
+The repository expects the following files and layout under `_EXTERNAL_DATA_ROOT`. Adjust the root path in `common/constants.py` if your data lives elsewhere.
 
 Top level
 ```
@@ -260,58 +232,9 @@ stimuli/
 └── images/*.png                          # 40 chess board images (C* and NC* files)
 ```
 
-If your file names differ from these patterns, let me know and I’ll align the loaders accordingly.
-
-## Configuration
-
-### Set Data Paths
-
-Edit `common/constants.py` to point to your data location:
-
-```python
-# ============================================================================
-# *** USER CONFIGURATION: Update this one path for your system ***
-# ============================================================================
-
-# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
-_EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
-# All other paths (BIDS_ROOT, ROI_* paths, Neurosynth, etc.) are derived from this.
-```
-
-### Configure Analysis Parameters
-
-Key parameters are defined in `common/constants.py`:
-
-```python
-# Statistical parameters
-ALPHA = 0.05                    # Significance threshold
-ALPHA_FDR = 0.05               # FDR correction threshold
-RANDOM_SEED = 42               # For reproducibility
-
-# Model definitions
-MODEL_COLUMNS = ['check', 'strategy', 'visual']  # RSA model RDMs
-MODEL_ORDER = ['check', 'strategy', 'visual']    # Display order
-
-# Visualization
-ENABLE_PYLUSTRATOR = False     # Set True for interactive figure layout
-```
-
-### Verify Configuration
-
-Quick sanity check that imports and configuration load correctly:
-
-```bash
-python - << 'PY'
-from common import CONFIG
-print('CONFIG loaded')
-print('BIDS_ROOT =', CONFIG['BIDS_ROOT'])
-print('ROIs dir  =', CONFIG['ROI_ROOT'])
-PY
-```
-
 ## Running Analyses
 
-Always run commands from the repository root so that `common/` imports resolve correctly.
+You have two options to run the code. Either you run the single python scripts one by one (in which case, make sure to cd into the analysis folder first, e.g., `cd chess-manifold` --> `conda activate ml` --> `python 01_....py`) or you can run all the scripts at once (this can be run directly from the repo root, see below).
 
 ### Option A: Automated Pipeline (bash)
 
@@ -337,17 +260,19 @@ This will execute analyses in the following order:
 4. Neurosynth meta-analytic correlations
 5. All supplementary analyses
 
-**Total runtime**: ~2-3 hours (depends on system)
+**Total runtime**: ~30 minutes (depends on system and chosen options)
 
 ### Option B: Run Individually (Python)
 
 Each analysis directory has detailed instructions in its README. Basic workflow:
 
 ```bash
-# Always run from the repository root
-python chess-behavioral/01_behavioral_rsa.py                 # Main analysis (~2 min)
-python chess-behavioral/81_table_behavioral_correlations.py  # Tables (~10 sec)
-python chess-behavioral/91_plot_behavioral_panels.py         # Figures (~30 sec)
+# Always run from the anaysis folder
+cd chess-behavioral
+conda activate <your-new-env-name>
+python 01_behavioral_rsa.py                 # Main analysis (~2 min)
+python 81_table_behavioral_correlations.py  # Tables (~10 sec)
+python 91_plot_behavioral_panels.py         # Figures (~30 sec)
 ```
 
 See individual analysis READMEs for details:
@@ -357,31 +282,12 @@ See individual analysis READMEs for details:
 - [`chess-neurosynth/README.md`](chess-neurosynth/README.md) - Meta-analytic correlations
 - [`chess-supplementary/*/README.md`](chess-supplementary/) - Supplementary analyses
 
-### Analysis Dependencies
-
-Some analyses depend on outputs from others:
-
-```
-Behavioral RSA (01_behavioral_rsa.py)
-    └─> Behavioral reliability (supplementary)
-    └─> RDM intercorrelation (supplementary)
-
-MVPA group RSA (02_mvpa_group_rsa.py)
-    └─> RSA ROI summary (supplementary)
-
-Manifold analysis (01_manifold_analysis.py)
-    └─> (standalone, no dependencies)
-
-Neurosynth analyses (01_univariate_neurosynth.py, 02_rsa_neurosynth.py)
-    └─> Neurosynth term visualization (supplementary)
-```
-
 ## Outputs
 
-All analyses save results to timestamped directories within their respective folders:
+All analyses save artefacts to the results directory within their respective folders:
 
 ```
-chess-{analysis}/results/<timestamp>_{analysis_name}/
+chess-{analysis}/results/{analysis_name}/
 ├── *.npy                   # Numerical arrays (RDMs, coordinates, etc.)
 ├── *.pkl                   # Python objects (results dictionaries)
 ├── *.csv                   # Summary tables
@@ -401,123 +307,6 @@ Additionally, publication-ready PDFs and LaTeX tables are copied to a consolidat
 results-bundle/
 ├── figures/    # Final panels (PDF)
 └── tables/     # Final tables (LaTeX)
-```
-
-### Main Results Files
-
-Key results for manuscript:
-
-**Behavioral**:
-- `chess-behavioral/results/latest/correlation_results.pkl`
-- `chess-behavioral/results/latest/tables/behavioral_rsa_correlations.tex`
-- `chess-behavioral/results/latest/figures/panels/behavioral_rsa_panel.pdf`
-
-**Manifold**:
-- `chess-manifold/results/latest/pr_results.pkl`
-- `chess-manifold/results/latest/tables/manifold_pr_results.tex`
-- `chess-manifold/results/latest/figures/panels/manifold_bars_panel.pdf`
-
-**MVPA**:
-- `chess-mvpa/results/latest_mvpa_group_rsa/mvpa_group_stats.pkl`
-- `chess-mvpa/results/latest_mvpa_group_decoding/mvpa_group_stats.pkl`
-- `chess-mvpa/results/latest/tables/mvpa_rsa_*.tex`
-- `chess-mvpa/results/latest/figures/panels/*.pdf`
-
-**Neurosynth**:
-- `chess-neurosynth/results/latest_neurosynth_univariate/*_term_corr_*.csv`
-- `chess-neurosynth/results/latest_neurosynth_rsa/*_term_corr_*.csv`
-- `chess-neurosynth/results/latest/tables/*.tex`
-- `chess-neurosynth/results/latest/figures/panels/*.pdf`
-
-## Project Structure
-
-```
-chess-expertise-2025/
-├── README.md                          # This file
-├── requirements.txt                   # Python dependencies
-├── LICENSE                            # MIT License
-├── .gitignore                         # Git ignore rules
-├── run_all_analyses.sh               # Run all analyses sequentially
-│
-├── common/                            # Shared utilities
-│   ├── constants.py                   # Configuration and paths ⚙️
-│   ├── bids_utils.py                  # BIDS data loading
-│   ├── rsa_utils.py                   # RSA computations
-│   ├── stats_utils.py                 # Statistical functions
-│   ├── group_stats.py                 # Group-level statistics
-│   ├── neuro_utils.py                 # Neuroimaging utilities
-│   ├── io_utils.py                    # File I/O helpers
-│   ├── logging_utils.py               # Logging setup
-│   ├── report_utils.py                # Table/report generation
-│   ├── formatters.py                  # Data formatting
-│   ├── spm_utils.py                   # SPM integration
-│   └── plotting/                      # Plotting utilities
-│       ├── bars.py                    # Bar plots
-│       ├── heatmaps.py                # Heatmaps and RDMs
-│       ├── scatter.py                 # Scatter plots
-│       ├── surfaces.py                # Brain surface plots
-│       ├── colors.py                  # Color palettes
-│       ├── legends.py                 # Legend utilities
-│       ├── helpers.py                 # Plotting helpers
-│       └── style.py                   # Nature-compliant styling
-│
-├── chess-behavioral/                  # Behavioral RSA analysis
-│   ├── README.md                      # Analysis documentation
-│   ├── 01_behavioral_rsa.py           # Main analysis
-│   ├── 81_table_*.py                  # Table generation
-│   ├── 91_plot_*.py                   # Figure generation
-│   ├── modules/                       # Analysis-specific modules
-│   └── results/                       # Analysis outputs
-│
-├── chess-manifold/                    # Participation ratio analysis
-│   ├── README.md
-│   ├── 01_manifold_analysis.py        # Main analysis
-│   ├── 81_table_*.py
-│   ├── 91_plot_*.py
-│   ├── modules/
-│   └── results/
-│
-├── chess-mvpa/                        # MVPA: RSA and decoding
-│   ├── README.md
-│   ├── 02_mvpa_group_rsa.py           # Group-level RSA
-│   ├── 03_mvpa_group_decoding.py      # Group-level decoding
-│   ├── 81_table_*.py
-│   ├── 92_plot_*.py, 93_plot_*.py
-│   ├── modules/
-│   └── results/
-│
-├── chess-neurosynth/                  # Meta-analytic correlations
-│   ├── README.md
-│   ├── 01_univariate_neurosynth.py    # GLM t-map correlations
-│   ├── 02_rsa_neurosynth.py           # RSA map correlations
-│   ├── 81_table_*.py, 82_table_*.py
-│   ├── 91_plot_*.py, 92_plot_*.py
-│   ├── modules/
-│   └── results/
-│
-├── chess-supplementary/               # Supplementary analyses
-│   ├── behavioral-reliability/        # Split-half reliability
-│   ├── dataset-viz/                   # Stimulus visualization
-│   ├── eyetracking/                   # Eye-tracking decoding
-│   ├── mvpa-finer/                    # Finer MVPA resolution
-│   ├── neurosynth-terms/              # Term map visualization
-│   ├── rdm-intercorrelation/          # RDM intercorrelations
-│   ├── rsa-rois/                      # RSA ROI summary
-│   └── univariate-rois/               # Univariate ROI summary
-│
-├── scripts/                           # Utility scripts
-│   ├── 00_generate_api_reference.py   # API reference (Markdown)
-│   ├── 01_generate_file_io_index.py   # File I/O index (HTML)
-│   ├── 02_generate_loader_patterns.py
-│   ├── 03_manuscript_tools.py         # LaTeX/Methods tools
-│   └── generate_docs.py               # Wrapper to open docs
-│
-└── data/                              # Data directory (not in repo)
-    └── BIDS/                          # BIDS-compliant dataset
-        ├── sub-01/, sub-02/, ...      # Subject directories
-        ├── participants.tsv           # Participant info
-        ├── stimuli.tsv                # Stimulus info
-        └── derivatives/               # Preprocessed data
 ```
 
 ## Analysis Overview
@@ -554,185 +343,11 @@ See [`chess-supplementary/README.md`](chess-supplementary/README.md) for details
 - ROI-level summaries for 180 bilateral Glasser regions
 - Dataset and colorbar visualization
 
-## Dependencies
-
-### Python Packages
-
-Core dependencies (see `requirements.txt` for complete list):
-
-- **Scientific computing**: numpy, scipy, pandas
-- **Statistics**: statsmodels, pingouin
-- **Machine learning**: scikit-learn
-- **Neuroimaging**: nibabel, nilearn
-- **Visualization**: matplotlib, seaborn, pylustrator (optional)
-- **Data formats**: h5py, openpyxl
-
-### MATLAB Packages (Optional)
-
-For subject-level MVPA preprocessing:
-
-- MATLAB R2019b or higher
-- SPM12 (Statistical Parametric Mapping)
-- CoSMoMVPA (Cosmological Multi-Voxel Pattern Analysis toolbox)
-
-### System Requirements
-
-- **RAM**: 16 GB minimum, 32 GB recommended
-- **Storage**: ~100 GB for full dataset and derivatives
-- **OS**: Linux, macOS, or Windows 10/11
-- **CPU**: Multi-core recommended for searchlight analyses
-
-## Troubleshooting
-
-### Common Issues
-
-**1. "ModuleNotFoundError: No module named 'common'"**
-
-Solution: Always run scripts from the repository root directory:
-
-```bash
-# Correct (run from repo root)
-cd /path/to/chess-expertise-2025
-python chess-behavioral/01_behavioral_rsa.py
-
-# Incorrect (may fail due to imports)
-cd chess-behavioral
-python 01_behavioral_rsa.py
-```
-
-**2. "FileNotFoundError: BIDS directory not found"**
-
-Solution: Verify `BIDS_ROOT` in `common/constants.py` points to your data:
-
-```python
-BIDS_ROOT = Path("/correct/path/to/BIDS")
-```
-
-Run configuration check:
-
-```bash
-python scripts/00_verify_config.py
-```
-
-**3. "No participants found" or "No event files found"**
-
-Solution: Ensure BIDS structure is correct:
-
-```bash
-data/BIDS/
-├── participants.tsv          # Required
-├── sub-01/                   # Subject directories
-│   └── func/
-│       ├── sub-01_task-exp_run-1_bold.nii.gz
-│       └── sub-01_task-exp_run-1_events.tsv
-```
-
-**4. Import errors or missing dependencies**
-
-Solution: Reinstall dependencies:
-
-```bash
-pip install --upgrade -r requirements.txt
-```
-
-**5. MATLAB/CoSMoMVPA errors**
-
-Solution: Subject-level MVPA (MATLAB) is optional. Python group-level analyses can run using pre-computed derivatives in `data/BIDS/derivatives/mvpa-rsa/`.
-
-**6. Figure generation fails with Pylustrator errors**
-
-Solution: Disable interactive mode:
-
-```python
-# In common/constants.py
-ENABLE_PYLUSTRATOR = False
-```
-
-### Getting Help
-
-If you encounter issues:
-
-1. Check the analysis-specific README in the relevant directory
-2. Search existing [GitHub Issues](https://github.com/your-username/chess-expertise-2025/issues)
-3. Open a new issue with:
-   - Error message (full traceback)
-   - Script being run
-   - Python version and OS
-   - Minimal reproducible example
-
-## Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-### Code Style
-
-- Follow PEP 8 style guidelines
-- Use type hints for function signatures
-- Write comprehensive docstrings (NumPy style)
-- Add inline comments for complex logic
-
-### Testing
-
-Before submitting changes:
-
-```bash
-# Verify all imports work
-python -c "import common; import common.plotting"
-
-# Run configuration check
-python scripts/00_verify_config.py
-
-# Test a simple analysis
-python chess-behavioral/01_behavioral_rsa.py
-```
-
-### Pull Requests
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -m "Description"`
-4. Push to branch: `git push origin feature-name`
-5. Open a Pull Request with detailed description
-
 ## Citation
 
 If you use this code or data in your research, please cite:
 
-```bibtex
-@article{YourName2025ChessExpertise,
-  title={Neural and Behavioral Representations of Chess Expertise},
-  author={Your Name and Collaborators},
-  journal={Journal Name},
-  year={2025},
-  volume={XX},
-  pages={XXX-XXX},
-  doi={10.XXXX/XXXXXX}
-}
-```
-
-### Dataset Citation
-
-```bibtex
-@dataset{YourName2025ChessData,
-  title={Chess Expertise fMRI Dataset},
-  author={Your Name and Collaborators},
-  year={2025},
-  publisher={OpenNeuro/OSF},
-  doi={10.XXXX/XXXXXX},
-  url={https://openneuro.org/datasets/dsXXXXXX}
-}
-```
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-### Third-Party Licenses
-
-- **SPM12**: GNU General Public License v2.0
-- **CoSMoMVPA**: MIT License
-- **Neurosynth**: BSD 2-Clause License
-- **Glasser Parcellation**: Human Connectome Project Open Access Data Use Terms
+[PLACEHOLDER]
 
 ## Acknowledgments
 
@@ -741,15 +356,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Neurosynth](https://neurosynth.org/) for meta-analytic term maps
 - [fMRIPrep](https://fmriprep.org/) developers for preprocessing pipeline
 - [CoSMoMVPA](http://www.cosmomvpa.org/) developers for MVPA tools
-
-## Contact
-
-**Principal Investigator**: [Name] ([email])
-**Lead Analyst**: [Name] ([email])
-**GitHub Issues**: [https://github.com/your-username/chess-expertise-2025/issues](https://github.com/your-username/chess-expertise-2025/issues)
-
----
-
-**Repository Status**: ✅ Complete (as of 2025-01-XX)
-**Last Updated**: 2025-01-XX
-**Version**: 1.0.0
