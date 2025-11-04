@@ -33,11 +33,36 @@ def format_pvalue_latex(p: float, threshold: float = 0.001) -> str:
     return f"$.{int(round(p * 1000)):03d}$"
 
 
-def format_ci(ci_lower: float, ci_upper: float, precision: int = 3, latex: bool = True) -> str:
-    """Format confidence interval as [low, high]; wrap in $...$ if latex=True."""
+def format_ci(ci_lower: float, ci_upper: float, precision: int = 3, latex: bool = True, use_numrange: bool = False) -> str:
+    """
+    Format confidence interval as [low, high] or \\numrange{low}{high}.
+
+    Parameters
+    ----------
+    ci_lower : float
+        Lower bound of CI
+    ci_upper : float
+        Upper bound of CI
+    precision : int
+        Number of decimal places
+    latex : bool
+        If True and use_numrange=False, wrap in $...$
+    use_numrange : bool
+        If True, use \\numrange{low}{high} for siunitx compatibility (recommended for LaTeX tables)
+
+    Returns
+    -------
+    str
+        Formatted CI string
+    """
     fmt = f"{{:.{precision}f}}"
-    content = f"[{fmt.format(ci_lower)}, {fmt.format(ci_upper)}]"
-    return f"${content}$" if latex else content
+    if use_numrange:
+        # Use \numrange for siunitx compatibility (no wrapper needed)
+        return f"\\numrange{{{fmt.format(ci_lower)}}}{{{fmt.format(ci_upper)}}}"
+    else:
+        # Traditional bracket notation
+        content = f"[{fmt.format(ci_lower)}, {fmt.format(ci_upper)}]"
+        return f"${content}$" if latex else content
 
 
 def significance_stars(p_value: float) -> str:

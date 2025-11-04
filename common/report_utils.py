@@ -155,7 +155,7 @@ def format_correlation_summary(
     model_columns: List[str],
     model_labels_map: Optional[Dict[str, str]] = None,
     ci_brackets: bool = True,
-    p_sci: bool = True,
+    p_sci: bool = False,
     exp_p_fdr: Optional[Dict[str, float]] = None,
     nov_p_fdr: Optional[Dict[str, float]] = None,
 ) -> pd.DataFrame:
@@ -197,22 +197,27 @@ def format_correlation_summary(
         if model_labels_map and key in model_labels_map:
             label = model_labels_map[key].replace('\n', ' ')
 
+        # Build row with proper column ordering (group expert cols together, then novice cols)
         row = {
             'Model': label,
             'r_Experts': f"{er:.3f}",
-            '95%_CI_Experts': f"[{eci_l:.3f}, {eci_u:.3f}]" if ci_brackets else None,
-            'p_Experts': f"{ep:.3e}" if p_sci else f"{ep:.3f}",
-            'r_Novices': f"{nr:.3f}",
-            '95%_CI_Novices': f"[{nci_l:.3f}, {nci_u:.3f}]" if ci_brackets else None,
-            'p_Novices': f"{npv:.3e}" if p_sci else f"{npv:.3f}",
+            '95%_CI_Experts': f"\\numrange{{{eci_l:.3f}}}{{{eci_u:.3f}}}" if ci_brackets else None,
+            'p_Experts': format_p_cell(ep),
         }
-        # Optional FDR-corrected p-values
+        # Add pFDR_Experts immediately after other expert columns
         if isinstance(exp_p_fdr, dict) and key in exp_p_fdr:
             pexp_fdr = exp_p_fdr[key]
-            row['pFDR_Experts'] = f"{pexp_fdr:.3e}" if p_sci else f"{pexp_fdr:.3f}"
+            row['pFDR_Experts'] = format_p_cell(pexp_fdr)
+        # Now add all novice columns
+        row.update({
+            'r_Novices': f"{nr:.3f}",
+            '95%_CI_Novices': f"\\numrange{{{nci_l:.3f}}}{{{nci_u:.3f}}}" if ci_brackets else None,
+            'p_Novices': format_p_cell(npv),
+        })
+        # Add pFDR_Novices immediately after other novice columns
         if isinstance(nov_p_fdr, dict) and key in nov_p_fdr:
             pnov_fdr = nov_p_fdr[key]
-            row['pFDR_Novices'] = f"{pnov_fdr:.3e}" if p_sci else f"{pnov_fdr:.3f}"
+            row['pFDR_Novices'] = format_p_cell(pnov_fdr)
         rows.append(row)
 
     df = pd.DataFrame(rows)
@@ -229,7 +234,7 @@ def generate_latex_table(
     escape: bool = False,
     logger: Optional[logging.Logger] = None,
     manuscript_name: Optional[str] = None,
-    wrap_with_resizebox: bool = True,
+    wrap_with_resizebox: bool = False,
     use_booktabs: bool = True,
     na_rep: str = "--",
 ) -> Path:
@@ -319,11 +324,52 @@ def generate_latex_table(
         # First column left-aligned, rest centered
         column_format = "l" + "c" * (len(df.columns) - 1)
 
+    # Preflight: ensure columns designated as 'S' are numeric
+    def _parse_colspec(fmt: str) -> List[str]:
+        return [ch for ch in fmt if ch.strip() and ch != '|']
+
+    colspec_tokens = _parse_colspec(column_format)
+    if len(colspec_tokens) != len(df.columns):
+        raise ValueError(
+            f"column_format token count ({len(colspec_tokens)}) does not match number of DataFrame columns ({len(df.columns)})."
+        )
+    for idx, tok in enumerate(colspec_tokens):
+        if tok == 'S' and not pd.api.types.is_numeric_dtype(df.iloc[:, idx]):
+            raise TypeError(
+                f"Column '{df.columns[idx]}' mapped to 'S' (siunitx numeric) but dtype is not numeric. "
+                "Convert the column to float or change column_format."
+            )
+
+    # Sanitize caption: escape bare % outside math mode
+    def _escape_caption_text(text: str) -> str:
+        if text is None:
+            return text
+        out: List[str] = []
+        in_math = False
+        prev_char: Optional[str] = None
+        for ch in text:
+            if ch == '$':
+                in_math = not in_math
+                out.append(ch)
+            elif ch == '%' and not in_math:
+                # Avoid double-escaping already-escaped sequences like "\%"
+                if prev_char != '\\':
+                    out.append(r"\%")
+                else:
+                    # Already escaped: keep as-is
+                    out.append(ch)
+            else:
+                out.append(ch)
+            prev_char = ch
+        return ''.join(out)
+
+    caption_safe = _escape_caption_text(caption)
+
     # Generate basic LaTeX table
     try:
         latex_table = df.to_latex(
             index=False,
-            caption=caption,
+            caption=caption_safe,
             label=label,
             escape=escape,
             column_format=column_format,
@@ -332,6 +378,7 @@ def generate_latex_table(
             multicolumn_format='c',
             bold_rows=False,
             longtable=False,
+            float_format="%.3f",
             # booktabs is accepted in recent pandas; guard with try
             booktabs=use_booktabs,
         )
@@ -339,7 +386,7 @@ def generate_latex_table(
         # Fallback if pandas version lacks some args
         latex_table = df.to_latex(
             index=False,
-            caption=caption,
+            caption=caption_safe,
             label=label,
             escape=escape,
             column_format=column_format,
@@ -348,6 +395,7 @@ def generate_latex_table(
             multicolumn_format='c',
             bold_rows=False,
             longtable=False,
+            float_format="%.3f",
         )
 
     # Add multicolumn headers if provided
@@ -355,10 +403,39 @@ def generate_latex_table(
         latex_table = _add_multicolumn_headers(
             latex_table, df.columns.tolist(), multicolumn_headers
         )
+    else:
+        # No multicolumns: stylize math tokens and escape % in header row
+        latex_table = _stylize_and_escape_simple_header(latex_table)
 
-    # Optionally wrap tabular in a resizebox for consistent page width
+    # Sanitize known unicode/control sequences that break LaTeX compilers
+    # - Replace Unicode minus and en-dash with math minus
+    # - Replace stray BEL-alpha artifacts (\x07lpha) with \alpha
+    latex_table = (
+        latex_table
+        .replace('\u2212', '$-$')
+        .replace('−', '$-$')
+        .replace('–', '--')
+        .replace('\x07lpha', '\\alpha')
+    )
+
+    # Enforce capital Delta in any delta math tokens
+    latex_table = latex_table.replace('$\\delta', '$\\Delta')
+
+    # Normalize math tokens in headers to requested forms
+    latex_table = latex_table.replace('$p_\\mathrm{FDR}$', '$p_{FDR}$')
+    latex_table = latex_table.replace('$M_{\\text{diff}}$', '$M_{diff}$')
+
+    # Optionally wrap the tabular with a resizebox to fit linewidth
     if wrap_with_resizebox:
         latex_table = _wrap_tabular_with_resizebox(latex_table)
+
+    # Validate LaTeX tabular before saving
+    errors = validate_latex_table(latex_table)
+    if errors:
+        msg = "LaTeX table validation failed:\n- " + "\n- ".join(errors)
+        if logger:
+            logger.error(msg)
+        raise ValueError(msg)
 
     # Save to file (and optionally to manuscript folder)
     save_table_with_manuscript_copy(
@@ -415,17 +492,23 @@ def create_correlation_table(
         label_pretty = model_labels.get(key, key.capitalize()) if model_labels else key
         er, ep, ecl, ech = exp_res[1:]
         nr, npv, ncl, nch = nov_res[1:]
+        # Build row with proper column ordering (group expert cols together, then novice cols)
         row = {
             'Model': label_pretty,
             'r_Experts': float(er),
-            '95%_CI_Experts': format_ci(ecl, ech, precision=3, latex=False),
+            '95%_CI_Experts': format_ci(ecl, ech, precision=3, latex=False, use_numrange=True),
             'p_Experts': format_p_cell(ep),
-            'r_Novices': float(nr),
-            '95%_CI_Novices': format_ci(ncl, nch, precision=3, latex=False),
-            'p_Novices': format_p_cell(npv),
         }
+        # Add pFDR_Experts immediately after other expert columns
         if isinstance(exp_p_fdr, dict) and key in exp_p_fdr:
             row['pFDR_Experts'] = format_p_cell(exp_p_fdr[key])
+        # Now add all novice columns
+        row.update({
+            'r_Novices': float(nr),
+            '95%_CI_Novices': format_ci(ncl, nch, precision=3, latex=False, use_numrange=True),
+            'p_Novices': format_p_cell(npv),
+        })
+        # Add pFDR_Novices immediately after other novice columns
         if isinstance(nov_p_fdr, dict) and key in nov_p_fdr:
             row['pFDR_Novices'] = format_p_cell(nov_p_fdr[key])
         df_rows.append(row)
@@ -509,11 +592,11 @@ def format_roi_stats_table(
     def _fmt_triplet(t):
         m, lo, hi = t
         if pd.isna(m) or pd.isna(lo) or pd.isna(hi):
-            return float('nan'), '[--, --]'
+            return float('nan'), '{--}{--}'
         m_adj = float(m - subtract_chance)
         lo_adj = float(lo - subtract_chance)
         hi_adj = float(hi - subtract_chance)
-        return m_adj, f"[{lo_adj:.3f}, {hi_adj:.3f}]"
+        return m_adj, f"\\numrange{{{lo_adj:.3f}}}{{{hi_adj:.3f}}}"
 
     # Format expert and novice descriptives
     exp_vals, exp_cis = zip(*(_fmt_triplet(t) for t in exp_desc)) if exp_desc else ([], [])
@@ -528,7 +611,7 @@ def format_roi_stats_table(
         'Novice_CI': list(nov_cis),
         'Delta_mean': df['mean_diff'].astype(float),
         'Delta_CI': pd.Series(zip(df['ci95_low'], df['ci95_high'])).map(
-            lambda x: '[--, --]' if any(pd.isna(list(x))) else f"[{float(x[0]):.3f}, {float(x[1]):.3f}]"
+            lambda x: '{--}{--}' if any(pd.isna(list(x))) else f"\\numrange{{{float(x[0]):.3f}}}{{{float(x[1]):.3f}}}"
         ),
         'p_raw': df['p_val'].map(lambda p: format_p_cell(p) if pd.notna(p) else '--'),
         'pFDR': df['p_val_fdr'].map(lambda p: format_p_cell(p) if pd.notna(p) else '--'),
@@ -588,6 +671,14 @@ def save_table_with_manuscript_copy(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Validate before saving (strict: raise on errors)
+    errors = validate_latex_table(latex_table)
+    if errors:
+        msg = "LaTeX table validation failed:\n- " + "\n- ".join(errors)
+        if logger:
+            logger.error(msg)
+        raise ValueError(msg)
+
     # Save to primary location (results directory)
     with open(output_path, 'w') as f:
         f.write(latex_table)
@@ -619,6 +710,8 @@ __all__ = [
     'save_results_metadata',
     'format_roi_stats_table',
     'save_table_with_manuscript_copy',
+    'validate_latex_table',
+    'compile_latex_table',
 ]
 
 
@@ -693,10 +786,14 @@ def _add_multicolumn_headers(
     current_col_idx = 0
     processed_groups = set()
 
-    # First column (e.g., "Model") is usually standalone
+    # First column (e.g., "ROI") is usually standalone; optionally multirow
     first_col_name = column_names[0]
+    do_multirow = first_col_name.strip() == 'ROI'
     if first_col_name not in col_to_group:
-        multicolumn_row_parts.append("")  # Empty for first column
+        if do_multirow:
+            multicolumn_row_parts.append(rf"\\multirow{{2}}{{*}}{{{first_col_name}}}")
+        else:
+            multicolumn_row_parts.append("")  # Empty for first column
         current_col_idx = 1
     else:
         current_col_idx = 0
@@ -737,8 +834,8 @@ def _add_multicolumn_headers(
     lines.insert(toprule_idx + 1, multicolumn_row)
     lines.insert(toprule_idx + 2, cmidrule_row)
 
-    # Modify the original header row to use short column names
-    # (remove group prefix, e.g., "r_Experts" -> "r")
+    # Modify the original header row to use short, styled column names
+    # (remove group suffix and apply math/escaping conventions)
     original_header = lines[header_idx + 2]  # +2 because we inserted 2 lines
     header_parts = original_header.split('&')
 
@@ -746,14 +843,43 @@ def _add_multicolumn_headers(
     for i, part in enumerate(header_parts):
         col_name = column_names[i].strip() if i < len(column_names) else part.strip()
 
-        # Shorten column name if it's part of a group
-        if col_name in col_to_group:
-            # Extract short name (remove group suffix)
-            # E.g., "r_Experts" -> "r", "95%_CI_Experts" -> "95% CI"
-            short_name = col_name.split('_')[0]  # Take first part before underscore
-            new_header_parts.append(short_name)
-        else:
-            new_header_parts.append(part.strip())
+        # Extract short base name (remove group suffix after the last underscore)
+        base = col_name.split('_')[0] if '_' in col_name else col_name
+
+        # Map to standardized LaTeX-friendly labels
+        def stylize(token: str) -> str:
+            t = token.strip()
+            # Escape percent
+            t = t.replace('%', r'\%')
+            # Specific header tokens → LaTeX math/text
+            mapping = {
+                'pFDR': r'$p_\mathrm{FDR}$',
+                'p': r'$p$',
+                't': r'$t$',
+                'M_diff': r'$M_{\text{diff}}$',
+                'r': r'$r$',
+            }
+            if t in mapping:
+                return mapping[t]
+            # Delta-prefixed tokens (e.g., 'Δr', 'Δacc', 'Δ')
+            if t.startswith('Δ'):
+                rest = t[1:]
+                # For 'Δr' prefer lower-case delta and math r
+                if rest == 'r':
+                    return r'$\delta r$'
+                elif rest:
+                    # Lower-case delta followed by base token (non-math)
+                    return rf'$\delta\,{rest}$'
+                else:
+                    return r'$\delta$'
+            return t
+
+        # For ROI multirow, leave the first cell of the second header row empty
+        if i == 0 and first_col_name.strip() == 'ROI':
+            new_header_parts.append("")
+            continue
+        short_name = stylize(base)
+        new_header_parts.append(short_name)
 
     new_header_row = " & ".join(new_header_parts) + " \\\\"
     lines[header_idx + 2] = new_header_row
@@ -772,6 +898,202 @@ def _wrap_tabular_with_resizebox(latex_table: str) -> str:
     lines.insert(begin_idx, r"\resizebox{\linewidth}{!}{%")
     lines.insert(end_idx + 2, r"}")
     return '\n'.join(lines)
+
+
+def _escape_header_percents(latex_table: str) -> str:
+    """Escape % signs in the header row when not using multicolumn headers."""
+    lines = latex_table.split('\n')
+    toprule_idx = None
+    header_idx = None
+    for i, line in enumerate(lines):
+        if '\\toprule' in line:
+            toprule_idx = i
+        if toprule_idx is not None and i > toprule_idx and '&' in line and header_idx is None:
+            header_idx = i
+            break
+    if header_idx is None:
+        return latex_table
+    # Escape % outside math in the header row
+    row = lines[header_idx]
+    out = []
+    in_math = False
+    for ch in row:
+        if ch == '$':
+            in_math = not in_math
+            out.append(ch)
+        elif ch == '%' and not in_math:
+            out.append(r'\%')
+        else:
+            out.append(ch)
+    lines[header_idx] = ''.join(out)
+    return '\n'.join(lines)
+
+def validate_latex_table(latex_table: str) -> List[str]:
+    """
+    Validate a LaTeX table string for common issues that break compilation.
+
+    Checks:
+    - Presence of a single tabular environment with column spec
+    - Column count consistency (rows have expected number of & separators)
+    - No unescaped % characters inside tabular content
+
+    Returns a list of error strings (empty if valid).
+    """
+    errors: List[str] = []
+    lines = latex_table.split('\n')
+    # Find begin/end tabular and extract colspec
+    begin_idx = next((i for i, ln in enumerate(lines) if '\\begin{tabular}' in ln), None)
+    end_idx = next((i for i, ln in enumerate(lines) if '\\end{tabular}' in ln), None)
+    if begin_idx is None or end_idx is None or end_idx <= begin_idx:
+        errors.append("Missing or malformed tabular environment")
+        return errors
+    import re
+    m = re.search(r"\\begin\{tabular\}\{([^}]*)\}", lines[begin_idx])
+    if not m:
+        errors.append("Could not parse tabular column specification")
+        return errors
+    colspec = m.group(1)
+    tokens = [ch for ch in colspec if ch.strip() and ch != '|']
+    ncols = len(tokens)
+    # Determine start of body (after last \midrule if present)
+    midrules = [i for i, ln in enumerate(lines) if '\\midrule' in ln]
+    body_start = (midrules[-1] + 1) if midrules else (begin_idx + 1)
+    content_lines = lines[body_start:end_idx]
+
+    # Also check header region for unescaped % characters
+    header_lines = lines[begin_idx:end_idx]
+    for ln in header_lines:
+        # Skip empty and structural lines
+        s = ln.strip()
+        if not s or any(tag in s for tag in ('\\begin{tabular}', '\\end{tabular}', '\\toprule', '\\midrule', '\\bottomrule', '\\cmidrule')):
+            continue
+        # Detect unescaped % in header region
+        for j, ch in enumerate(ln):
+            if ch == '%':
+                if j == 0 or ln[j-1] != '\\':
+                    errors.append("Unescaped % in header: '" + ln.strip() + "'")
+                    break
+
+    def _is_data_row(ln: str) -> bool:
+        ln_stripped = ln.strip()
+        if not ln_stripped:
+            return False
+        if any(tag in ln_stripped for tag in ('\\toprule', '\\midrule', '\\bottomrule', '\\cmidrule')):
+            return False
+        return ln_stripped.endswith('\\')
+
+    for ln in content_lines:
+        # Error on unescaped % inside tabular content
+        for j, ch in enumerate(ln):
+            if ch == '%':
+                if j == 0 or ln[j-1] != '\\':
+                    errors.append("Unescaped % in tabular content: '" + ln.strip() + "'")
+                    break
+        if not _is_data_row(ln):
+            continue
+        # Skip column count check for multicolumn rows
+        if '\\multicolumn' in ln:
+            continue
+        ampersands = ln.count('&')
+        if ampersands != ncols - 1:
+            errors.append(
+                f"Row has {ampersands+1} columns but tabular spec defines {ncols}: '{ln.strip()}'"
+            )
+    return errors
+
+
+def compile_latex_table(
+    latex_table: str,
+    *,
+    engine: str = 'pdflatex',
+    work_dir: Optional[Path] = None,
+    timeout_s: int = 20,
+) -> Tuple[bool, str]:
+    """
+    Attempt to compile a LaTeX table into a PDF using a minimal document.
+
+    Parameters
+    ----------
+    latex_table : str
+        The LaTeX table code (including the table environment) to compile.
+    engine : str, default 'pdflatex'
+        LaTeX engine to use ('pdflatex' recommended for compatibility).
+    work_dir : Path, optional
+        Directory to write temporary files; if None, uses a temp directory.
+    timeout_s : int, default 20
+        Maximum seconds to allow the compilation process to run.
+
+    Returns
+    -------
+    (ok, log) : Tuple[bool, str]
+        ok is True when compilation succeeds (exit code 0), False otherwise.
+        log contains stdout/stderr or diagnostic message if engine not found.
+
+    Notes
+    -----
+    - This is optional; call when a LaTeX engine is available in the environment.
+    - No network access is required; it shells out to the local LaTeX engine.
+    - Strict: no silent fallbacks — failure returns False with full log.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if shutil.which(engine) is None:
+        return False, f"LaTeX engine '{engine}' not found in PATH"
+
+    # Minimal wrapper document
+    doc = (
+        "\\documentclass{article}\n"
+        "\\usepackage[utf8]{inputenc}\n"
+        "\\usepackage{booktabs}\n"
+        "\\usepackage{multirow}\n"
+        "\\usepackage{siunitx}\n"
+        "\\usepackage{amsmath}\n"
+        "\\usepackage{graphicx}\n"
+        "\\begin{document}\n"
+        + latex_table +
+        "\n\\end{document}\n"
+    )
+
+    # Prepare working directory
+    cleanup = False
+    if work_dir is None:
+        tmp = tempfile.TemporaryDirectory()
+        work_dir = Path(tmp.name)
+        cleanup = True
+    else:
+        work_dir = Path(work_dir)
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+    tex_path = work_dir / 'table_test.tex'
+    tex_path.write_text(doc, encoding='utf-8')
+
+    cmd = [engine, '-interaction=nonstopmode', '-halt-on-error', 'table_test.tex']
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(work_dir),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout_s,
+            check=False,
+            text=True,
+        )
+        ok = (proc.returncode == 0)
+        log = proc.stdout
+    except subprocess.TimeoutExpired as e:
+        ok = False
+        log = f"LaTeX compilation timed out after {timeout_s}s\n{e}"
+
+    # Cleanup temp directory if we created it
+    if cleanup:
+        try:
+            tmp.cleanup()
+        except Exception:
+            pass
+
+    return ok, log
 
 
 def save_results_metadata(
@@ -833,3 +1155,59 @@ Parameters:
         logger.info(f"Metadata saved to: {metadata_path}")
 
     return metadata_path
+def _stylize_and_escape_simple_header(latex_table: str) -> str:
+    """Stylize math tokens (p, pFDR, t, M_diff, r, Δ*) and escape % in a simple header row.
+
+    Applies when no multicolumn headers are used. Rewrites the header line following
+    \toprule, converting known tokens to LaTeX math and escaping percent signs.
+    """
+    lines = latex_table.split('\n')
+    toprule_idx = None
+    header_idx = None
+    for i, line in enumerate(lines):
+        if '\\toprule' in line:
+            toprule_idx = i
+        if toprule_idx is not None and i > toprule_idx and '&' in line and header_idx is None:
+            header_idx = i
+            break
+    if header_idx is None:
+        return latex_table
+
+    row = lines[header_idx]
+    # Remove trailing \\ for processing, will add back later
+    has_trail = row.rstrip().endswith('\\')
+    row_clean = row.rstrip()
+    if has_trail:
+        row_clean = row_clean[:-2].rstrip()
+
+    cells = [c.strip() for c in row_clean.split('&')]
+
+    def style_cell(cell: str) -> str:
+        # Escape % outside of math (these headers are text by default)
+        cell_esc = cell.replace('%', r'\%')
+        t = cell_esc
+        # Exact token mappings
+        if t == 'pFDR':
+            return '$p_{FDR}$'
+        if t == 'p':
+            return '$p$'
+        if t == 't':
+            return '$t$'
+        if t == 'M_diff':
+            return '$M_{diff}$'
+        if t == 'r':
+            return '$r$'
+        # Delta-prefixed
+        if t.startswith('Δ'):
+            rest = t[1:]
+            if rest == 'r':
+                return '$\\Delta r$'
+            return f'$\\Delta\\,{rest}$' if rest else '$\\Delta$'
+        return t
+
+    new_cells = [style_cell(c) for c in cells]
+    new_row = ' & '.join(new_cells)
+    if has_trail:
+        new_row += ' \\\\'
+    lines[header_idx] = new_row
+    return '\n'.join(lines)

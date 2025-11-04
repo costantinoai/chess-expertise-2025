@@ -190,7 +190,7 @@ def generate_roi_table_from_blocks(
     multicolumn = {
         'Experts': ['Expert_mean', 'Expert_CI'],
         'Novices': ['Novice_mean', 'Novice_CI'],
-        'Experts−Novices': ['Delta_mean', 'Delta_CI'],
+        'Experts $-$ Novices': ['Delta_mean', 'Delta_CI'],
     }
 
     generate_styled_table(
