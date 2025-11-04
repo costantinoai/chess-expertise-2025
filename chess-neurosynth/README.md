@@ -100,24 +100,6 @@ Paths (under external data root):
 - Correlate Z+ and Z− maps with Neurosynth term maps
 - Compute correlation differences (r_pos − r_neg)
 
-### Statistical Assumptions and Limitations
-
-- **Spatial independence**: Voxels treated as independent observations for correlation analysis. In reality, fMRI voxels exhibit spatial autocorrelation due to smoothing and hemodynamic spread. Correlations are descriptive effect size measures rather than statistical tests
-- **Neurosynth circularity**: If the current study overlaps with Neurosynth database studies, term maps may reflect the current dataset, inflating correlations. The Neurosynth database is large (>10,000 studies), mitigating this concern
-- **Gray matter restriction**: All analyses restricted to gray matter voxels to focus on functionally relevant tissue
-- **Variance filtering**: Voxels with non-finite values or variance <10⁻⁵ excluded
-
-## Dependencies
-
-- Python 3.8+
-- numpy, pandas, scipy
-- nibabel (for NIfTI file I/O)
-- nilearn (for second-level GLM and image manipulation)
-- matplotlib, seaborn (for plotting)
-- Neurosynth term maps (downloaded separately)
-
-See `requirements.txt` in the repository root for complete dependencies.
-
 ## Data Requirements
 
 ### Input Files
@@ -138,38 +120,7 @@ See `requirements.txt` in the repository root for complete dependencies.
   - Columns: `participant_id`, `group` (expert/novice)
 - **Neurosynth term maps**: Same as above
 
-### Data Location
-
-Set the external data root once in `common/constants.py` (all analysis paths are derived from it):
-
-```python
-# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
-_EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
-# BIDS_ROOT, RSA searchlight, and Neurosynth term paths are built from this
-```
-
-Key derived paths used here (from `CONFIG`):
-- `SPM_GLM_SMOOTH4`: Path to smoothed (4mm) GLM directory with group-level results
-- `BIDS_RSA_SEARCHLIGHT`: Path to RSA searchlight results
-- `NEUROSYNTH_TERMS_DIR`: Path to Neurosynth term maps directory
-
 ## Running the Analysis
-
-### Step 0: Download Neurosynth Term Maps (One-time Setup)
-
-```bash
-# Download term maps from Neurosynth
-# Visit https://neurosynth.org/ and download association test maps for:
-# - working memory
-# - memory retrieval
-# - navigation
-# - language
-# - face recognition
-# - early visual
-# - object recognition
-
-# Place downloaded maps in: neurosynth/terms/
-```
 
 ### Step 1: Univariate Neurosynth Correlation
 
@@ -303,65 +254,4 @@ chess-neurosynth/
         └── figures/                      # Publication figures
 ```
 
-## Troubleshooting
 
-### Common Issues
-
-**"FileNotFoundError: Neurosynth terms directory not found"**
-- Verify `NEUROSYNTH_TERMS_DIR` path in `common/constants.py`
-- Download term maps from https://neurosynth.org/
-- Place maps in `data/neurosynth_terms/` directory
-
-**"No term maps found"**
-- Ensure term maps are named correctly (e.g., `working_memory_association-test_z.nii.gz`)
-- Check that maps are in NIfTI format (.nii or .nii.gz)
-
-**"FileNotFoundError: Group t-maps not found"**
-- Run SPM12 second-level GLM analysis first
-- Verify group directory: `data/BIDS/derivatives/spm-glm/smooth4/group/`
-- Check for files named `spmT_*.nii`
-
-**"FileNotFoundError: RSA searchlight maps not found"**
-- Run MATLAB searchlight RSA analysis first (`chess-mvpa/04_searchlight_rsa.m`)
-- Verify searchlight directory: `data/BIDS/derivatives/rsa-searchlight/`
-
-**"ValueError: Images have different shapes"**
-- Ensure Neurosynth term maps are resampled to match GLM resolution
-- Script handles resampling automatically using nearest-neighbor interpolation
-- If issue persists, check that all input images are in the same space (MNI152)
-
-**"Empty correlation results"**
-- Check gray matter mask threshold (default: >0.5)
-- Verify that z-maps contain non-zero values in gray matter regions
-- Check variance filtering threshold (default: <10⁻⁵)
-
-**Import errors**
-- Run from repository root (not from `chess-neurosynth/`)
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Verify nilearn version: `pip install nilearn>=0.9.0`
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-**Neurosynth citation**:
-```
-Yarkoni, T., Poldrack, R. A., Nichols, T. E., Van Essen, D. C., & Wager, T. D. (2011).
-Large-scale automated synthesis of human functional neuroimaging data.
-Nature Methods, 8(8), 665-670.
-```
-
-## Related Analyses
-
-- **Univariate GLM** (SPM12 analysis): Source of group-level t-maps
-- **MVPA searchlight RSA** (`chess-mvpa/04_searchlight_rsa.m`): Source of RSA searchlight maps
-- **Neurosynth term visualization** (`chess-supplementary/neurosynth-terms/`): Visualization of individual term maps
-- **Univariate ROI analysis** (`chess-supplementary/univariate-rois/`): ROI-level univariate results for comparison
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
