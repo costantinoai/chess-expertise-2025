@@ -131,28 +131,3 @@ chess-supplementary/rdm-intercorrelation/
         └── figures/                       # Publication figures
 ```
 
-## Troubleshooting
-
-**"Missing stimulus metadata"**
-- Ensure `data/BIDS/stimuli.tsv` exists with required columns
-
-**Import errors**
-- Run from repository root
-- Ensure all dependencies are installed
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **Behavioral RSA** (`chess-behavioral/`): Uses model RDMs as prediction targets
-- **MVPA RSA** (`chess-mvpa/`): Neural RSA with model RDMs
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
