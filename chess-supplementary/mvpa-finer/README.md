@@ -134,28 +134,3 @@ chess-supplementary/mvpa-finer/
     ├── <timestamp>_mvpa_finer_rsa/
     └── <timestamp>_mvpa_finer_decoding/
 ```
-
-## Troubleshooting
-
-**"Insufficient data for finer categories"**
-- Verify stimulus metadata includes checkmate-specific columns (motif, n_pieces, n_moves, etc.)
-- Check that 20 checkmate boards are correctly labeled
-
-**Other issues**: See main MVPA troubleshooting (`chess-mvpa/README.md`)
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **MVPA main** (`chess-mvpa/`): Main RSA and decoding analysis using all 40 boards
-- **RDM intercorrelation** (`chess-supplementary/rdm-intercorrelation/`): Orthogonality of model RDMs
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
