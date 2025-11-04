@@ -106,22 +106,6 @@ Subject-level RSA correlations and decoding accuracies were aggregated and teste
 - **Spatial dependence**: ROIs are anatomically adjacent and functionally connected, violating independence. FDR correction partially accounts for this by controlling the expected proportion of false positives
 - **Fisher z-transformation**: RSA correlation coefficients were not Fisher z-transformed for group-level testing, following standard practice when sample correlations are not strongly skewed
 
-## Dependencies
-
-**MATLAB**:
-- MATLAB R2022b or later
-- CoSMoMVPA toolbox (https://github.com/CoSMoMVPA/CoSMoMVPA)
-- SPM12 (for loading NIfTI files and GLM outputs)
-
-**Python**:
-- Python 3.8+
-- numpy, pandas, scipy
-- statsmodels (for FDR correction)
-- matplotlib, seaborn (for plotting)
-- nibabel (for loading NIfTI files)
-
-See `requirements.txt` in the repository root for complete Python dependencies.
-
 ## Data Requirements
 
 ### Input Files
@@ -327,54 +311,3 @@ chess-mvpa/
         └── figures/                   # Publication figures
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-**MATLAB: "CoSMoMVPA not found"**
-- Add CoSMoMVPA to MATLAB path: `addpath(genpath('/path/to/CoSMoMVPA'))`
-- Or set `COSMOMVPA_PATH` environment variable
-
-**MATLAB: "SPM.mat not found"**
-- Verify GLM directory structure: `BIDS/derivatives/SPM/GLM-unsmoothed/sub-*/exp/SPM.mat`
-- Check path in script line 41: `glmRoot` variable
-
-**MATLAB: "ROI atlas not found"**
-- Verify atlas exists: `data/BIDS/derivatives/rois/glasser22/*.nii`
-- Override with environment variable `CHESS_ROI_ATLAS_22`
-
-**Python: "No MVPA results found"**
-- Run MATLAB subject-level analysis first (step 1)
-- Verify TSV files exist in `BIDS/derivatives/mvpa-rsa/` and `mvpa-decoding/`
-- Check paths in `common/constants.py`: `BIDS_MVPA_RSA` and `BIDS_MVPA_DECODING`
-
-**Python: "Missing participant metadata"**
-- Ensure `BIDS/participants.tsv` exists with `participant_id` and `group` columns
-
-**MATLAB: Empty dataset warning**
-- Check that beta images exist in SPM directory
-- Verify SPM.mat contains condition labels matching expected format
-
-**Import errors (Python)**
-- Run from repository root (not from `chess-mvpa/`)
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **Behavioral RSA** (`chess-behavioral/`): Behavioral similarity judgments using same model RDMs
-- **RSA ROI summary** (`chess-supplementary/rsa-rois/`): Detailed ROI-level RSA results and visualization
-- **MVPA finer resolution** (`chess-supplementary/mvpa-finer/`): RSA and decoding with finer categorical distinctions (checkmate boards only)
-- **RDM intercorrelation** (`chess-supplementary/rdm-intercorrelation/`): Orthogonality analysis of model RDMs
-- **Univariate ROI analysis** (`chess-supplementary/univariate-rois/`): Traditional activation-based analysis for comparison
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
