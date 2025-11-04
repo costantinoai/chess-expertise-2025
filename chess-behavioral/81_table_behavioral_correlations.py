@@ -108,7 +108,8 @@ tex_path, csv_path = generate_expert_novice_table(
     label='tab:behavioral_rsa_correlations',
     formatter_func=_format_behavioral_correlations,
     pickle_name='correlation_results.pkl',
-    column_format='lSccc|Sccc',
+    # Let central style infer multicolumn headers and c-only colspec robustly
+    column_format=None,
     manuscript_name='behavioral_rsa_correlations.tex',
     logger=logger,
 )
