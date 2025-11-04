@@ -158,39 +158,4 @@ chess-behavioral/
         └── figures/                       # Publication figures
 ```
 
-## Troubleshooting
 
-### Common Issues
-
-**"FileNotFoundError: BIDS directory not found"**
-- Ensure `BIDS_ROOT` is set correctly in `common/constants.py`
-- Verify that participant directories exist: `data/BIDS/sub-01/`, etc.
-
-**"No valid preferences found"**
-- Check that event files have a `preference` column with valid values
-- Ensure event files are named correctly: `sub-*_task-exp_run-*_events.tsv`
-
-**"Missing stimulus metadata"**
-- Verify `data/BIDS/stimuli.tsv` exists and contains all 40 stimulus IDs
-
-**Import errors**
-- Run from repository root (not from `chess-behavioral/`)
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **MVPA RSA** (`chess-mvpa/`): Neural RSA using the same model RDMs
-- **Behavioral reliability** (`chess-supplementary/behavioral-reliability/`): Split-half reliability of behavioral RDMs
-- **RDM intercorrelation** (`chess-supplementary/rdm-intercorrelation/`): Correlations between behavioral, neural, and model RDMs
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
