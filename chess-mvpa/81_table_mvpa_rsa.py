@@ -70,8 +70,7 @@ for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
         break
 
 from common import setup_script, log_script_end
-from common.bids_utils import load_roi_metadata
-from common.tables import generate_styled_table
+from common.tables import generate_styled_table, build_c_only_colspec
 from common.formatters import format_p_cell, format_ci, shorten_roi_name
 from common import CONFIG
 
@@ -93,12 +92,8 @@ tables_dir = dirs['tables']
 # ============================================================================
 
 logger.info("Loading MVPA group statistics from pickle file...")
-
 with open(RESULTS_DIR / 'mvpa_group_stats.pkl', 'rb') as f:
     index = pickle.load(f)
-
-# Load ROI metadata
-roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
 
 # Extract RSA targets from data
 rsa_data = index.get('rsa_corr', {})
@@ -177,20 +172,11 @@ first_target = expected_targets[0]
 welch_df = rsa_data[first_target]['welch_expert_vs_novice']
 roi_labels = welch_df['ROI_Label'].tolist()
 
-# Merge with ROI metadata to get pretty names
-roi_df = welch_df.merge(
-    roi_info[['roi_id', 'pretty_name']],
-    left_on='ROI_Label',
-    right_on='roi_id',
-    how='left'
-)
-
 for roi_idx, roi_label in enumerate(roi_labels):
     row = {}
-
-    # Get pretty ROI name
-    pretty_name = roi_df.iloc[roi_idx]['pretty_name'].replace('\n', ' ')
-    row['ROI'] = pretty_name
+    # Use ROI name from stats (no external metadata dependency)
+    pretty_name = welch_df[welch_df['ROI_Label'] == roi_label]['ROI_Name'].iloc[0]
+    row['ROI'] = shorten_roi_name(str(pretty_name).replace('\n', ' '))
 
     # Add data for each target
     for tgt_idx, tgt in enumerate(expected_targets):
@@ -234,9 +220,9 @@ for _, r in df_combined.iterrows():
         group = target_display_names[tgt]
         row[f'Δr_{group}'] = float(r[f'{prefix}_Δr']) if pd.notna(r[f'{prefix}_Δr']) else float('nan')
         if pd.notna(r[f'{prefix}_CI_low']) and pd.notna(r[f'{prefix}_CI_high']):
-            row[f'95% CI_{group}'] = format_ci(float(r[f'{prefix}_CI_low']), float(r[f'{prefix}_CI_high']), precision=3, latex=False)
+            row[f'95% CI_{group}'] = format_ci(float(r[f'{prefix}_CI_low']), float(r[f'{prefix}_CI_high']), precision=3, latex=False, use_numrange=True)
         else:
-            row[f'95% CI_{group}'] = '[--, --]'
+            row[f'95% CI_{group}'] = '{--}{--}'
         row[f'p_{group}'] = format_p_cell(r[f'{prefix}_p'])
         row[f'pFDR_{group}'] = format_p_cell(r[f'{prefix}_pFDR'])
     rows.append(row)
@@ -258,10 +244,10 @@ latex_path = tables_dir / 'mvpa_rsa_summary.tex'
 generate_styled_table(
     df=df_out,
     output_path=latex_path,
-    caption='ROI-level RSA. Expert–novice difference in correlation (Δr) for Visual Similarity, Strategy, and Check vs Non-Check; 95% CIs and both raw and FDR-corrected p-values (Welch t-tests per ROI).',
+    caption='ROI-level RSA. Expert–novice difference in correlation ($\\delta r$) for Visual Similarity, Strategy, and Check vs Non-Check; 95% CIs and both raw and FDR-corrected $p$-values (Welch $t$-tests per ROI).',
     label='tab:rsa_roi_summary',
     multicolumn_headers=multicolumn,
-    column_format='lSccc|Sccc|Sccc',
+    column_format=build_c_only_colspec(df_out, multicolumn),
     logger=logger,
     manuscript_name='rsa_main_dims.tex',
 )
