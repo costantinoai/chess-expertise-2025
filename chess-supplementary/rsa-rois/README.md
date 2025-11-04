@@ -37,15 +37,6 @@ While searchlight RSA provides whole-brain voxelwise maps, ROI-level summaries f
 - **FDR correction** (Benjamini-Hochberg) at α=0.05 across 180 ROIs
 - **95% CIs** for group differences
 
-## Dependencies
-
-- Python 3.8+
-- numpy, pandas, scipy
-- nilearn (NiftiLabelsMasker for ROI extraction)
-- statsmodels (for FDR correction)
-
-See `requirements.txt` in the repository root for complete dependencies.
-
 ## Data Requirements
 
 ### Input Files
@@ -101,28 +92,3 @@ chess-supplementary/rsa-rois/
         └── *.pkl                          # Statistical results
 ```
 
-## Troubleshooting
-
-**"FileNotFoundError: RSA searchlight maps not found"**
-- Run MATLAB searchlight RSA first (`chess-mvpa/04_searchlight_rsa.m`)
-- Verify searchlight directory and file naming
-
-**"FileNotFoundError: Atlas not found"**
-- Verify Glasser-180 atlas path in `common/constants.py`
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **MVPA searchlight RSA** (`chess-mvpa/04_searchlight_rsa.m`): Source of searchlight maps
-- **Univariate ROI summary** (`chess-supplementary/univariate-rois/`): Parallel analysis for univariate contrasts
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
