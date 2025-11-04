@@ -69,24 +69,6 @@ To assess whether PR profiles distinguish experts from novices, we trained a log
 
 Principal component analysis (PCA) was performed on the standardized 22-dimensional PR features to enable 2D visualization. The first two principal components (PC1, PC2) captured the largest sources of variance in PR profiles. A logistic regression decision boundary was fitted in the 2D PCA space to visualize the linear separability of expert and novice PR profiles.
 
-### Statistical Assumptions and Limitations
-
-- **Independence**: PR values are assumed independent across participants but may share common noise sources (scanner drift, task strategies)
-- **ROI size**: PR is sensitive to the number of voxels in each ROI. We computed correlations between PR and ROI size to assess this potential confound
-- **Dimensionality interpretation**: PR quantifies spread across dimensions but does not identify which dimensions are functionally meaningful
-
-## Dependencies
-
-- Python 3.8+
-- numpy, pandas, scipy
-- scikit-learn (for PCA, logistic regression, and standardization)
-- statsmodels (for FDR correction)
-- matplotlib, seaborn (for plotting)
-- nibabel (for loading atlas NIfTI files)
-- SPM12 first-level GLM outputs (unsmoothed beta images)
-
-See `requirements.txt` in the repository root for complete dependencies.
-
 ## Data Requirements
 
 ### Input Files
@@ -122,7 +104,8 @@ Additional paths (derived from the external data root) used here:
 
 ```bash
 # From repository root
-python chess-manifold/01_manifold_analysis.py
+cd chess-manifold
+python 01_manifold_analysis.py
 ```
 
 **Outputs** (saved to `chess-manifold/results/<timestamp>_manifold/`):
@@ -207,46 +190,3 @@ chess-manifold/
         └── figures/                 # Publication figures
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-**"FileNotFoundError: Atlas file not found"**
-- Ensure `ROI_GLASSER_22_ATLAS` path is set correctly in `common/constants.py`
-- Verify atlas NIfTI file exists: `data/BIDS/derivatives/rois/glasser_22/glasser_22_atlas.nii.gz`
-
-**"No beta images found for subject"**
-- Check that `SPM_GLM_UNSMOOTHED` path points to the correct GLM directory
-- Verify beta images exist: `data/BIDS/derivatives/spm_glm_unsmoothed/sub-*/beta_*.nii`
-- Ensure beta images are named correctly (SPM12 default naming)
-
-**"Zero variance voxels warning"**
-- This is expected behavior; voxels with zero variance are excluded before PCA
-- If all voxels in an ROI have zero variance, check GLM results for that subject
-
-**"Singular matrix error in PCA"**
-- Occurs when n_stimuli < n_voxels in an ROI
-- PR computation handles this by retaining min(n_stimuli-1, n_voxels) components
-- Check that you have 40 beta images per subject
-
-**Import errors**
-- Run from repository root (not from `chess-manifold/`)
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **MVPA RSA** (`chess-mvpa/`): Neural RSA examining representational geometry
-- **Univariate ROI analysis** (`chess-supplementary/univariate-rois/`): Traditional activation-based ROI analysis for comparison
-- **RSA ROI summary** (`chess-supplementary/rsa-rois/`): ROI-level RSA results
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
