@@ -105,28 +105,3 @@ chess-supplementary/eyetracking/
         └── *.csv                          # Fold accuracies
 ```
 
-## Troubleshooting
-
-**"FileNotFoundError: Eye-tracking directory not found"**
-- Verify `BIDS_EYETRACK` path in `common/constants.py`
-- Check that eye-tracking TSV files exist
-
-**"Empty dataset after loading"**
-- Verify TSV files contain required columns (x_coordinate, y_coordinate)
-- Check JSON metadata files exist and are valid
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- Main behavioral and neural analyses provide context for eye-tracking patterns
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
