@@ -55,7 +55,7 @@ for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
         break
 
 from common import setup_script, log_script_end
-from common.tables import generate_styled_table
+from common.tables import generate_styled_table, build_c_only_colspec
 
 # ============================================================================
 # Configuration & Setup
@@ -137,7 +137,7 @@ generate_styled_table(
     caption='Neurosynth meta-analytic correlations for two contrasts: All > Rest and Check vs Non-Check. For each term, columns show correlations with positive and negative maps and their difference.',
     label='tab:neurosynth_univ',
     multicolumn_headers=multicolumn,
-    column_format='lSSS|SSS',
+    column_format=build_c_only_colspec(df_out, multicolumn),
     logger=logger,
     manuscript_name='neurosynth_univ.tex',
 )

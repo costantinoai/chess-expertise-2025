@@ -49,7 +49,7 @@ for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
         break
 
 from common import setup_script, log_script_end
-from common.tables import generate_styled_table
+from common.tables import generate_styled_table, build_c_only_colspec
 
 # ============================================================================
 # Configuration & Setup
@@ -105,22 +105,23 @@ logger.info("Building Neurosynth RSA table via centralized style system...")
 terms = data['visual']['pos']['term'].tolist()
 
 # Build clean DataFrame with formatted columns for publication
+# Use column names that will shorten nicely: Pos+/Neg+/Diff+ for each group
 rows = []
 for i, term in enumerate(terms):
     row = {'Term': term.replace('_', ' ').title()}
-    for key, name in [('visual', 'Visual'), ('strategy', 'Strategy'), ('check', 'Checkmate')]:
-        row[f'{name}_Pos'] = float(data[key]['pos'].iloc[i]['r'])
-        row[f'{name}_Neg'] = float(data[key]['neg'].iloc[i]['r'])
-        row[f'{name}_Diff'] = float(data[key]['diff'].iloc[i]['r_diff'])
+    for key, name in [('visual', 'Visual Similarity'), ('strategy', 'Strategy'), ('check', 'Checkmate')]:
+        row[f'Pos+_{name}'] = float(data[key]['pos'].iloc[i]['r'])
+        row[f'Neg-_{name}'] = float(data[key]['neg'].iloc[i]['r'])
+        row[f'Δ_{name}'] = float(data[key]['diff'].iloc[i]['r_diff'])
     rows.append(row)
 
 df_out = pd.DataFrame(rows)
 
 # Define multicolumn header groups
 multicolumn = {
-    'Visual Similarity': ['Visual_Pos', 'Visual_Neg', 'Visual_Diff'],
-    'Strategy': ['Strategy_Pos', 'Strategy_Neg', 'Strategy_Diff'],
-    'Checkmate': ['Checkmate_Pos', 'Checkmate_Neg', 'Checkmate_Diff']
+    'Visual Similarity': ['Pos+_Visual Similarity', 'Neg-_Visual Similarity', 'Δ_Visual Similarity'],
+    'Strategy': ['Pos+_Strategy', 'Neg-_Strategy', 'Δ_Strategy'],
+    'Checkmate': ['Pos+_Checkmate', 'Neg-_Checkmate', 'Δ_Checkmate']
 }
 
 # Generate and save LaTeX table (saves to both results and manuscript folders)
@@ -131,7 +132,7 @@ generate_styled_table(
     caption='Neurosynth RSA: correlations between neural dissimilarity and meta-analytic maps. For each model RDM (Visual Similarity, Strategy, Checkmate), columns show correlations with positive and negative maps and their difference.',
     label='tab:rsa_searchlight',
     multicolumn_headers=multicolumn,
-    column_format='lSSS|SSS|SSS',
+    column_format=build_c_only_colspec(df_out, multicolumn),
     logger=logger,
     manuscript_name='neurosynth_rsa.tex',
 )

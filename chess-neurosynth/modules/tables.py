@@ -7,7 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 import pandas as pd
 from typing import Dict
-from common.report_utils import generate_latex_table
+from common.tables import generate_styled_table, build_c_only_colspec
 
 
 def save_latex_correlation_tables(
@@ -26,8 +26,14 @@ def save_latex_correlation_tables(
 
     def _save(df: pd.DataFrame, base_name: str, caption: str, label: str):
         path = out_dir / f"{base_name}.tex"
-        # Minimal formatting: rely on pandas to_latex via generate_latex_table
-        generate_latex_table(df, path, caption=caption, label=label)
+        # Use centralized styled generator for consistency and validation
+        generate_styled_table(
+            df=df,
+            output_path=path,
+            caption=caption,
+            label=label,
+            column_format=build_c_only_colspec(df),
+        )
 
     _save(
         df_pos,
@@ -46,7 +52,7 @@ def save_latex_correlation_tables(
     _save(
         df_diff,
         base_name=f"{run_id}_difference_zmap",
-        caption=f"{run_id} — Difference in correlations (positive − negative).",
+        caption=f"{run_id} — Difference in correlations (positive $-$ negative).",
         label=f"tab:{run_id}_diff",
     )
 
@@ -95,20 +101,19 @@ def save_latex_combined_pos_neg_diff(
     multicolumn = {
         'Positive z-map': ['r', 'CI_low', 'CI_high', 'p_fdr'],
         'Negative z-map': ['r', 'CI_low', 'CI_high', 'p_fdr'],
-        'Difference (pos − neg)': ['r', 'CI_low', 'CI_high', 'p_fdr'],
+        'Difference (pos $-$ neg)': ['r', 'CI_low', 'CI_high', 'p_fdr'],
     }
 
     caption = f"{run_id} — Correlations with Neurosynth term maps (positive/negative/difference)."
     label = f"tab:{run_id}_combined"
 
-    return generate_latex_table(
-        merged,
-        out_path,
+    return generate_styled_table(
+        df=merged,
+        output_path=out_path,
         caption=caption,
         label=label,
-        column_format="lcccccccccccc",
         multicolumn_headers=multicolumn,
-        escape=False,
+        column_format=build_c_only_colspec(merged, multicolumn_headers=multicolumn),
     )
 
 
@@ -166,12 +171,11 @@ def generate_latex_multicolumn_table(
         ordered_cols.extend(cols_)
     merged = merged[ordered_cols]
 
-    return generate_latex_table(
-        merged,
-        output_path,
+    return generate_styled_table(
+        df=merged,
+        output_path=output_path,
         caption=caption,
         label=label,
-        column_format="l" + "c" * (merged.shape[1] - 1),
         multicolumn_headers=multicolumn,
-        escape=False,
+        column_format=build_c_only_colspec(merged, multicolumn_headers=multicolumn),
     )
