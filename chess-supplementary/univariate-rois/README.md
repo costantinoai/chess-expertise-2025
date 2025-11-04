@@ -100,29 +100,4 @@ chess-supplementary/univariate-rois/
         └── *.pkl                          # Statistical results
 ```
 
-## Troubleshooting
 
-**"FileNotFoundError: SPM contrast images not found"**
-- Run SPM first-level GLM analysis first
-- Verify GLM directory and contrast image naming (con_0001.nii, con_0002.nii)
-
-**"FileNotFoundError: Atlas not found"**
-- Verify Glasser-180 atlas path in `common/constants.py`
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **SPM first-level GLM**: Source of contrast images
-- **RSA ROI summary** (`chess-supplementary/rsa-rois/`): Parallel analysis for RSA searchlight maps
-- **Manifold PR analysis** (`chess-manifold/`): Uses similar ROI-based approach
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
