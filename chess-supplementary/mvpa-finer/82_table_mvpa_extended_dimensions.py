@@ -15,8 +15,14 @@ from common.report_utils import save_table_with_manuscript_copy
 from common.formatters import format_ci, format_p_cell, shorten_roi_name
 
 # Find RSA and decoding results directories
-rsa_dir = find_latest_results_directory(Path(__file__).parent / 'results', pattern='*_rsa', require_exists=True, verbose=True)
-dec_dir = find_latest_results_directory(Path(__file__).parent / 'results', pattern='*_decoding', require_exists=True, verbose=True)
+try:
+    rsa_dir = find_latest_results_directory(Path(__file__).parent / 'results', pattern='*_rsa', require_exists=True, verbose=True)
+    dec_dir = find_latest_results_directory(Path(__file__).parent / 'results', pattern='*_decoding', require_exists=True, verbose=True)
+except Exception as e:
+    logger = None
+    # If setup_analysis_in_dir below depends on rsa_dir, create a minimal logger via setup once we can
+    print(f"[WARN] Skipping MVPA Extended Dimensions tables: {e}")
+    sys.exit(0)
 
 # Use RSA dir for logging/output
 _, _, logger = setup_analysis_in_dir(rsa_dir, script_file=__file__,
@@ -27,133 +33,94 @@ tables_dir.mkdir(exist_ok=True)
 
 # Load data
 logger.info("Loading MVPA RSA and decoding statistics...")
-with open(rsa_dir / 'mvpa_group_stats.pkl', 'rb') as f:
+rsa_pkl = rsa_dir / 'mvpa_group_stats.pkl'
+dec_pkl = dec_dir / 'mvpa_group_stats.pkl'
+if not rsa_pkl.exists() or not dec_pkl.exists():
+    print(f"[WARN] Skipping MVPA Extended Dimensions tables: missing results files {rsa_pkl} or {dec_pkl}")
+    sys.exit(0)
+with open(rsa_pkl, 'rb') as f:
     rsa_stats = pickle.load(f)
-with open(dec_dir / 'mvpa_group_stats.pkl', 'rb') as f:
+with open(dec_pkl, 'rb') as f:
     dec_stats = pickle.load(f)
 
 # Load ROI metadata (22 bilateral regions)
-roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
+roi_dir = CONFIG['ROI_GLASSER_22']
+if not Path(roi_dir).exists():
+    print(f"[WARN] Skipping MVPA Extended Dimensions tables: ROI directory not found: {roi_dir}")
+    sys.exit(0)
+roi_info = load_roi_metadata(roi_dir)
 logger.info(f"Loaded {len(roi_info)} ROIs")
 
 # Define finer-grained dimensions (checkmate boards only)
 finer_dims = ['strategy_half', 'check_n_half', 'legal_moves_half', 'motif_half', 'total_pieces_half']
 dim_labels = ['Strategy', 'Moves to Checkmate', 'Legal Moves', 'Motifs', 'Total Pieces']
 
-# Build RSA table
-logger.info("Building RSA table...")
-rsa_lines = [
-    r'\begin{table}[p]',
-    r'\centering',
-    r'\resizebox{\linewidth}{!}{%',
-    r'\begin{tabular}{lScc|Scc|Scc|Scc|Scc}',
-    r'\toprule',
-    r'\multirow{2}{*}{ROI}',
-    r'  & \multicolumn{3}{c|}{Strategy}',
-    r'  & \multicolumn{3}{c|}{Moves to Checkmate}',
-    r'  & \multicolumn{3}{c|}{Legal Moves}',
-    r'  & \multicolumn{3}{c|}{Motifs}',
-    r'  & \multicolumn{3}{c}{Total Pieces} \\',
-    r'  & $\Delta r$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta r$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta r$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta r$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta r$ & 95\% CI & $p_\mathrm{FDR}$ \\',
-    r'\midrule'
-]
+logger.info("Building data matrices for RSA and decoding (single tables)...")
+from common.tables import generate_styled_table, build_c_only_colspec
 
-for _, roi_row in roi_info.iterrows():
-    roi_name = shorten_roi_name(roi_row['pretty_name'])
-    line = roi_name
-    for dim in finer_dims:
-        if 'rsa_corr' in rsa_stats and dim in rsa_stats['rsa_corr']:
-            welch = rsa_stats['rsa_corr'][dim]['welch_expert_vs_novice']
-            roi_data = welch[welch['ROI_Label'] == roi_row['roi_id']]
-            if len(roi_data) > 0:
-                row = roi_data.iloc[0]
-                dr = float(row['mean_diff'])
-                ci_l, ci_h = float(row['ci95_low']), float(row['ci95_high'])
-                p = row['p_val_fdr']
-                p_str = format_p_cell(p)
-                ci_str = format_ci(ci_l, ci_h, precision=3, latex=False)
-                line += f' & {dr:.3f} & {ci_str} & {p_str}'
+def build_df_for(kind: str) -> pd.DataFrame:
+    rows = []
+    source = rsa_stats if kind == 'rsa' else dec_stats
+    # Top-level keys differ between RSA and decoding pickles
+    key = 'rsa_corr' if kind == 'rsa' else 'svm'
+    for _, roi_row in roi_info.iterrows():
+        roi_name = shorten_roi_name(roi_row['pretty_name'])
+        row_out = {'ROI': roi_name}
+        for dim, lab in zip(finer_dims, dim_labels):
+            if key in source and dim in source[key]:
+                welch = source[key][dim]['welch_expert_vs_novice']
+                roi_data = welch[welch['ROI_Label'] == roi_row['roi_id']]
+                if len(roi_data) > 0:
+                    r = roi_data.iloc[0]
+                    delta = float(r['mean_diff'])
+                    ci_l, ci_h = float(r['ci95_low']), float(r['ci95_high'])
+                    p = r['p_val_fdr']
+                    # Put metric first for short headers under multicolumn: Δ, 95% CI, pFDR
+                    row_out[f'Δ_{lab}'] = delta
+                    row_out[f'95% CI_{lab}'] = format_ci(ci_l, ci_h, precision=3, latex=False, use_numrange=True)
+                    row_out[f'pFDR_{lab}'] = format_p_cell(p)
+                else:
+                    row_out[f'Δ_{lab}'] = float('nan')
+                    row_out[f'95% CI_{lab}'] = '{--}{--}'
+                    row_out[f'pFDR_{lab}'] = '--'
             else:
-                line += ' & -- & -- & --'
-        else:
-            line += ' & -- & -- & --'
-    line += ' \\\\'
-    rsa_lines.append(line)
+                row_out[f'Δ_{lab}'] = float('nan')
+                row_out[f'95% CI_{lab}'] = '{--}{--}'
+                row_out[f'pFDR_{lab}'] = '--'
+        rows.append(row_out)
+    return pd.DataFrame(rows)
 
-rsa_lines.extend([
-    r'\bottomrule',
-    r'\end{tabular}',
-    r'}',
-    r'\caption{Summary of ROI-level RSA results using correlation-based representational similarity. '
-    r'Values reflect the expert–novice difference in RSA for five finer (i.e., derived from checkmate boards only) regressors. '
-    r'All values are bootstrapped means with 95\% confidence intervals and FDR-corrected $p$-values.}',
-    r'\label{tab:rsa_roi_summary_checkonly}',
-    r'\end{table}',
-    ''
-])
+# Build full matrices
+df_rsa_all = build_df_for('rsa')
+df_dec_all = build_df_for('dec')
 
-# Build decoding table (same structure but with Δacc)
-logger.info("Building decoding table...")
-dec_lines = [
-    r'\begin{table}[p]',
-    r'\centering',
-    r'\resizebox{\linewidth}{!}{%',
-    r'\begin{tabular}{lScc|Scc|Scc|Scc|Scc}',
-    r'\toprule',
-    r'\multirow{2}{*}{ROI}',
-    r'  & \multicolumn{3}{c|}{Strategy}',
-    r'  & \multicolumn{3}{c|}{Moves to Mate}',
-    r'  & \multicolumn{3}{c|}{Legal Moves}',
-    r'  & \multicolumn{3}{c|}{Motifs}',
-    r'  & \multicolumn{3}{c}{Total Pieces} \\',
-    r'  & $\Delta acc$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta acc$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta acc$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta acc$ & 95\% CI & $p_\mathrm{FDR}$',
-    r'  & $\Delta acc$ & 95\% CI & $p_\mathrm{FDR}$ \\',
-    r'\midrule'
-]
+multicol_all = {lab: [f'Δ_{lab}', f'95% CI_{lab}', f'pFDR_{lab}'] for lab in dim_labels}
 
-for _, roi_row in roi_info.iterrows():
-    roi_name = shorten_roi_name(roi_row['pretty_name'])
-    line = roi_name
-    for dim in finer_dims:
-        if 'decoding' in dec_stats and dim in dec_stats['decoding']:
-            welch = dec_stats['decoding'][dim]['welch_expert_vs_novice']
-            roi_data = welch[welch['ROI_Label'] == roi_row['roi_id']]
-            if len(roi_data) > 0:
-                row = roi_data.iloc[0]
-                dacc = float(row['mean_diff'])
-                ci_l, ci_h = float(row['ci95_low']), float(row['ci95_high'])
-                p = row['p_val_fdr']
-                p_str = format_p_cell(p)
-                ci_str = format_ci(ci_l, ci_h, precision=3, latex=False)
-                line += f' & {dacc:.3f} & {ci_str} & {p_str}'
-            else:
-                line += ' & -- & -- & --'
-        else:
-            line += ' & -- & -- & --'
-    line += ' \\\\'
-    dec_lines.append(line)
+# Render RSA and Decoding tables as one file with two tables
+rsa_tex_path = generate_styled_table(
+    df=df_rsa_all,
+    output_path=tables_dir / 'mvpa_extended_dimensions_rsa.tex',
+    caption='RSA — expert–novice difference across five finer regressors.',
+    label='supptab:mvpa_ext_rsa',
+    multicolumn_headers=multicol_all,
+    column_format=build_c_only_colspec(df_rsa_all, multicolumn_headers=multicol_all),
+    logger=logger,
+    manuscript_name=None,
+)
 
-dec_lines.extend([
-    r'\bottomrule',
-    r'\end{tabular}',
-    r'}',
-    r'\caption{Summary of ROI-level decoding results using SVM classification. '
-    r'Values reflect decoding accuracy differences (\(\Delta acc\)) between expert and novice participants '
-    r'for five regressors: Strategy, Moves to Checkmate, Legal Moves, Motifs, and Total Pieces (checkmate boards only). '
-    r'All values are bootstrapped means with 95\% confidence intervals and FDR-corrected \(p\)-values.}',
-    r'\label{tab:svm_roi_summary_checkonly}',
-    r'\end{table}'
-])
+dec_tex_path = generate_styled_table(
+    df=df_dec_all,
+    output_path=tables_dir / 'mvpa_extended_dimensions_decoding.tex',
+    caption='Decoding — expert–novice difference across five finer regressors.',
+    label='supptab:mvpa_ext_dec',
+    multicolumn_headers=multicol_all,
+    column_format=build_c_only_colspec(df_dec_all, multicolumn_headers=multicol_all),
+    logger=logger,
+    manuscript_name=None,
+)
 
-# Combine and save
-combined_tex = '\n'.join(rsa_lines) + '\n\n\n' + '\n'.join(dec_lines)
+# Combine into the single manuscript file (backward-compatible)
+combined_tex = rsa_tex_path.read_text() + "\n\n" + dec_tex_path.read_text()
 save_table_with_manuscript_copy(
     combined_tex,
     tables_dir / 'mvpa_extended_dimensions.tex',
@@ -161,9 +128,15 @@ save_table_with_manuscript_copy(
     logger=logger
 )
 
+# Remove intermediate single-table files to keep only the final combined file
+try:
+    (tables_dir / 'mvpa_extended_dimensions_rsa.tex').unlink(missing_ok=True)
+    (tables_dir / 'mvpa_extended_dimensions_decoding.tex').unlink(missing_ok=True)
+    logger.info("Removed intermediate RSA/Decoding .tex files (kept combined only)")
+except Exception:
+    pass
+
 logger.info("="*80)
-logger.info(f"MVPA Extended Dimensions Table Complete")
-logger.info(f"  RSA: 5 dimensions × {len(roi_info)} ROIs")
-logger.info(f"  Decoding: 5 dimensions × {len(roi_info)} ROIs")
+logger.info("MVPA Extended Dimensions Tables Complete (single file with two tables)")
 logger.info("="*80)
 log_script_end(logger)

@@ -108,7 +108,7 @@ with open(RESULTS_DIR / 'mvpa_group_stats.pkl', 'rb') as f:
 
 # Load ROI metadata (names, hemisphere, anatomical grouping)
 # Note: This uses the full 180-region Glasser parcellation (ROI_GLASSER_22 is a typo in original)
-roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_22'])
+roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_180'])
 
 # Extract list of RSA targets (e.g., 'check', 'strategy', 'visual')
 targets = sorted(index.get('rsa_corr', {}).keys())

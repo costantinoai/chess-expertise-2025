@@ -435,25 +435,32 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 # Display figure in pylustrator GUI for interactive layout adjustment
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
+import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
 plt.figure(1).set_size_inches(cm_to_inches(18.26), cm_to_inches(23.93), forward=True)
-plt.figure(1).ax_dict["RDM_0_strategy_half"].set(position=[0.4555, 0.6875, 0.08276, 0.06322])
-plt.figure(1).ax_dict["RDM_1_check_n_half"].set(position=[0.4555, 0.4895, 0.08276, 0.06322])
-plt.figure(1).ax_dict["RDM_2_total_pieces_half"].set(position=[0.4555, 0.09723, 0.08276, 0.06322])
-plt.figure(1).ax_dict["RDM_3_legal_moves_half"].set(position=[0.4555, 0.2934, 0.08276, 0.06322])
-plt.figure(1).ax_dict["RDM_4_motif_half"].set(position=[0.4555, 0.8854, 0.08276, 0.06322])
-plt.figure(1).ax_dict["RSA_0_strategy_half"].set(position=[0.6065, 0.6762, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_1_check_n_half"].set(position=[0.6065, 0.4782, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_2_total_pieces_half"].set(position=[0.6065, 0.08599, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_3_legal_moves_half"].set(position=[0.6065, 0.2821, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_4_motif_half"].set(position=[0.6065, 0.8742, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_4_motif_half"].text(0.5148, 1.2943, 'Brain-Model RSA (Checkmate boards only)', transform=plt.figure(1).ax_dict["RSA_4_motif_half"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["RSA_4_motif_half"].texts[1].new
-plt.figure(1).ax_dict["SVM_0_strategy_half"].set(position=[0.05909, 0.6744, 0.378, 0.08941])
-plt.figure(1).ax_dict["SVM_1_check_n_half"].set(position=[0.05909, 0.4782, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_2_total_pieces_half"].set(position=[0.05909, 0.08599, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_3_legal_moves_half"].set(position=[0.05909, 0.2821, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_4_motif_half"].set(position=[0.05909, 0.8742, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.2045, 1.2943, 'Brain Decoding (Checkmate board only)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[6].new
+plt.figure(1).ax_dict["RDM_0_strategy_half"].set(position=[0.4155, 0.7528, 0.04391, 0.03354])
+plt.figure(1).ax_dict["RDM_1_check_n_half"].set(position=[0.4155, 0.5549, 0.04391, 0.03354])
+plt.figure(1).ax_dict["RDM_2_total_pieces_half"].set(position=[0.4155, 0.1591, 0.04391, 0.03354])
+plt.figure(1).ax_dict["RDM_3_legal_moves_half"].set(position=[0.4155, 0.357, 0.04391, 0.03354])
+plt.figure(1).ax_dict["RDM_4_motif_half"].set(position=[0.4155, 0.9507, 0.04391, 0.03354])
+plt.figure(1).ax_dict["RSA_0_strategy_half"].set(position=[0.5445, 0.6753, 0.3821, 0.08568])
+plt.figure(1).ax_dict["RSA_0_strategy_half"].title.set(visible=False)
+plt.figure(1).ax_dict["RSA_1_check_n_half"].set(position=[0.5445, 0.4773, 0.3821, 0.08568])
+plt.figure(1).ax_dict["RSA_2_total_pieces_half"].set(position=[0.5412, 0.08684, 0.3821, 0.08568])
+plt.figure(1).ax_dict["RSA_3_legal_moves_half"].set(position=[0.5401, 0.283, 0.3821, 0.08568])
+plt.figure(1).ax_dict["RSA_4_motif_half"].set(position=[0.5434, 0.8742, 0.3821, 0.08568])
+plt.figure(1).ax_dict["RSA_4_motif_half"].text(0.3409, 1.3042, 'Brain-Model RSA (Checkmate boards only)', transform=plt.figure(1).ax_dict["RSA_4_motif_half"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["RSA_4_motif_half"].texts[1].new
+plt.figure(1).ax_dict["RSA_4_motif_half"].text(0.5000, 0.5000, 'Tactical Motif (CM)', transform=plt.figure(1).ax_dict["RSA_4_motif_half"].transAxes, fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_4_motif_half"].texts[2].new
+plt.figure(1).ax_dict["RSA_4_motif_half"].title.set(visible=False)
+plt.figure(1).ax_dict["SVM_0_strategy_half"].set(position=[0.06021, 0.6744, 0.378, 0.08941])
+plt.figure(1).ax_dict["SVM_0_strategy_half"].title.set(visible=False)
+plt.figure(1).ax_dict["SVM_1_check_n_half"].set(position=[0.06021, 0.4782, 0.378, 0.08568])
+plt.figure(1).ax_dict["SVM_2_total_pieces_half"].set(position=[0.06021, 0.08599, 0.378, 0.08568])
+plt.figure(1).ax_dict["SVM_3_legal_moves_half"].set(position=[0.06021, 0.2821, 0.378, 0.08568])
+plt.figure(1).ax_dict["SVM_4_motif_half"].set(position=[0.06021, 0.8742, 0.378, 0.08568])
+plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.2045, 1.2940, 'Brain Decoding (Checkmate board only)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[6].new
+plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.5000, 0.5000, 'Tactical Motif (CM)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[7].new
+plt.figure(1).ax_dict["SVM_4_motif_half"].title.set(visible=False)
 #% end: automatic generated code from pylustrator
 from common import CONFIG as _CONFIG_FOR_SHOW
 if _CONFIG_FOR_SHOW['ENABLE_PYLUSTRATOR']:
