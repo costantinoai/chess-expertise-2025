@@ -43,9 +43,8 @@ This repository contains the complete analysis code for our study investigating 
 ### Prerequisites
 
 - **Python 3.9–3.12** (tested on 3.11)
-- **MATLAB R2019b or higher** (optional, only for subject-level MVPA)
+- **MATLAB R2019b or higher** (optional, only for subject-level GLM and MVPA. Group stats are computed in Python)
 - **SPM12** (optional, for first-level GLM preprocessing)
-- **Git** for cloning the repository
 
 ### Clone Repository
 
