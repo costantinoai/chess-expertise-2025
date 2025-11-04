@@ -36,7 +36,7 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.report_utils import save_table_with_manuscript_copy
+from common.tables import generate_styled_table
 from common import CONFIG
 
 # ============================================================================
@@ -75,59 +75,31 @@ df_stimuli = pd.read_csv(stimuli_file, sep='\t')
 logger.info(f"Loaded {len(df_stimuli)} stimuli")
 
 # ============================================================================
-# Build LaTeX Table
+# Build LaTeX Table (centralized generator)
 # ============================================================================
 
 logger.info("Building stimuli table...")
 
-# Sort by stim_id to ensure correct order
+from pandas import DataFrame
 df_stimuli = df_stimuli.sort_values('stim_id').reset_index(drop=True)
-
-# Build LaTeX table manually for precise control
-latex_lines = []
-latex_lines.append(r'\begin{table}[p]')
-latex_lines.append(r'\centering')
-latex_lines.append(r'\resizebox{\linewidth}{!}{%')
-latex_lines.append(r'\begin{tabular}{ll}')
-latex_lines.append(r'\toprule')
-latex_lines.append(r'Stimulus ID & FEN Notation \\')
-latex_lines.append(r'\midrule')
-
-# Add each stimulus
+rows = []
 for _, row in df_stimuli.iterrows():
-    stim_id = int(row['stim_id'])
-    fen = row['fen']
+    stim_label = f"S{int(row['stim_id']):02d}"
+    fen_tex = f"\\texttt{{{row['fen']}}}"
+    rows.append({'Stimulus ID': stim_label, 'FEN Notation': fen_tex})
+df_out = DataFrame(rows)
 
-    # Format stimulus ID as S01, S02, etc.
-    stim_label = f'S{stim_id:02d}'
-
-    # Escape underscores in FEN for LaTeX (though FEN shouldn't have underscores)
-    fen_latex = fen.replace('_', r'\_')
-
-    latex_lines.append(f'{stim_label} & \\texttt{{{fen_latex}}} \\\\')
-
-latex_lines.append(r'\bottomrule')
-latex_lines.append(r'\end{tabular}')
-latex_lines.append(r'}')
-
-# Caption
-caption = (r'\caption{Complete listing of all 40 experimental stimuli with their '
-           r'Forsyth-Edwards Notation (FEN) strings. Each stimulus ID (S01--S40) '
-           r'corresponds to a unique chess board position used in the study.}')
-latex_lines.append(caption)
-latex_lines.append(r'\label{tab:stimuli}')
-latex_lines.append(r'\end{table}')
-
-# Join all lines
-latex_table = '\n'.join(latex_lines)
-
-# Save LaTeX table to both results and final_results folders
 latex_path = tables_dir / 'stimuli.tex'
-save_table_with_manuscript_copy(
-    latex_table,
-    latex_path,
+generate_styled_table(
+    df=df_out,
+    output_path=latex_path,
+    caption=('Complete listing of all 40 experimental stimuli with their '
+             'Forsyth-Edwards Notation (FEN) strings. Each stimulus ID (S01--S40) '
+             'corresponds to a unique chess board position used in the study.'),
+    label='tab:stimuli',
+    column_format='ll',
+    logger=logger,
     manuscript_name='stimuli.tex',
-    logger=logger
 )
 
 # Also save a simple CSV for reference
