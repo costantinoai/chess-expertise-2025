@@ -170,97 +170,63 @@ checkmate_sig = filter_and_format_significant('checkmate', 'Checkmate', alpha=0.
 strategy_sig = filter_and_format_significant('strategy', 'Strategy', alpha=0.05)
 
 # ============================================================================
-# Build LaTeX Tables
+# Build LaTeX Tables (central generator)
 # ============================================================================
 
-logger.info("Building LaTeX tables...")
+logger.info("Building tables with centralized generator...")
 
-def build_latex_table(df: pd.DataFrame, model_label: str, table_label: str) -> str:
-    """
-    Build a LaTeX table for one model's significant ROIs.
+from common.tables import generate_styled_table
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Filtered DataFrame with significant results
-    model_label : str
-        Display name for the model (e.g., "Checkmate model")
-    table_label : str
-        LaTeX label for the table
-
-    Returns
-    -------
-    str
-        Complete LaTeX table code
-    """
-    lines = []
-
-    # Table header
-    lines.append(r'\begin{table}[p]')
-    lines.append(r'\centering')
-    lines.append(r'\resizebox{\linewidth}{!}{%')
-    lines.append(r'\begin{tabular}{llSScc}')
-    lines.append(r'\toprule')
-    lines.append(r'ROI & Harvard-Oxford Label & $M_{\text{diff}}$ & $t$ & 95\% CI & $p$ \\')
-    lines.append(r'\midrule')
-
-    # Table rows
-    for _, row in df.iterrows():
+def build_df(sig: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for _, row in sig.iterrows():
         roi_name = shorten_roi_name(row['pretty_name'])
         ho_label = row['harvard_oxford_label'] if pd.notna(row['harvard_oxford_label']) else 'Unlabeled'
-        m_diff = row['mean_diff']
-        t_stat = row['t_stat']
-        ci_low = row['ci95_low']
-        ci_high = row['ci95_high']
-        p_fdr = row['p_val_fdr']
+        ci_str = format_ci(float(row['ci95_low']), float(row['ci95_high']), precision=3, latex=False, use_numrange=True)
+        p_str = format_p_cell(row['p_val_fdr'])
+        rows.append({
+            'ROI': roi_name,
+            'Harvard–Oxford Label': ho_label,
+            'M_diff': float(row['mean_diff']),
+            't': float(row['t_stat']),
+            '95% CI': ci_str,
+            'p': p_str,
+        })
+    return pd.DataFrame(rows)
 
-        # Format p-value and CI
-        p_str = format_p_cell(p_fdr)
-        ci_str = format_ci(float(ci_low), float(ci_high), precision=3, latex=False)
+df_check = build_df(checkmate_sig)
+df_strategy = build_df(strategy_sig)
 
-        lines.append(
-            f'{roi_name} & {ho_label} & {float(m_diff):.3f} & '
-            f'{float(t_stat):.3f} & {ci_str} & {p_str} \\\\'
-        )
-
-    # Table footer
-    lines.append(r'\bottomrule')
-    lines.append(r'\end{tabular}')
-    lines.append(r'}')
-
-    # Caption
-    lines.append(
-        f'\\caption{{\\textbf{{{model_label} (RSA): Experts $>$ Novices.}} '
-        f'Glasser ROIs showing stronger model–brain correspondence in Experts than Novices '
-        f'when summarizing searchlight RSA within parcels. '
-        f'Columns report the Glasser ROI label, secondary Harvard–Oxford label '
-        f'(assigned by ROI center of mass), '
-        f'mean group difference $M_{{\\text{{diff}}}}$ (Experts $-$ Novices), '
-        f'$t$ statistic, 95\\% CI of the difference, and FDR-corrected $p$ value ($\\alpha<.05$).}}'
-    )
-
-    lines.append(f'\\label{{{table_label}}}')
-    lines.append(r'\end{table}')
-    lines.append('')  # Blank line between tables
-
-    return '\n'.join(lines)
-
-# Build both tables
-checkmate_tex = build_latex_table(
-    checkmate_sig,
-    'Checkmate model',
-    'supptab:roi_analysis_rsa_check'
+check_path = generate_styled_table(
+    df=df_check,
+    output_path=tables_dir / 'roi_maps_rsa_check.tex',
+    caption=(
+        'Checkmate model (RSA): Experts > Novices. Glasser ROIs showing stronger model–brain correspondence '
+        'in Experts than Novices. Columns: Glasser ROI label; Harvard–Oxford label; '
+        '$M_{\text{diff}}$ (Experts $-$ Novices); $t$; 95% CI; FDR-corrected $p$.'
+    ),
+    label='supptab:roi_analysis_rsa_check',
+    column_format='llcccc',
+    logger=logger,
+    manuscript_name='roi_maps_rsa_check.tex',
 )
 
-strategy_tex = build_latex_table(
-    strategy_sig,
-    'Strategy model',
-    'supptab:roi_analysis_rsa_strategy'
+strategy_path = generate_styled_table(
+    df=df_strategy,
+    output_path=tables_dir / 'roi_maps_rsa_strategy.tex',
+    caption=(
+        'Strategy model (RSA): Experts > Novices. Glasser ROIs showing stronger model–brain correspondence '
+        'in Experts than Novices. Columns: Glasser ROI label; Harvard–Oxford label; '
+        '$M_{\text{diff}}$ (Experts $-$ Novices); $t$; 95% CI; FDR-corrected $p$.'
+    ),
+    label='supptab:roi_analysis_rsa_strategy',
+    column_format='llcccc',
+    logger=logger,
+    manuscript_name='roi_maps_rsa_strategy.tex',
 )
 
-# Combine tables
-combined_tex = checkmate_tex + '\n' + strategy_tex
-
+# Combined file (backward-compat single include)
+combined_tex = check_path.read_text() + "\n\n" + strategy_path.read_text()
 # ============================================================================
 # Save Tables
 # ============================================================================
@@ -275,6 +241,14 @@ save_table_with_manuscript_copy(
     manuscript_name='roi_maps_rsa.tex',
     logger=logger
 )
+
+# Remove intermediate per-model files to keep only the combined table
+try:
+    check_path.unlink(missing_ok=True)
+    strategy_path.unlink(missing_ok=True)
+    logger.info("Removed intermediate per-model .tex files (kept combined only)")
+except Exception:
+    pass
 
 # Save combined CSV for reference
 combined_csv = pd.concat([

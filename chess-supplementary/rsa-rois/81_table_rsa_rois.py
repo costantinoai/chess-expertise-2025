@@ -84,7 +84,6 @@ for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
         break
 
 from common import CONFIG, setup_script, log_script_end
-from common.bids_utils import load_roi_metadata
 from common.report_utils import generate_latex_table, format_roi_stats_table
 from modules import RSA_TARGETS
 
@@ -112,9 +111,15 @@ logger.info("Loading RSA group statistics from pickle file...")
 with open(results_dir / 'rsa_group_stats.pkl', 'rb') as f:
     index = pickle.load(f)
 
-# Load ROI metadata (names, hemisphere, anatomical grouping)
-# This uses the full 180-region Glasser parcellation
-roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_180'])
+# Load ROI metadata from local results (avoids external path dependency)
+import pandas as pd
+roi_info_path = results_dir / 'roi_info_with_ho_labels.tsv'
+if roi_info_path.exists():
+    roi_info = pd.read_csv(roi_info_path, sep='\t')
+else:
+    # Fallback to configured ROI directory if local metadata not found
+    from common.bids_utils import load_roi_metadata
+    roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_180'])
 
 # Extract list of RSA targets from configuration
 targets = list(RSA_TARGETS.keys())
