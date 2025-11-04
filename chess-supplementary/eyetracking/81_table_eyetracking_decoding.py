@@ -141,7 +141,7 @@ def build_metric_rows(res: dict, feature_label: str) -> list:
         Feature=feature_label,
         Metric='Accuracy (CV mean, t-test)',
         Estimate=float(res['mean_accuracy']),
-        CI=format_ci(float(res['ci_low']), float(res['ci_high']), precision=3, latex=False),
+        CI=format_ci(float(res['ci_low']), float(res['ci_high']), precision=3, latex=False, use_numrange=True),
         p_value=format_p_cell(p_t),
     ))
 
@@ -172,7 +172,7 @@ def build_metric_rows(res: dict, feature_label: str) -> list:
         Feature=feature_label,
         Metric='Accuracy (pooled, binomial)',
         Estimate=float(pooled_acc) if pooled_acc == pooled_acc else float('nan'),
-        CI=(format_ci(float(pooled_lo), float(pooled_hi), precision=3, latex=False)
+        CI=(format_ci(float(pooled_lo), float(pooled_hi), precision=3, latex=False, use_numrange=True)
             if pooled_lo == pooled_lo and pooled_hi == pooled_hi else ''),
         p_value=(format_p_cell(p_bin) if p_bin == p_bin else ''),
     ))
@@ -254,7 +254,7 @@ tex_path = generate_styled_table(
     output_path=tables_dir / 'eyetracking_decoding_summary.tex',  # Output LaTeX file
     caption='Eyetracking decoding summary metrics for displacement and XY position features.',  # Table caption
     label='tab:eyetracking_decoding_summary',  # LaTeX label for references
-    column_format='llScc',  # Two text cols, S for Estimate, then CI and p as text
+    column_format='llccc',  # Two text cols, then three centered data columns
     logger=logger,
     manuscript_name='et_decoding.tex',  # Copy to final_results/tables/
 )
