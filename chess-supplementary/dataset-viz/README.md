@@ -113,22 +113,6 @@ python chess-supplementary/dataset-viz/91_plot_dataset_viz.py
 
 **Expected runtime**: ~30 seconds
 
-### Step 2: Generate Standalone Colorbars
-
-```bash
-python chess-supplementary/dataset-viz/91_plot_colorbars.py
-```
-
-**Outputs** (saved to `chess-supplementary/dataset-viz/results/<timestamp>_colorbars/figures/`):
-- `colorbar_behavioral_directional_vertical.svg` (and .pdf)
-- `colorbar_0_to_01_horizontal.svg` (and .pdf)
-- `colorbar_neurosynth_univariate_vertical.svg` (and .pdf)
-- `colorbar_neurosynth_rsa_horizontal.svg` (and .pdf)
-- `colorbar_manifold_pr_profiles_vertical.svg` (and .pdf)
-- `colorbar_manifold_pca_components_horizontal.svg` (and .pdf)
-
-**Expected runtime**: ~1-2 minutes
-
 ## Key Results
 
 **Stimulus set characteristics**:
@@ -137,66 +121,5 @@ python chess-supplementary/dataset-viz/91_plot_colorbars.py
 - 20 visual pairs (matched for perceptual similarity)
 - Systematic variation in piece count, legal moves, and tactical motifs
 
-**Colorbars**:
-- All colorbars extracted from actual data ranges to ensure consistency
-- Both horizontal and vertical orientations provided for flexible figure composition
-- Sequential and diverging colormaps selected based on data type
 
-## File Structure
 
-```
-chess-supplementary/dataset-viz/
-├── README.md                          # This file
-├── 91_plot_dataset_viz.py             # Chess board grid visualization
-├── 91_plot_colorbars.py               # Standalone colorbar generation
-├── METHODS.md                         # Detailed methods from manuscript
-├── DISCREPANCIES.md                   # Notes on analysis discrepancies
-├── modules/
-│   ├── __init__.py
-│   └── plotting.py                    # Plotting utilities
-└── results/                           # Analysis outputs (timestamped)
-    ├── <timestamp>_dataset_viz/
-    │   └── figures/                   # Chess board grid figures
-    └── <timestamp>_colorbars/
-        └── figures/                   # Standalone colorbar figures
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**"FileNotFoundError: Stimulus images not found"**
-- Verify chess board images exist: `data/BIDS/stimuli/images/*.png`
-- Check external data root in `common/constants.py`
-
-**"FileNotFoundError: Analysis results not found"**
-- Run prerequisite analyses before generating colorbars:
-  - `chess-behavioral/01_behavioral_rsa.py`
-  - `chess-neurosynth/01_univariate_neurosynth.py`
-  - `chess-neurosynth/02_rsa_neurosynth.py`
-  - `chess-manifold/01_manifold_analysis.py`
-
-**"Missing stimulus metadata"**
-- Ensure `data/BIDS/stimuli.tsv` exists with required columns
-- Check FEN strings are valid
-
-**Import errors**
-- Run from repository root (not from `chess-supplementary/dataset-viz/`)
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- All main analyses (colorbar references)
-- **Neurosynth term visualization** (`chess-supplementary/neurosynth-terms/`): Individual term map visualization
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
