@@ -29,7 +29,7 @@
 #   - zip utility
 #
 # Quick start (examples):
-#   cd /home/eik-tb/OneDrive_andreaivan.costantino@kuleuven.be/GitHub/chess-expertise-2025
+#   cd ./GitHub/chess-expertise-2025
 #   # Recommended (conda-forge):
 #   mamba env create -f environment.yml   # or: conda env create -f environment.yml
 #   conda activate chess-expertise
