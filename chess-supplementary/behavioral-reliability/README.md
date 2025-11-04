@@ -154,39 +154,3 @@ chess-supplementary/behavioral-reliability/
         └── tables/                             # LaTeX tables
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-**"FileNotFoundError: BIDS directory not found"**
-- Ensure the external data root is set correctly in `common/constants.py`
-- This analysis reuses data from `chess-behavioral/`, so same troubleshooting applies
-
-**"No valid preferences found"**
-- Check event files have a `preference` column with valid values
-- See `chess-behavioral/README.md` for detailed troubleshooting
-
-**"Import errors from chess-behavioral modules"**
-- Ensure `chess-behavioral/` directory exists with required modules
-- Run from repository root (not from `chess-supplementary/behavioral-reliability/`)
-
-**Slow runtime**
-- Default: 1,000 bootstrap iterations takes ~5-10 minutes
-- Can reduce `n_iterations` in script for faster testing (not recommended for final results)
-
-## Citation
-
-If you use this analysis in your work, please cite:
-
-```
-[Your paper citation here]
-```
-
-## Related Analyses
-
-- **Behavioral RSA** (`chess-behavioral/`): Main behavioral RDM analysis
-- **RDM intercorrelation** (`chess-supplementary/rdm-intercorrelation/`): Correlations between behavioral, neural, and model RDMs
-
-## Contact
-
-For questions or issues, please open an issue on GitHub or contact [your email].
