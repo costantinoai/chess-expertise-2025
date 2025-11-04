@@ -298,6 +298,44 @@ if ! command -v zip &> /dev/null; then
 fi
 print_success "zip utility found"
 
+# Constrain threading to avoid OpenMP shared memory errors in CI/sandboxed envs
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export OMP_DYNAMIC=FALSE
+export KMP_AFFINITY=disabled
+export KMP_INIT_AT_FORK=FALSE
+export MKL_THREADING_LAYER=SEQUENTIAL
+export VECLIB_MAXIMUM_THREADS=1
+export BLIS_NUM_THREADS=1
+export ACCELERATE_NUM_THREADS=1
+export NUMBA_NUM_THREADS=1
+print_info "Threading pinned (OMP/MKL/OPENBLAS/NUMEXPR = 1)"
+
+# Optional LaTeX environment check (for table compilation)
+if command -v pdflatex >/dev/null 2>&1; then
+  if command -v kpsewhich >/dev/null 2>&1; then
+    MISSING_PKGS=()
+    for sty in booktabs.sty multirow.sty siunitx.sty; do
+      if ! kpsewhich "$sty" >/dev/null 2>&1; then
+        MISSING_PKGS+=("$sty")
+      fi
+    done
+    if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
+      print_warning "Missing LaTeX packages: ${MISSING_PKGS[*]}"
+      print_warning "Install TeX packages, e.g. on Debian/Ubuntu:"
+      echo "  sudo apt-get update && sudo apt-get install -y texlive-latex-extra texlive-latex-recommended texlive-fonts-recommended"
+    else
+      print_success "LaTeX packages found (booktabs, multirow, siunitx)"
+    fi
+  else
+    print_warning "kpsewhich not found; cannot verify LaTeX packages. pdflatex present."
+  fi
+else
+  print_warning "pdflatex not found; skipping LaTeX compilation checks for tables."
+fi
+
 print_header "STAGE SELECTION"
 print_info "Run analysis scripts:  ${RUN_ANALYSIS}"
 print_info "Run table scripts:     ${RUN_TABLES}"
@@ -515,6 +553,17 @@ run_analysis_folder() {
   for script in "${selected_scripts[@]}"; do
     script_num=$((script_num + 1))
     local script_name=$(basename "$script")
+    # Determine script category by numeric prefix (for table compilation later)
+    local script_prefix=${script_name:0:2}
+    local script_n=$((10#$script_prefix))
+    local script_category="other"
+    if (( script_n >= 80 && script_n <= 89 )); then
+      script_category="tables"
+    elif (( script_n >= 90 && script_n <= 99 )); then
+      script_category="figures"
+    else
+      script_category="analysis"
+    fi
 
     eval "echo \"----------------------------------------\" | $_tee_cmd"
     eval "echo \"[$script_num/$script_count] Running: $script_name\" | $_tee_cmd"
@@ -523,9 +572,14 @@ run_analysis_folder() {
 
     # Run with conda, stream to console in sequential mode while logging
     local exit_code=0
+    # Record timestamp before running the script to detect new .tex files
+    local script_start_ts=$(date +%s)
     if $SEQUENTIAL; then
+      # In sequential mode, the pipeline to tee masks the original exit code.
+      # With 'set -o pipefail' enabled, the 'if !' branch is entered on failure.
+      # Explicitly mark failure with exit_code=1 to avoid misreporting success.
       if ! "$PYTHON_BIN" "$script" 2>&1 | tee -a "$logfile"; then
-        exit_code=$?
+        exit_code=1
       fi
     else
       if ! "$PYTHON_BIN" "$script" >> "$logfile" 2>&1; then
@@ -558,6 +612,55 @@ run_analysis_folder() {
 
     eval "echo \"Finished: $(date)\" | $_tee_cmd"
     eval "echo \"\" | $_tee_cmd"
+
+    # --------------------------------------------------------------
+    # Post-step: If this was a table script, optionally compile new .tex
+    # --------------------------------------------------------------
+    if [ $exit_code -eq 0 ] && [ "$script_category" = "tables" ]; then
+      # Check for pdflatex availability
+      if command -v pdflatex >/dev/null 2>&1; then
+        eval "echo \"Validating LaTeX tables via pdflatex...\" | $_tee_cmd"
+        # Find .tex files created or modified after this script started
+        mapfile -t _new_tex < <(find "$folder" -type f -name "*.tex" -newermt "@${script_start_ts}" 2>/dev/null | sort)
+        if [ ${#_new_tex[@]} -eq 0 ]; then
+          eval "echo \"No new .tex tables detected after $script_name\" | $_tee_cmd"
+        else
+          for _tf in "${_new_tex[@]}"; do
+            eval "echo \"  • Compiling: $_tf\" | $_tee_cmd"
+            # Use the central Python validator/compilation helper
+            if $SEQUENTIAL; then
+              "$PYTHON_BIN" - "$REPO_ROOT" "$_tf" <<'PY' | tee -a "$logfile"
+import sys, os
+repo_root, tex_file = sys.argv[1], sys.argv[2]
+sys.path.insert(0, repo_root)
+from pathlib import Path
+from common.report_utils import compile_latex_table
+s = Path(tex_file).read_text(encoding='utf-8')
+ok, log = compile_latex_table(s)
+print(f"    result: {'OK' if ok else 'FAIL'}")
+if not ok:
+    print("    ---- pdflatex log ----\n" + log)
+PY
+            else
+              "$PYTHON_BIN" - "$REPO_ROOT" "$_tf" >> "$logfile" 2>&1 <<'PY'
+import sys, os
+repo_root, tex_file = sys.argv[1], sys.argv[2]
+sys.path.insert(0, repo_root)
+from pathlib import Path
+from common.report_utils import compile_latex_table
+s = Path(tex_file).read_text(encoding='utf-8')
+ok, log = compile_latex_table(s)
+print(f"    result: {'OK' if ok else 'FAIL'}")
+if not ok:
+    print("    ---- pdflatex log ----\n" + log)
+PY
+            fi
+          done
+        fi
+      else
+        eval "echo \"pdflatex not found; skipping LaTeX compilation checks for tables.\" | $_tee_cmd"
+      fi
+    fi
   done
 
   eval "echo \"========================================\" | $_tee_cmd"
