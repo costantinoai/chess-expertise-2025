@@ -126,6 +126,8 @@ spm*.nii
 
 # Exclude all markdown files (documentation, notes, plans)
 *.md
+# But allow README files
+!README.md
 
 # Old implementation - never commit (read-only reference only)
 old-implementation/
