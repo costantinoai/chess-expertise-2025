@@ -56,47 +56,41 @@ sig_df = welch_df[(welch_df['p_val_fdr'] < 0.05) & (welch_df['mean_diff'] > 0)].
 sig_df = sig_df.sort_values('p_val_fdr')
 logger.info(f"Significant ROIs: {len(sig_df)}")
 
-# Build LaTeX table
-lines = [
-    r'\begin{table}[p]',
-    r'\centering',
-    r'\resizebox{\linewidth}{!}{%',
-    r'\begin{tabular}{llSScc}',
-    r'\toprule',
-    r'ROI & Harvard-Oxford Label & $M_{\text{diff}}$ & $t$ & 95\% CI & $p$ \\',
-    r'\midrule'
-]
-
+logger.info("Formatting table with centralized generator...")
+rows = []
 for _, row in sig_df.iterrows():
     ho = row['harvard_oxford_label'] if pd.notna(row['harvard_oxford_label']) else 'Unlabeled'
     p_str = format_p_cell(row['p_val_fdr'])
-    ci_str = format_ci(float(row['ci95_low']), float(row['ci95_high']), precision=3, latex=False)
+    ci_str = format_ci(float(row['ci95_low']), float(row['ci95_high']), precision=3, latex=False, use_numrange=True)
     roi_name = shorten_roi_name(row['pretty_name'])
-    lines.append(
-        f'{roi_name} & {ho} & {float(row["mean_diff"]):.3f} & {float(row["t_stat"]):.3f} & '
-        f'{ci_str} & {p_str} \\\\'
-    )
+    rows.append({
+        'ROI': roi_name,
+        'Harvard–Oxford Label': ho,
+        'M_diff': float(row['mean_diff']),
+        't': float(row['t_stat']),
+        '95% CI': ci_str,
+        'p': p_str,
+    })
 
-lines.extend([
-    r'\bottomrule',
-    r'\end{tabular}',
-    r'}',
-    r'\caption{\textbf{Univariate contrast \emph{All} $>$ \emph{Rest}: Experts $>$ Novices.} '
-    r'Glasser ROIs with higher second-level GLM contrast values in Experts than Novices. '
-    r'Columns show Glasser ROI label, Harvard–Oxford label, '
-    r'mean group difference $M_{\text{diff}}$ (contrast units; Experts $-$ Novices), '
-    r'$t$ statistic, 95\% CI, and FDR-corrected $p$ value ($\alpha<.05$).}',
-    r'\label{supptab:roi_analysis_univ_allrest}',
-    r'\end{table}'
-])
+_df_out = pd.DataFrame(rows)
+from common.tables import generate_styled_table
 
-# Save
-save_table_with_manuscript_copy(
-    '\n'.join(lines),
-    tables_dir / 'roi_maps_univ.tex',
+generate_styled_table(
+    df=_df_out,
+    output_path=tables_dir / 'roi_maps_univ.tex',
+    caption=(
+        'Univariate contrast \emph{All} > \emph{Rest}: Experts > Novices. '
+        'Glasser ROIs with higher second-level GLM contrast values in Experts than Novices. '
+        'Columns show Glasser ROI label, Harvard–Oxford label, '
+        'mean group difference $M_{\text{diff}}$ (contrast units; Experts $-$ Novices), '
+        '$t$ statistic, 95% CI, and FDR-corrected $p$ value ($\alpha<.05$).'
+    ),
+    label='supptab:roi_analysis_univ_allrest',
+    column_format='llcccc',
+    logger=logger,
     manuscript_name='roi_maps_univ.tex',
-    logger=logger
 )
+logger.info("Saved LaTeX table via centralized generator")
 
 sig_df[['pretty_name', 'harvard_oxford_label', 'mean_diff', 't_stat', 'ci95_low', 'ci95_high', 'p_val_fdr']].to_csv(
     tables_dir / 'roi_maps_univ.csv',
