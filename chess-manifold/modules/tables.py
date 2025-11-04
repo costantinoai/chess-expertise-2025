@@ -20,6 +20,7 @@ import pandas as pd
 # Add repo root to path for common imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from common.report_utils import save_table_with_manuscript_copy
+from common.tables import generate_styled_table, build_c_only_colspec
 from common.formatters import format_ci as fmt_ci_global, format_p_cell, shorten_roi_name
 
 logger = logging.getLogger(__name__)
@@ -81,8 +82,8 @@ def generate_pr_results_table(
     def fmt_ci(low: float, high: float) -> str:
         """Format confidence interval to 3 decimals."""
         if np.isnan(low) or np.isnan(high):
-            return "[--, --]"
-        return fmt_ci_global(float(low), float(high), precision=3, latex=False)
+            return "{--}{--}"
+        return fmt_ci_global(float(low), float(high), precision=3, latex=False, use_numrange=True)
 
     def fmt_p(p: float) -> str:
         """Format p-value cell (APA style)."""
@@ -133,55 +134,11 @@ def generate_pr_results_table(
             'Novice_CI': fmt_ci(novice_row['ci_low'], novice_row['ci_high']),
             'Delta_mean': fmt_val(stats_row['mean_diff']),
             'Delta_CI': fmt_ci(stats_row['ci95_low'], stats_row['ci95_high']),
-            'p_value': f"{fmt_p(stats_row['p_val'])} / {fmt_p(stats_row['p_val_fdr'])}",
+            'p_raw': fmt_p(stats_row['p_val']),
+            'pFDR': fmt_p(stats_row['p_val_fdr']),
         })
 
     table_df = pd.DataFrame(table_rows)
-
-    # ========== Generate LaTeX Table ==========
-    # Label for significance column (raw/FDR combined as text)
-    p_label = '$p$/$p_{\\mathrm{FDR}}$' if use_fdr else '$p$'
-    # Two significance columns: raw and FDR-corrected p-values
-
-    latex_header = (
-        "\\begin{table}[p]\n"
-        "\\centering\n"
-        "\\resizebox{\\linewidth}{!}{%\n"
-        "\\begin{tabular}{lSc|Sc|Sc|c}\n"
-        "\\toprule\n"
-        "\\multirow{2}{*}{ROI}\n"
-        "  & \\multicolumn{2}{c|}{Experts}\n"
-        "  & \\multicolumn{2}{c|}{Novices}\n"
-        "  & \\multicolumn{2}{c|}{Experts$-$Novices}\n"
-        f"  & {p_label} \\\\\n"
-        "  & Mean & 95\\% CI"
-        "  & Mean & 95\\% CI"
-        "  & $\\Delta$ & 95\\% CI"
-        "  &  \\\\\n"
-        "\\midrule\n"
-    )
-
-    latex_body = "\n".join(
-        f"{row['ROI']} "
-        f"& {row['Expert_mean']} & {row['Expert_CI']} "
-        f"& {row['Novice_mean']} & {row['Novice_CI']} "
-        f"& {row['Delta_mean']} & {row['Delta_CI']} "
-        f"& {row['p_value']} \\\\"
-        for _, row in table_df.iterrows()
-    )
-
-    latex_footer = (
-        "\n\\bottomrule\n"
-        "\\end{tabular}\n"
-        "}\n"
-        "\\caption{Participation Ratio (PR) by ROI: group means with 95\\% confidence intervals, "
-        "group differences (Expert $-$ Novice) from Welch's $t$-tests (t-based CIs), and both raw and "
-        "FDR-corrected $p$-values (reported as $p$/$p_{\\mathrm{FDR}}$).}\n"
-        "\\label{tab:pr_results}\n"
-        "\\end{table}\n"
-    )
-
-    latex_table = latex_header + latex_body + latex_footer
 
     # ========== Save Files ==========
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -189,12 +146,24 @@ def generate_pr_results_table(
     tex_path = output_dir / filename_tex
     csv_path = output_dir / filename_csv
 
-    # Save LaTeX table with manuscript copy
-    save_table_with_manuscript_copy(
-        latex_table,
-        tex_path,
-        manuscript_name='pr_ttest.tex',  # Copy to final_results/tables/
-        logger=logger
+    multicolumn = {
+        'Experts': ['Expert_mean', 'Expert_CI'],
+        'Novices': ['Novice_mean', 'Novice_CI'],
+        'Experts $-$ Novices': ['Delta_mean', 'Delta_CI'],
+    }
+    generate_styled_table(
+        df=table_df,
+        output_path=tex_path,
+        caption=(
+            "Participation Ratio (PR) by ROI: group means with 95% confidence intervals, "
+            "group differences (Expert $-$ Novice) from Welch's $t$-tests (t-based CIs), "
+            "and both raw and FDR-corrected $p$-values."
+        ),
+        label='tab:pr_results',
+        multicolumn_headers=multicolumn,
+        column_format=build_c_only_colspec(table_df, multicolumn_headers=multicolumn),
+        logger=logger,
+        manuscript_name='pr_ttest.tex',
     )
 
     table_df.to_csv(csv_path, index=False)
