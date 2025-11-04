@@ -107,7 +107,7 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 python chess-supplementary/dataset-viz/91_plot_dataset_viz.py
 ```
 
-**Outputs** (saved to `chess-supplementary/dataset-viz/results/<timestamp>_dataset_viz/figures/`):
+**Outputs** (saved to `chess-supplementary/dataset-viz/results/dataset_viz/figures/`):
 - `chess_stimuli_grid.pdf`: Complete grid of all 40 chess boards with labels
 - `chess_stimuli_grid.svg`: SVG version
 
@@ -120,6 +120,5 @@ python chess-supplementary/dataset-viz/91_plot_dataset_viz.py
 - 5 strategy types with 4 exemplars each (2 checkmate, 2 non-checkmate per strategy)
 - 20 visual pairs (matched for perceptual similarity)
 - Systematic variation in piece count, legal moves, and tactical motifs
-
 
 

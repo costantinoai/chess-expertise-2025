@@ -87,7 +87,7 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 python chess-supplementary/rdm-intercorrelation/01_rdm_intercorrelation.py
 ```
 
-**Outputs** (saved to `chess-supplementary/rdm-intercorrelation/results/<timestamp>_rdm_intercorr/`):
+**Outputs** (saved to `chess-supplementary/rdm-intercorrelation/results/rdm_intercorrelation/`):
 - `pairwise_correlations.csv`: Spearman correlations between all RDM pairs
 - `partial_correlations.csv`: Partial correlations controlling for other RDMs
 - `variance_partitioning.csv`: Unique, shared, and unexplained variance per target
@@ -102,7 +102,7 @@ python chess-supplementary/rdm-intercorrelation/01_rdm_intercorrelation.py
 python chess-supplementary/rdm-intercorrelation/91_plot_rdm_intercorr.py
 ```
 
-**Outputs** (saved to `chess-supplementary/rdm-intercorrelation/results/<latest>/figures/`):
+**Outputs** (saved to `chess-supplementary/rdm-intercorrelation/results/rdm_intercorrelation/figures/`):
 - `rdm_intercorr_panel.pdf`: Combined visualization showing pairwise correlations, partial correlations, and variance partitioning
 
 ## Key Results
@@ -124,10 +124,9 @@ chess-supplementary/rdm-intercorrelation/
 ├── modules/
 │   ├── __init__.py
 │   └── rdm_utils.py                       # RDM correlation and partitioning utilities
-└── results/                               # Analysis outputs (timestamped)
-    └── <timestamp>_rdm_intercorr/
+└── results/
+    └── rdm_intercorrelation/
         ├── *.csv                          # Statistical results
         ├── *.pkl                          # Python objects
         └── figures/                       # Publication figures
 ```
-

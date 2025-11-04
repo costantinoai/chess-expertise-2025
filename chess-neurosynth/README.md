@@ -129,7 +129,7 @@ Paths (under external data root):
 python chess-neurosynth/01_univariate_neurosynth.py
 ```
 
-**Outputs** (saved to `chess-neurosynth/results/<timestamp>_neurosynth_univariate/`):
+**Outputs** (saved to `chess-neurosynth/results/neurosynth_univariate/`):
 - `zmap_<contrast>.nii.gz`: Signed z-score maps (converted from t-maps)
 - `<contrast>_term_corr_positive.csv`: Z+ term correlations (term, r)
 - `<contrast>_term_corr_negative.csv`: Z− term correlations (term, r)
@@ -144,7 +144,7 @@ python chess-neurosynth/01_univariate_neurosynth.py
 python chess-neurosynth/02_rsa_neurosynth.py
 ```
 
-**Outputs** (saved to `chess-neurosynth/results/<timestamp>_neurosynth_rsa/`):
+**Outputs** (saved to `chess-neurosynth/results/neurosynth_rsa/`):
 - `zmap_<pattern>.nii.gz`: Group z-score maps (Experts > Novices) for each RSA model
 - `<pattern>_term_corr_positive.csv`: Z+ term correlations
 - `<pattern>_term_corr_negative.csv`: Z− term correlations
@@ -163,11 +163,13 @@ python chess-neurosynth/81_table_neurosynth_univariate.py
 python chess-neurosynth/82_table_neurosynth_rsa.py
 ```
 
-**Outputs** (saved to `chess-neurosynth/results/<latest>/tables/`):
-- `neurosynth_univariate_<contrast>.tex`: LaTeX tables
-- `neurosynth_univariate_<contrast>.csv`: CSV tables
-- `neurosynth_rsa_<pattern>.tex`: LaTeX tables
-- `neurosynth_rsa_<pattern>.csv`: CSV tables
+**Outputs**:
+- Univariate tables → `chess-neurosynth/results/neurosynth_univariate/tables/`
+  - `neurosynth_univariate_<contrast>.tex`: LaTeX tables
+  - `neurosynth_univariate_<contrast>.csv`: CSV tables
+- RSA tables → `chess-neurosynth/results/neurosynth_rsa/tables/`
+  - `neurosynth_rsa_<pattern>.tex`: LaTeX tables
+  - `neurosynth_rsa_<pattern>.csv`: CSV tables
 
 ### Step 4: Generate Figures
 
@@ -179,9 +181,13 @@ python chess-neurosynth/91_plot_neurosynth_univariate.py
 python chess-neurosynth/92_plot_neurosynth_rsa.py
 ```
 
-**Outputs** (saved to `chess-neurosynth/results/<latest>/figures/`):
-- Individual axes as SVG/PDF: `neurosynth_univariate_<contrast>_<panel>.svg`, etc.
-- Complete panels: `panels/neurosynth_univariate_panel.pdf`, `panels/neurosynth_rsa_panel.pdf`
+**Outputs**:
+- Univariate figures → `chess-neurosynth/results/neurosynth_univariate/figures/`
+  - Individual axes as SVG/PDF: `neurosynth_univariate_<contrast>_<panel>.svg`, etc.
+  - Complete panel: `panels/neurosynth_univariate_panel.pdf`
+- RSA figures → `chess-neurosynth/results/neurosynth_rsa/figures/`
+  - Individual axes as SVG/PDF
+  - Complete panel: `panels/neurosynth_rsa_panel.pdf`
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 
@@ -253,5 +259,3 @@ chess-neurosynth/
         ├── tables/                       # LaTeX tables
         └── figures/                      # Publication figures
 ```
-
-

@@ -82,7 +82,7 @@ Same as main MVPA analysis (`chess-mvpa/`):
 python chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py
 ```
 
-**Outputs** (saved to `chess-supplementary/mvpa-finer/results/<timestamp>_mvpa_finer_rsa/`):
+**Outputs** (saved to `chess-supplementary/mvpa-finer/results/mvpa_finer_group_rsa/`):
 - Statistical results per target (CSV files)
 - `mvpa_group_stats.pkl`: Complete results dictionary
 
@@ -94,7 +94,7 @@ python chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py
 python chess-supplementary/mvpa-finer/03_mvpa_finer_group_decoding.py
 ```
 
-**Outputs** (saved to `chess-supplementary/mvpa-finer/results/<timestamp>_mvpa_finer_decoding/`):
+**Outputs** (saved to `chess-supplementary/mvpa-finer/results/mvpa_finer_group_decoding/`):
 - Statistical results per target (CSV files)
 - `mvpa_group_stats.pkl`: Complete results dictionary
 
@@ -130,7 +130,7 @@ chess-supplementary/mvpa-finer/
 ├── 92_plot_mvpa_finer_panel.py            # Figure generation
 ├── METHODS.md                             # Detailed methods from manuscript
 ├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-└── results/                               # Analysis outputs (timestamped)
-    ├── <timestamp>_mvpa_finer_rsa/
-    └── <timestamp>_mvpa_finer_decoding/
+└── results/
+    ├── mvpa_finer_group_rsa/
+    └── mvpa_finer_group_decoding/
 ```

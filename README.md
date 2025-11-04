@@ -267,7 +267,7 @@ This will execute analyses in the following order:
 Each analysis directory has detailed instructions in its README. Basic workflow:
 
 ```bash
-# Always run from the anaysis folder
+# Always run from the analysis folder
 cd chess-behavioral
 conda activate <your-new-env-name>
 python 01_behavioral_rsa.py                 # Main analysis (~2 min)

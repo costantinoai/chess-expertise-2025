@@ -178,7 +178,7 @@ cd /path/to/chess-expertise-2025/chess-mvpa/
 python chess-mvpa/02_mvpa_group_rsa.py
 ```
 
-**Outputs** (saved to `chess-mvpa/results/<timestamp>_mvpa_group_rsa/`):
+**Outputs** (saved to `chess-mvpa/results/mvpa_group/`):
 - `<target>_experts_vs_chance.csv`: Expert vs zero statistics per ROI
 - `<target>_novices_vs_chance.csv`: Novice vs zero statistics per ROI
 - `<target>_experts_vs_novices.csv`: Group comparison statistics per ROI
@@ -193,7 +193,7 @@ python chess-mvpa/02_mvpa_group_rsa.py
 python chess-mvpa/03_mvpa_group_decoding.py
 ```
 
-**Outputs** (saved to `chess-mvpa/results/<timestamp>_mvpa_group_decoding/`):
+**Outputs** (saved to `chess-mvpa/results/mvpa_group/`):
 - `<target>_experts_vs_chance.csv`: Expert vs chance statistics per ROI
 - `<target>_novices_vs_chance.csv`: Novice vs chance statistics per ROI
 - `<target>_experts_vs_novices.csv`: Group comparison statistics per ROI
@@ -212,7 +212,7 @@ python chess-mvpa/81_table_mvpa_rsa.py
 python chess-mvpa/82_table_mvpa_decoding.py
 ```
 
-**Outputs** (saved to `chess-mvpa/results/<latest>/tables/`):
+**Outputs** (saved to `chess-mvpa/results/mvpa_group/tables/`):
 - `mvpa_rsa_<target>.tex`: LaTeX tables for each model target
 - `mvpa_rsa_<target>.csv`: CSV tables for each model target
 - `mvpa_decoding_<target>.tex`: LaTeX tables for each classification target
@@ -228,7 +228,7 @@ python chess-mvpa/92_plot_mvpa_rsa.py
 python chess-mvpa/93_plot_mvpa_decoding.py
 ```
 
-**Outputs** (saved to `chess-mvpa/results/<latest>/figures/`):
+**Outputs** (saved to `chess-mvpa/results/mvpa_group/figures/`):
 - Individual axes as SVG/PDF: `mvpa_rsa_<target>_<panel>.svg`, etc.
 - Complete panels: `panels/mvpa_rsa_panel.pdf`, `panels/mvpa_decoding_panel.pdf`
 
@@ -298,16 +298,10 @@ chess-mvpa/
 │   ├── mvpa_group.py                  # Group-level statistical tests
 │   └── plotting.py                    # Plotting utilities
 ├── local/                             # Local data preparation scripts
-└── results/                           # Analysis outputs (timestamped)
-    ├── <timestamp>_mvpa_group_rsa/
-    │   ├── *.csv                      # Statistical results per target
-    │   ├── *.pkl                      # Python objects
-    │   ├── tables/                    # LaTeX tables
-    │   └── figures/                   # Publication figures
-    └── <timestamp>_mvpa_group_decoding/
+└── results/
+    └── mvpa_group/
         ├── *.csv                      # Statistical results per target
         ├── *.pkl                      # Python objects
         ├── tables/                    # LaTeX tables
         └── figures/                   # Publication figures
 ```
-

@@ -66,7 +66,7 @@ NEUROSYNTH_TERMS_DIR = EXTERNAL_DATA_ROOT / "neurosynth" / "terms"
 python chess-supplementary/neurosynth-terms/91_plot_neurosynth_terms.py
 ```
 
-**Outputs** (saved to `chess-supplementary/neurosynth-terms/results/<timestamp>_neurosynth_terms/figures/`):
+**Outputs** (saved to `chess-supplementary/neurosynth-terms/results/neurosynth_terms_panel/figures/`):
 - Flatmap visualizations for each term
 - Glass brain projections for each term
 - Combined multi-panel figure showing all terms
@@ -87,8 +87,8 @@ chess-supplementary/neurosynth-terms/
 ├── 91_plot_neurosynth_terms.py            # Term map visualization
 ├── METHODS.md                             # Detailed methods from manuscript
 ├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-└── results/                               # Analysis outputs (timestamped)
-    └── <timestamp>_neurosynth_terms/
+└── results/
+    └── neurosynth_terms_panel/
         └── figures/                       # Term visualizations
 ```
 
@@ -102,4 +102,3 @@ chess-supplementary/neurosynth-terms/
 **"Term map resolution mismatch"**
 - Script handles resampling automatically
 - Ensure term maps are in standard MNI space
-

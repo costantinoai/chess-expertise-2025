@@ -41,18 +41,18 @@ While searchlight RSA provides whole-brain voxelwise maps, ROI-level summaries f
 
 ### Input Files
 
-- **RSA searchlight maps**: `data/BIDS/derivatives/rsa-searchlight/sub-*/sub-*_desc-searchlight_<target>_stat-r_map.nii.gz`
-- **Atlas**: `data/BIDS/derivatives/rois/glasser180/glasser180_bilateral_atlas.nii.gz`
-- **ROI metadata**: `data/BIDS/derivatives/rois/glasser180/region_info.tsv`
-- **Participant data**: `data/BIDS/participants.tsv`
+- **RSA searchlight maps**: `BIDS/derivatives/rsa_searchlight/sub-*/sub-*_desc-searchlight_<target>_stat-r_map.nii.gz`
+- **Atlas**: `rois/glasser180/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii.gz`
+- **ROI metadata**: `rois/glasser180/region_info.tsv`
+- **Participant data**: `BIDS/participants.tsv`
 
 ### Data Location
 
 Set paths in `common/constants.py`:
 
 ```python
-BIDS_RSA_SEARCHLIGHT = BIDS_ROOT / "derivatives" / "rsa-searchlight"
-ROI_GLASSER_180_ATLAS = BIDS_ROOT / "derivatives" / "rois" / "glasser180" / "glasser180_bilateral_atlas.nii.gz"
+BIDS_RSA_SEARCHLIGHT = BIDS_ROOT / "derivatives" / "rsa_searchlight"
+ROI_GLASSER_180_ATLAS = ROI_GLASSER_180 / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii.gz"
 ```
 
 ## Running the Analysis
@@ -64,7 +64,7 @@ ROI_GLASSER_180_ATLAS = BIDS_ROOT / "derivatives" / "rois" / "glasser180" / "gla
 python chess-supplementary/rsa-rois/01_rsa_roi_summary.py
 ```
 
-**Outputs** (saved to `chess-supplementary/rsa-rois/results/<timestamp>_rsa_rois/`):
+**Outputs** (saved to `chess-supplementary/rsa-rois/results/rsa_rois/`):
 - `rsa_subject_roi_means_{target}.tsv`: Subject × ROI tables per target
 - `rsa_group_stats.pkl`: Per-target Welch statistics and descriptives
 - `01_rsa_roi_summary.py`: Copy of the analysis script
@@ -86,9 +86,8 @@ chess-supplementary/rsa-rois/
 ├── modules/
 │   ├── __init__.py
 │   └── io.py                              # RSA map loading utilities
-└── results/                               # Analysis outputs (timestamped)
-    └── <timestamp>_rsa_rois/
+└── results/
+    └── rsa_rois/
         ├── *.tsv                          # Subject × ROI tables
         └── *.pkl                          # Statistical results
 ```
-

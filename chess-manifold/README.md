@@ -108,7 +108,7 @@ cd chess-manifold
 python 01_manifold_analysis.py
 ```
 
-**Outputs** (saved to `chess-manifold/results/<timestamp>_manifold/`):
+**Outputs** (saved to `chess-manifold/results/manifold/`):
 - `pr_results.pkl`: Complete results dictionary (for plotting scripts)
 - `pr_long_format.csv`: Subject-level PR values in long format (one row per subject-ROI)
 - `pr_summary_stats.csv`: Group means, standard errors, and 95% CIs per ROI
@@ -124,7 +124,7 @@ python 01_manifold_analysis.py
 python chess-manifold/81_table_manifold_pr.py
 ```
 
-**Outputs** (saved to `chess-manifold/results/<latest>/tables/`):
+**Outputs** (saved to `chess-manifold/results/manifold/tables/`):
 - `manifold_pr_tests.tex`: LaTeX table with group statistics and t-test results
 - `manifold_pr_tests.csv`: CSV version of the table
 
@@ -134,7 +134,7 @@ python chess-manifold/81_table_manifold_pr.py
 python chess-manifold/91_plot_manifold_panels.py
 ```
 
-**Outputs** (saved to `chess-manifold/results/<latest>/figures/`):
+**Outputs** (saved to `chess-manifold/results/manifold/figures/`):
 - Individual axes as SVG/PDF:
   - `manifold_A_PRHeatmap.svg`: Subject × ROI heatmap of PR values
   - `manifold_B_GroupComparison.svg`: Expert vs novice PR distributions
@@ -182,11 +182,10 @@ chess-manifold/
 │   ├── tables.py                    # Table formatting
 │   └── utils.py                     # General utilities
 ├── local/                           # Local data preparation scripts
-└── results/                         # Analysis outputs (timestamped)
-    └── <timestamp>_manifold/
+└── results/
+    └── manifold/
         ├── *.pkl                    # Python objects
         ├── *.csv                    # Summary tables
         ├── tables/                  # LaTeX tables
         └── figures/                 # Publication figures
 ```
-

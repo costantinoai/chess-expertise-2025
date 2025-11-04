@@ -96,7 +96,7 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 python chess-supplementary/behavioral-reliability/01_behavioral_split_half_reliability.py
 ```
 
-**Outputs** (saved to `chess-supplementary/behavioral-reliability/results/<timestamp>_behavioral_split_half/`):
+**Outputs** (saved to `chess-supplementary/behavioral-reliability/results/behavioral_split_half/`):
 - `reliability_metrics.pkl`: Full reliability statistics for table generation
 - `reliability_summary.csv`: Human-readable summary (bootstrap CIs and p_boot)
 - `split_rdm_distributions.npz`: Bootstrap distributions of r_half and r_full
@@ -110,7 +110,7 @@ python chess-supplementary/behavioral-reliability/01_behavioral_split_half_relia
 python chess-supplementary/behavioral-reliability/81_table_split_half_reliability.py
 ```
 
-**Outputs** (saved to `chess-supplementary/behavioral-reliability/results/<latest>/tables/`):
+**Outputs** (saved to `chess-supplementary/behavioral-reliability/results/behavioral_split_half/tables/`):
 - `split_half_reliability.tex`: LaTeX table
 - `split_half_reliability.csv`: CSV table
 
@@ -153,4 +153,3 @@ chess-supplementary/behavioral-reliability/
         ├── *.npz                               # Bootstrap distributions
         └── tables/                             # LaTeX tables
 ```
-

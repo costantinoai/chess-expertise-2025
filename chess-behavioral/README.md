@@ -30,7 +30,7 @@ Three theoretical model RDMs were constructed:
 
 ### Statistical Analysis
 
-Behavioral RDMs were correlated with each model RDM using Spearman rank correlation. Significance was assessed using bootstrap resampling (10,000 iterations, percentile method via `pingouin`). False discovery rate (FDR) correction was applied across models using the Benjamini-Hochberg procedure (α=0.05).
+Behavioral RDMs were correlated with each model RDM using Pearson correlation. Significance was assessed via bootstrap resampling (10,000 iterations; `pingouin`). False discovery rate (FDR) correction was applied across models using the Benjamini–Hochberg procedure (α=0.05).
 
 Separate analyses were conducted for experts and novices to test whether expertise modulates the cognitive dimensions underlying preference judgments.
 
@@ -91,7 +91,7 @@ Expected structure under this folder:
 python chess-behavioral/01_behavioral_rsa.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/<timestamp>_behavioral_rsa/`):
+**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/`):
 - `expert_behavioral_rdm.npy`: Expert group RDM (40×40)
 - `novice_behavioral_rdm.npy`: Novice group RDM (40×40)
 - `expert_directional_dsm.npy`: Expert directional preference matrix (40×40)
@@ -109,7 +109,7 @@ python chess-behavioral/01_behavioral_rsa.py
 python chess-behavioral/81_table_behavioral_correlations.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/<latest>/tables/`):
+**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/tables/`):
 - `behavioral_rsa_correlations.tex`: LaTeX table
 - `behavioral_rsa_correlations.csv`: CSV table
 
@@ -119,7 +119,7 @@ python chess-behavioral/81_table_behavioral_correlations.py
 python chess-behavioral/91_plot_behavioral_panels.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/<latest>/figures/`):
+**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/figures/`):
 - Individual axes as SVG/PDF: `behavioral_A1_RDM_Experts.svg`, etc.
 - Complete panels: `panels/behavioral_rsa_panel.pdf`
 
@@ -128,8 +128,8 @@ python chess-behavioral/91_plot_behavioral_panels.py
 ## Key Results
 
 **Experts**: Behavioral preferences correlate significantly with:
-- Checkmate status (r ≈ 0.49, p < 0.001 FDR-corrected)
-- Strategy type (r ≈ 0.20, p < 0.05 FDR-corrected)
+- Checkmate status (Pearson r ≈ 0.56, pFDR < 0.001)
+- Strategy type (Pearson r ≈ 0.22, pFDR < 0.001)
 
 **Novices**: No significant correlations with any model RDM.
 
@@ -149,13 +149,12 @@ chess-behavioral/
 ├── local/                                 # Data preparation (optional)
 │   ├── convert_mat_to_bids_events.py      # MATLAB to BIDS conversion
 │   └── participants_descriptive_stats.py  # Demographic statistics
-└── results/                               # Analysis outputs (timestamped)
-    └── <timestamp>_behavioral_rsa/
+└── results/
+    └── behavioral_rsa/
         ├── *.npy                          # Numerical results
         ├── *.pkl                          # Python objects
         ├── *.csv                          # Summary tables
         ├── tables/                        # LaTeX tables
         └── figures/                       # Publication figures
 ```
-
 

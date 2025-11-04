@@ -76,7 +76,7 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 python chess-supplementary/eyetracking/01_eye_decoding.py
 ```
 
-**Outputs** (saved to `chess-supplementary/eyetracking/results/<timestamp>_eyetracking_decoding/`):
+**Outputs** (saved to `chess-supplementary/eyetracking/results/eyetracking_decoding/`):
 - `results_xy.json`: Metrics and predictions for xy features
 - `results_displacement.json`: Metrics and predictions for displacement features
 - `fold_accuracies_xy.csv`: Per-fold accuracies for xy
@@ -99,9 +99,8 @@ chess-supplementary/eyetracking/
 ├── modules/
 │   ├── __init__.py
 │   └── io.py                              # Eye-tracking data loading
-└── results/                               # Analysis outputs (timestamped)
-    └── <timestamp>_eyetracking_decoding/
+└── results/
+    └── eyetracking_decoding/
         ├── *.json                         # Results dictionaries
         └── *.csv                          # Fold accuracies
 ```
-

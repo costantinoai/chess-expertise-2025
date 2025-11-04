@@ -60,7 +60,7 @@ Set paths in `common/constants.py` (derived from `_EXTERNAL_DATA_ROOT`):
 
 ```python
 SPM_GLM_SMOOTH4 = BIDS_ROOT / "derivatives" / "SPM" / "GLM-smooth4"
-ROI_GLASSER_180_ATLAS = ROI_GLASSER_180
+ROI_GLASSER_180_ATLAS = ROI_GLASSER_180 / "tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii.gz"
 ```
 
 ## Running the Analysis
@@ -72,7 +72,7 @@ ROI_GLASSER_180_ATLAS = ROI_GLASSER_180
 python chess-supplementary/univariate-rois/01_univariate_roi_summary.py
 ```
 
-**Outputs** (saved to `chess-supplementary/univariate-rois/results/<timestamp>_univariate_rois/`):
+**Outputs** (saved to `chess-supplementary/univariate-rois/results/univariate_rois/`):
 - `univ_subject_roi_means_{contrast}.tsv`: Subject × ROI tables per contrast
 - `univ_group_stats.pkl`: Per-contrast Welch statistics and descriptives
 - `01_univariate_roi_summary.py`: Copy of the analysis script
@@ -94,10 +94,8 @@ chess-supplementary/univariate-rois/
 ├── modules/
 │   ├── __init__.py
 │   └── io.py                              # Contrast map loading utilities
-└── results/                               # Analysis outputs (timestamped)
-    └── <timestamp>_univariate_rois/
+└── results/
+    └── univariate_rois/
         ├── *.tsv                          # Subject × ROI tables
         └── *.pkl                          # Statistical results
 ```
-
-
