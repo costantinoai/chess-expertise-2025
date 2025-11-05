@@ -229,7 +229,7 @@ for idx, tgt in enumerate(MAIN_TARGETS):
         comparison_pvals=data['pvals'],       # FDR p-values for significance stars
         ylim=PLOT_YLIMITS['decoding'],        # Centralized decoding limits (was -0.06, 0.25)
         y_label='Accuracy - chance',          # Y-axis label
-        subtitle=SVM_TITLES[tgt],                # Panel title
+        # subtitle=SVM_TITLES[tgt],                # Panel title
         xtick_labels=roi_names,               # ROI names on x-axis
         x_label_colors=label_colors,          # Color by significance (gray if p ≥ 0.05)
         x_tick_rotation=30,
@@ -299,7 +299,7 @@ for idx, tgt in enumerate(MAIN_TARGETS):
         comparison_pvals=data['pvals'],       # FDR p-values for significance stars
         ylim=PLOT_YLIMITS['rsa_neural'],      # Centralized RSA neural limits (was ylim_rsa)
         y_label=PLOT_PARAMS['ylabel_correlation_r'],  # Y-axis label (Spearman r)
-        subtitle=RSA_TITLES[tgt],                # Panel title
+        # subtitle=RSA_TITLES[tgt],                # Panel title
         xtick_labels=roi_names,               # ROI names on x-axis
         x_label_colors=label_colors,          # Color by significance (gray if p ≥ 0.05)
         x_tick_rotation=30,
@@ -361,30 +361,44 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
+import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(cm_to_inches(21.26), cm_to_inches(16.08), forward=True)
-plt.figure(1).ax_dict["RDM_1_visual_similarity"].set(position=[0.4499, 0.7901, 0.0929, 0.1228])
-plt.figure(1).ax_dict["RDM_1_visual_similarity"].text(0.4306, 1.3739, 'b', transform=plt.figure(1).ax_dict["RDM_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["RDM_1_visual_similarity"].texts[0].new
-plt.figure(1).ax_dict["RDM_2_strategy"].set(position=[0.3778, 0.5618, 0.07887, 0.09863])
-plt.figure(1).ax_dict["RDM_2_strategy"].set_position([0.449913, 0.465718, 0.092902, 0.122817])
-plt.figure(1).ax_dict["RDM_3_checkmate"].set(position=[0.3778, 0.3013, 0.07887, 0.09863])
-plt.figure(1).ax_dict["RDM_3_checkmate"].set_position([0.449913, 0.141302, 0.092902, 0.122817])
-plt.figure(1).ax_dict["RSA_1_visual_similarity"].set(position=[0.519, 0.8222, 0.3032, 0.1188])
-plt.figure(1).ax_dict["RSA_1_visual_similarity"].set_position([0.617271, 0.789950, 0.360350, 0.148003])
-plt.figure(1).ax_dict["RSA_1_visual_similarity"].text(0.3660, 1.2740, 'Brain-Model RSA', transform=plt.figure(1).ax_dict["RSA_1_visual_similarity"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["RSA_1_visual_similarity"].texts[0].new
-plt.figure(1).ax_dict["RSA_1_visual_similarity"].text(0.9773, 1.1415, 'c', transform=plt.figure(1).ax_dict["RSA_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["RSA_1_visual_similarity"].texts[1].new
-plt.figure(1).ax_dict["RSA_2_strategy"].set(position=[0.519, 0.5618, 0.3032, 0.1188])
-plt.figure(1).ax_dict["RSA_2_strategy"].set_position([0.617271, 0.465712, 0.360350, 0.148003])
-plt.figure(1).ax_dict["RSA_3_checkmate"].set(position=[0.519, 0.3013, 0.3032, 0.1188])
-plt.figure(1).ax_dict["RSA_3_checkmate"].set_position([0.617271, 0.141241, 0.360350, 0.148003])
-plt.figure(1).ax_dict["SVM_1_visual_similarity"].set(position=[0.044, 0.8222, 0.3032, 0.1188])
-plt.figure(1).ax_dict["SVM_1_visual_similarity"].set_position([0.052843, 0.790004, 0.360298, 0.147949])
-plt.figure(1).ax_dict["SVM_1_visual_similarity"].text(0.3885, 1.2741, 'Brain Decoding', transform=plt.figure(1).ax_dict["SVM_1_visual_similarity"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_1_visual_similarity"].texts[5].new
+plt.figure(1).set_size_inches(18.290000/2.54, 13.500000/2.54, forward=True)
+plt.figure(1).ax_dict["RDM_1_visual_similarity"].set(position=[0.9216, 0.8861, 0.04483, 0.05118])
+plt.figure(1).ax_dict["RDM_1_visual_similarity"].set_position([0.921061, 0.904012, 0.044527, 0.060310])
+plt.figure(1).ax_dict["RDM_2_strategy"].set(position=[0.9216, 0.6217, 0.04483, 0.05118])
+plt.figure(1).ax_dict["RDM_2_strategy"].set_position([0.921061, 0.592256, 0.044527, 0.060310])
+plt.figure(1).ax_dict["RDM_3_checkmate"].set(position=[0.9216, 0.3572, 0.04483, 0.05118])
+plt.figure(1).ax_dict["RDM_3_checkmate"].set_position([0.921061, 0.280499, 0.044527, 0.060310])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].set(position=[0.5488, 0.7902, 0.4176, 0.1321])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].set_position([0.548513, 0.790941, 0.417204, 0.155756])
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].get_legend().set(visible=False)
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].text(0.5000, 1.1414, 'Brain-Model RSA', transform=plt.figure(1).ax_dict["RSA_1_visual_similarity"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["RSA_1_visual_similarity"].texts[0].new
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].text(-0.0224, 1.1414, 'c', transform=plt.figure(1).ax_dict["RSA_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["RSA_1_visual_similarity"].texts[1].new
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].text(0.5000, 0.9358, 'Visual Similarity', transform=plt.figure(1).ax_dict["RSA_1_visual_similarity"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_1_visual_similarity"].texts[2].new
+plt.figure(1).ax_dict["RSA_1_visual_similarity"].title.set(visible=False)
+plt.figure(1).ax_dict["RSA_2_strategy"].set(position=[0.5488, 0.5217, 0.4176, 0.1321])
+plt.figure(1).ax_dict["RSA_2_strategy"].set_position([0.548513, 0.474390, 0.417204, 0.155756])
+plt.figure(1).ax_dict["RSA_2_strategy"].text(0.5000, 0.9074, 'Strategy', transform=plt.figure(1).ax_dict["RSA_2_strategy"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_2_strategy"].texts[10].new
+plt.figure(1).ax_dict["RSA_2_strategy"].title.set(visible=False)
+plt.figure(1).ax_dict["RSA_3_checkmate"].set(position=[0.5488, 0.2531, 0.4176, 0.1321])
+plt.figure(1).ax_dict["RSA_3_checkmate"].set_position([0.548513, 0.157711, 0.417204, 0.155756])
+plt.figure(1).ax_dict["RSA_3_checkmate"].text(0.5000, 0.9038, 'Checkmate', transform=plt.figure(1).ax_dict["RSA_3_checkmate"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_3_checkmate"].texts[8].new
+plt.figure(1).ax_dict["RSA_3_checkmate"].title.set(visible=False)
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].set(position=[0.06112, 0.7902, 0.4176, 0.1321])
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].set_position([0.061330, 0.790911, 0.417204, 0.155756])
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].text(0.4773, 1.1416, 'Brain Decoding', transform=plt.figure(1).ax_dict["SVM_1_visual_similarity"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_1_visual_similarity"].texts[5].new
 plt.figure(1).ax_dict["SVM_1_visual_similarity"].text(-0.0386, 1.1416, 'a', transform=plt.figure(1).ax_dict["SVM_1_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["SVM_1_visual_similarity"].texts[6].new
-plt.figure(1).ax_dict["SVM_2_strategy"].set(position=[0.044, 0.5618, 0.3032, 0.1188])
-plt.figure(1).ax_dict["SVM_2_strategy"].set_position([0.052843, 0.465712, 0.360298, 0.147949])
-plt.figure(1).ax_dict["SVM_3_checkmate"].set(position=[0.044, 0.3013, 0.3032, 0.1188])
-plt.figure(1).ax_dict["SVM_3_checkmate"].set_position([0.052843, 0.141295, 0.360298, 0.147949])
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].text(0.4773, 0.9360, 'Visual Similarity', transform=plt.figure(1).ax_dict["SVM_1_visual_similarity"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_1_visual_similarity"].texts[7].new
+plt.figure(1).ax_dict["SVM_1_visual_similarity"].title.set(visible=False)
+plt.figure(1).ax_dict["SVM_2_strategy"].set(position=[0.06112, 0.5216, 0.4176, 0.1321])
+plt.figure(1).ax_dict["SVM_2_strategy"].set_position([0.061330, 0.474296, 0.417204, 0.155756])
+plt.figure(1).ax_dict["SVM_2_strategy"].text(0.4773, 0.9080, 'Strategy', transform=plt.figure(1).ax_dict["SVM_2_strategy"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_2_strategy"].texts[12].new
+plt.figure(1).ax_dict["SVM_2_strategy"].title.set(visible=False)
+plt.figure(1).ax_dict["SVM_3_checkmate"].set(position=[0.06112, 0.253, 0.4176, 0.1321])
+plt.figure(1).ax_dict["SVM_3_checkmate"].set_position([0.061330, 0.157681, 0.417204, 0.155756])
+plt.figure(1).ax_dict["SVM_3_checkmate"].text(0.4773, 0.9040, 'Checkmate', transform=plt.figure(1).ax_dict["SVM_3_checkmate"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_3_checkmate"].texts[13].new
+plt.figure(1).ax_dict["SVM_3_checkmate"].title.set(visible=False)
 #% end: automatic generated code from pylustrator
 
 # Display figures in pylustrator GUI for interactive layout adjustment

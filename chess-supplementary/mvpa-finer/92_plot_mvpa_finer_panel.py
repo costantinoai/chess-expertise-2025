@@ -355,9 +355,9 @@ for target in FINE_TARGETS:
         comparison_pvals=rsa['pvals'],       # FDR-corrected p-values for stars
         ylim=ylim_rsa,                       # Shared y-axis range
         y_label=PLOT_PARAMS['ylabel_correlation_r'],  # 'Correlation (r)'
-        subtitle=f'{TARGET_DISPLAY_NAMES[target]}',
-        xtick_labels=roi_names,              # ROI names on x-axis
-        x_label_colors=label_colors_rsa,         # Color by significance
+        # subtitle=f'{TARGET_DISPLAY_NAMES[target]}',
+        xtick_labels=roi_names if target == "total_pieces_half" else ["" for _ in roi_names],              # ROI names on x-axis
+        x_label_colors=["gray" for _ in label_colors_svm],         # Color by significance
         x_tick_rotation=30,
         x_tick_align='right',
         visible_spines=['left','bottom'],
@@ -386,9 +386,9 @@ for target in FINE_TARGETS:
         comparison_pvals=svm['pvals'],       # FDR-corrected p-values for stars
         ylim=ylim_svm,                       # Shared y-axis range
         y_label='Accuracy - chance',         # Chance-subtracted accuracy
-        subtitle=f'{TARGET_DISPLAY_NAMES[target]}',
-        xtick_labels=roi_names,              # ROI names on x-axis
-        x_label_colors=label_colors_svm,         # Color by significance
+        # subtitle=f'{TARGET_DISPLAY_NAMES[target]}',
+        xtick_labels=roi_names if target == "total_pieces_half" else ["" for _ in roi_names],              # ROI names on x-axis
+        x_label_colors=["gray" for _ in label_colors_svm],         # Color by significance
         x_tick_rotation=30,
         x_tick_align='right',
         visible_spines=['left','bottom'],
@@ -437,30 +437,49 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
 import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(cm_to_inches(18.26), cm_to_inches(23.93), forward=True)
-plt.figure(1).ax_dict["RDM_0_strategy_half"].set(position=[0.4155, 0.7528, 0.04391, 0.03354])
-plt.figure(1).ax_dict["RDM_1_check_n_half"].set(position=[0.4155, 0.5549, 0.04391, 0.03354])
-plt.figure(1).ax_dict["RDM_2_total_pieces_half"].set(position=[0.4155, 0.1591, 0.04391, 0.03354])
-plt.figure(1).ax_dict["RDM_3_legal_moves_half"].set(position=[0.4155, 0.357, 0.04391, 0.03354])
-plt.figure(1).ax_dict["RDM_4_motif_half"].set(position=[0.4155, 0.9507, 0.04391, 0.03354])
-plt.figure(1).ax_dict["RSA_0_strategy_half"].set(position=[0.5445, 0.6753, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_0_strategy_half"].title.set(visible=False)
-plt.figure(1).ax_dict["RSA_1_check_n_half"].set(position=[0.5445, 0.4773, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_2_total_pieces_half"].set(position=[0.5412, 0.08684, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_3_legal_moves_half"].set(position=[0.5401, 0.283, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_4_motif_half"].set(position=[0.5434, 0.8742, 0.3821, 0.08568])
-plt.figure(1).ax_dict["RSA_4_motif_half"].text(0.3409, 1.3042, 'Brain-Model RSA (Checkmate boards only)', transform=plt.figure(1).ax_dict["RSA_4_motif_half"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["RSA_4_motif_half"].texts[1].new
-plt.figure(1).ax_dict["RSA_4_motif_half"].text(0.5000, 0.5000, 'Tactical Motif (CM)', transform=plt.figure(1).ax_dict["RSA_4_motif_half"].transAxes, fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_4_motif_half"].texts[2].new
-plt.figure(1).ax_dict["RSA_4_motif_half"].title.set(visible=False)
-plt.figure(1).ax_dict["SVM_0_strategy_half"].set(position=[0.06021, 0.6744, 0.378, 0.08941])
-plt.figure(1).ax_dict["SVM_0_strategy_half"].title.set(visible=False)
-plt.figure(1).ax_dict["SVM_1_check_n_half"].set(position=[0.06021, 0.4782, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_2_total_pieces_half"].set(position=[0.06021, 0.08599, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_3_legal_moves_half"].set(position=[0.06021, 0.2821, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_4_motif_half"].set(position=[0.06021, 0.8742, 0.378, 0.08568])
-plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.2045, 1.2940, 'Brain Decoding (Checkmate board only)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[6].new
-plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.5000, 0.5000, 'Tactical Motif (CM)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[7].new
-plt.figure(1).ax_dict["SVM_4_motif_half"].title.set(visible=False)
+plt.figure(1).set_size_inches(18.300000/2.54, 16.500000/2.54, forward=True)
+plt.figure(1).ax_dict["RDM_0_strategy_half"].set(position=[0.9458, 0.752, 0.04747, 0.04885])
+plt.figure(1).ax_dict["RDM_0_strategy_half"].set_position([0.945324, 0.756172, 0.047388, 0.050218])
+plt.figure(1).ax_dict["RDM_1_check_n_half"].set(position=[0.9452, 0.6017, 0.04747, 0.04885])
+plt.figure(1).ax_dict["RDM_1_check_n_half"].set_position([0.944756, 0.601542, 0.047388, 0.050218])
+plt.figure(1).ax_dict["RDM_2_total_pieces_half"].set(position=[0.9452, 0.2461, 0.04747, 0.04885])
+plt.figure(1).ax_dict["RDM_2_total_pieces_half"].set_position([0.944756, 0.235538, 0.047388, 0.050218])
+plt.figure(1).ax_dict["RDM_3_legal_moves_half"].set(position=[0.9452, 0.413, 0.04747, 0.04885])
+plt.figure(1).ax_dict["RDM_3_legal_moves_half"].set_position([0.944756, 0.407268, 0.047388, 0.050218])
+plt.figure(1).ax_dict["RDM_4_motif_half"].set(position=[0.9452, 0.9168, 0.04747, 0.04885])
+plt.figure(1).ax_dict["RDM_4_motif_half"].set_position([0.944756, 0.925804, 0.047388, 0.050218])
+plt.figure(1).ax_dict["RSA_0_strategy_half"].set(position=[0.5388, 0.4884, 0.4093, 0.0915])
+plt.figure(1).ax_dict["RSA_0_strategy_half"].set_position([0.554412, 0.671628, 0.419146, 0.129059])
+plt.figure(1).ax_dict["RSA_0_strategy_half"].text(0.4616, 0.9259, 'Strategy (CM)', transform=plt.figure(1).ax_dict["RSA_0_strategy_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_0_strategy_half"].texts[1].new
+plt.figure(1).ax_dict["RSA_1_check_n_half"].set(position=[0.5399, 0.3667, 0.4093, 0.09165])
+plt.figure(1).ax_dict["RSA_1_check_n_half"].set_position([0.555549, 0.499884, 0.419146, 0.129271])
+plt.figure(1).ax_dict["RSA_1_check_n_half"].text(0.4722, 0.9192, 'Moves to Mate (CM)', transform=plt.figure(1).ax_dict["RSA_1_check_n_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_1_check_n_half"].texts[10].new
+plt.figure(1).ax_dict["RSA_2_total_pieces_half"].set(position=[0.5399, 0.1235, 0.4093, 0.0915])
+plt.figure(1).ax_dict["RSA_2_total_pieces_half"].set_position([0.555549, 0.156833, 0.419146, 0.129059])
+plt.figure(1).ax_dict["RSA_2_total_pieces_half"].text(0.4697, 0.9054, 'Total Pieces (CM)', transform=plt.figure(1).ax_dict["RSA_2_total_pieces_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_2_total_pieces_half"].texts[0].new
+plt.figure(1).ax_dict["RSA_3_legal_moves_half"].set(position=[0.5399, 0.2451, 0.4093, 0.0915])
+plt.figure(1).ax_dict["RSA_3_legal_moves_half"].set_position([0.555549, 0.328351, 0.419146, 0.129059])
+plt.figure(1).ax_dict["RSA_3_legal_moves_half"].text(0.4674, 0.9139, 'Legal Moves (CM)', transform=plt.figure(1).ax_dict["RSA_3_legal_moves_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_3_legal_moves_half"].texts[1].new
+plt.figure(1).ax_dict["RSA_4_motif_half"].set(position=[0.5388, 0.6013, 0.4093, 0.0915])
+plt.figure(1).ax_dict["RSA_4_motif_half"].set_position([0.554412, 0.830765, 0.419146, 0.129059])
+plt.figure(1).ax_dict["RSA_4_motif_half"].text(0.4616, 1.1020, 'Brain-Model RSA (Checkmate boards only)', transform=plt.figure(1).ax_dict["RSA_4_motif_half"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["RSA_4_motif_half"].texts[1].new
+plt.figure(1).ax_dict["RSA_4_motif_half"].text(0.4616, 0.9327, 'Tactical Motif (CM)', transform=plt.figure(1).ax_dict["RSA_4_motif_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["RSA_4_motif_half"].texts[2].new
+plt.figure(1).ax_dict["SVM_0_strategy_half"].set(position=[0.06018, 0.4884, 0.4093, 0.09564])
+plt.figure(1).ax_dict["SVM_0_strategy_half"].set_position([0.064278, 0.671628, 0.419146, 0.134899])
+plt.figure(1).ax_dict["SVM_0_strategy_half"].text(0.4773, 0.8690, 'Strategy (CM)', transform=plt.figure(1).ax_dict["SVM_0_strategy_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_0_strategy_half"].texts[15].new
+plt.figure(1).ax_dict["SVM_1_check_n_half"].set(position=[0.06018, 0.3668, 0.4093, 0.0915])
+plt.figure(1).ax_dict["SVM_1_check_n_half"].set_position([0.064278, 0.500095, 0.419146, 0.129059])
+plt.figure(1).ax_dict["SVM_1_check_n_half"].text(0.4724, 0.9191, 'Moves to Mate (CM)', transform=plt.figure(1).ax_dict["SVM_1_check_n_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_1_check_n_half"].texts[8].new
+plt.figure(1).ax_dict["SVM_2_total_pieces_half"].set(position=[0.06019, 0.1233, 0.4093, 0.09165])
+plt.figure(1).ax_dict["SVM_2_total_pieces_half"].set_position([0.064289, 0.156607, 0.419146, 0.129271])
+plt.figure(1).ax_dict["SVM_2_total_pieces_half"].text(0.4796, 0.9055, 'Total Pieces (CM)', transform=plt.figure(1).ax_dict["SVM_2_total_pieces_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_2_total_pieces_half"].texts[1].new
+plt.figure(1).ax_dict["SVM_3_legal_moves_half"].set(position=[0.06018, 0.2451, 0.4093, 0.09165])
+plt.figure(1).ax_dict["SVM_3_legal_moves_half"].set_position([0.064278, 0.328351, 0.419146, 0.129271])
+plt.figure(1).ax_dict["SVM_3_legal_moves_half"].text(0.4773, 0.9124, 'Legal Moves (CM)', transform=plt.figure(1).ax_dict["SVM_3_legal_moves_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_3_legal_moves_half"].texts[9].new
+plt.figure(1).ax_dict["SVM_4_motif_half"].set(position=[0.06018, 0.6011, 0.4093, 0.09165])
+plt.figure(1).ax_dict["SVM_4_motif_half"].set_position([0.064278, 0.830554, 0.419146, 0.129271])
+plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.4773, 1.1022, 'Brain Decoding (Checkmate board only)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, ha='center', fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[6].new
+plt.figure(1).ax_dict["SVM_4_motif_half"].text(0.4773, 0.9311, 'Tactical Motif (CM)', transform=plt.figure(1).ax_dict["SVM_4_motif_half"].transAxes, ha='center', fontsize=7.)  # id=plt.figure(1).ax_dict["SVM_4_motif_half"].texts[7].new
 #% end: automatic generated code from pylustrator
 from common import CONFIG as _CONFIG_FOR_SHOW
 if _CONFIG_FOR_SHOW['ENABLE_PYLUSTRATOR']:
