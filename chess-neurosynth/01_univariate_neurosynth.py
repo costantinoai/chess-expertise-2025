@@ -66,6 +66,46 @@ to identify terms that are differentially associated with expert-enhanced
 versus expert-reduced regions. Positive differences indicate terms more
 strongly associated with regions where experts show higher activations.
 
+Bootstrap Statistical Inference
+--------------------------------
+To provide robust confidence intervals and p-values accounting for spatial
+dependencies in brain imaging data, we employed bootstrap resampling:
+
+1. **Individual correlations** (r_pos, r_neg):
+   - Method: Percentile bootstrap using Pingouin implementation
+   - Resamples: 10,000 bootstrap samples
+   - Procedure: For each bootstrap iteration, voxels are resampled with
+     replacement, and Pearson correlation is recomputed
+   - CI estimation: 95% confidence intervals computed using the percentile
+     method (2.5th and 97.5th percentiles of bootstrap distribution)
+   - P-value: Two-sided test based on the bootstrap distribution
+   - Implementation: common.stats_utils.correlate_vectors_bootstrap()
+
+2. **Correlation differences** (Δr = r_pos − r_neg):
+   - Method: Custom percentile bootstrap for paired differences
+   - Resamples: 10,000 bootstrap samples
+   - Procedure: For each bootstrap iteration:
+     a. Resample voxel indices with replacement
+     b. Compute r_x = corr(term, Z+) on resampled data
+     c. Compute r_y = corr(term, Z−) on resampled data
+     d. Store difference: Δr_i = r_x − r_y
+   - CI estimation: 95% confidence intervals from percentile method
+     (2.5th and 97.5th percentiles of Δr bootstrap distribution)
+   - P-value: Two-sided test computed as 2 × min(P(Δr ≤ 0), P(Δr ≥ 0))
+   - Implementation: modules.maps_utils.bootstrap_corr_diff()
+
+3. **Multiple testing correction**:
+   - Method: False Discovery Rate (FDR) correction using Benjamini-Hochberg
+     procedure
+   - Applied separately to positive, negative, and difference correlations
+   - Significance level: α = 0.05 (5% FDR)
+   - Implementation: common.stats_utils.apply_fdr_correction()
+
+The bootstrap approach addresses spatial autocorrelation by resampling voxels
+as units, providing empirical confidence intervals that reflect sampling
+variability without assuming independence. The percentile method is
+distribution-free and robust to non-normality.
+
 Statistical Assumptions and Limitations
 ----------------------------------------
 - **Spatial independence**: Voxels are treated as independent observations for

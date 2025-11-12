@@ -156,8 +156,39 @@ def load_term_corr_triple(results_dir: Path, stem: str):
     return pos, neg, diff
 
 def zero_cis(values):
-    """Return zero-width CIs for a list of values, as (v, v) pairs."""
+    """
+    Return zero-width CIs for a list of values, as (v, v) pairs.
+
+    Fallback helper for cases where CI data is not available.
+    Prefer extracting actual CIs from DataFrames when available.
+    """
     return [(v, v) for v in values]
+
+
+def _extract_cis_from_df(df: 'pd.DataFrame') -> list:
+    """
+    Extract confidence intervals from DataFrame as list of (low, high) tuples.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with 'CI_low' and 'CI_high' columns
+
+    Returns
+    -------
+    list of tuple
+        List of (ci_low, ci_high) pairs for each row
+
+    Notes
+    -----
+    Returns zero-width CIs if columns are missing (backward compatibility).
+    """
+    if 'CI_low' in df.columns and 'CI_high' in df.columns:
+        return list(zip(df['CI_low'].to_numpy(), df['CI_high'].to_numpy()))
+    else:
+        # Fallback for DataFrames without CI columns (backward compatibility)
+        values = df['r'].to_numpy() if 'r' in df.columns else df['r_diff'].to_numpy()
+        return zero_cis(values)
 
 
 def plot_correlations_on_ax(
@@ -169,31 +200,51 @@ def plot_correlations_on_ax(
     ylim=None
 ):
     """
-    Plot paired bars for POS vs NEG correlations onto an existing axis.
+    Plot paired bars for POS vs NEG correlations onto an existing axis with CIs.
 
-    Uses centralized grouped bar plotting and PLOT_PARAMS styling.
+    Uses centralized grouped bar plotting and PLOT_PARAMS styling. Automatically
+    extracts bootstrap confidence intervals from DataFrames if available.
 
     Parameters
     ----------
     ax : matplotlib.axes.Axes
         Axes to plot on
     df_pos : pd.DataFrame
-        DataFrame with positive correlations (columns: 'term', 'r')
+        DataFrame with positive correlations
+        Required columns: 'term', 'r'
+        Optional columns: 'CI_low', 'CI_high' (bootstrap CIs), 'p_fdr' (FDR-corrected p-values)
     df_neg : pd.DataFrame
-        DataFrame with negative correlations (columns: 'term', 'r')
+        DataFrame with negative correlations
+        Required columns: 'term', 'r'
+        Optional columns: 'CI_low', 'CI_high' (bootstrap CIs), 'p_fdr' (FDR-corrected p-values)
     title : str
         Main plot title (bold)
     subtitle : str, optional
         Plot subtitle (normal weight), e.g., contrast name or context
     ylim : tuple, optional
         Y-axis limits (ymin, ymax). If None, uses automatic scaling.
+
+    Notes
+    -----
+    - If CI_low/CI_high columns are present, plots error bars
+    - If CI columns are missing, plots bars without error bars (backward compatible)
+    - If p_fdr column is present, adds significance stars based on FDR-corrected p-values
+    - Green bars: positive z-map (expert-enhanced regions)
+    - Red bars: negative z-map (expert-reduced regions)
     """
     import numpy as np
+
     terms = [t.title() for t in df_pos['term']]
     r_pos = df_pos['r'].to_numpy().tolist()
     r_neg = df_neg['r'].to_numpy().tolist()
-    cis_pos = zero_cis(r_pos)
-    cis_neg = zero_cis(r_neg)
+
+    # Extract CIs from DataFrames (uses zero-width if not available)
+    cis_pos = _extract_cis_from_df(df_pos)
+    cis_neg = _extract_cis_from_df(df_neg)
+
+    # Extract p-values for significance stars (DRY: reuse existing significance_stars logic)
+    pvals_pos = df_pos['p_fdr'].to_numpy().tolist() if 'p_fdr' in df_pos.columns else None
+    pvals_neg = df_neg['p_fdr'].to_numpy().tolist() if 'p_fdr' in df_neg.columns else None
 
     green = COLORS_EXPERT_NOVICE.get('expert', '#198019')
     red = COLORS_EXPERT_NOVICE.get('novice', '#a90f0f')
@@ -205,14 +256,16 @@ def plot_correlations_on_ax(
         group1_values=r_pos,
         group1_cis=cis_pos,
         group1_color=green,
+        group1_pvals=pvals_pos,
         group2_values=r_neg,
         group2_cis=cis_neg,
         group2_color=red,
+        group2_pvals=pvals_neg,
         group1_label='Positive z-map',
         group2_label='Negative z-map',
         ylim=ylim,
         # DRY formatting in helper
-        y_label='Correlation (z)',
+        y_label='Correlation (r)',
         title=title,
         subtitle=subtitle,
         xtick_labels=terms,
@@ -233,48 +286,64 @@ def plot_differences_on_ax(
     ylim=None
 ):
     """
-    Plot Δr bars with sign-colored bars onto an existing axis.
+    Plot Δr bars with sign-colored bars and CIs onto an existing axis.
 
     Parameters
     ----------
     ax : matplotlib.axes.Axes
         Axes to plot on
     df_diff : pd.DataFrame
-        DataFrame with correlation differences (columns: 'term', 'r_diff')
+        DataFrame with correlation differences
+        Required columns: 'term', 'r_diff'
+        Optional columns: 'CI_low', 'CI_high' (bootstrap CIs), 'p_fdr' (FDR-corrected p-values)
     title : str
         Main plot title (bold)
     subtitle : str, optional
         Plot subtitle (normal weight), e.g., contrast description
     ylim : tuple, optional
         Y-axis limits (ymin, ymax). If None, uses automatic scaling.
+
+    Notes
+    -----
+    - Bars are colored by sign: green (positive Δr) = expert-enhanced association,
+      red (negative Δr) = novice-enhanced association
+    - If CI_low/CI_high columns are present, plots error bars
+    - If CI columns are missing, plots bars without error bars (backward compatible)
+    - If p_fdr column is present, adds significance stars based on FDR-corrected p-values
     """
     import numpy as np
     from matplotlib.patches import Patch
 
     terms = [t.title() for t in df_diff['term']]
     diffs = df_diff['r_diff'].to_numpy().tolist()
-    # cis = zero_cis(diffs)
+
+    # Extract CIs from DataFrame (uses zero-width if not available)
+    cis = _extract_cis_from_df(df_diff)
+
+    # Extract p-values for significance stars (DRY: reuse existing significance_stars logic)
+    pvals = df_diff['p_fdr'].to_numpy().tolist() if 'p_fdr' in df_diff.columns else None
+
     green = COLORS_EXPERT_NOVICE.get('expert', '#198019')
     red = COLORS_EXPERT_NOVICE.get('novice', '#a90f0f')
     colors = [green if (isinstance(v, (int, float)) and np.isfinite(v) and v >= 0) else red for v in diffs]
 
-    # legend wants exactly one entry per unique color:
+    # Legend labels for sign-coded colors
     labels_for_colors = ['Exp > Nov', 'Nov > Exp']  # must match unique colors order (first appearance)
-
 
     x = np.arange(len(terms))
     plot_grouped_bars_on_ax(
         ax=ax,
         x_positions=x,
         group1_values=diffs,
-        # group1_cis=cis,
+        group1_cis=cis,
         group1_color=colors,
+        group1_pvals=pvals,
         group1_label=labels_for_colors,
         params=PLOT_PARAMS,
         bar_width_multiplier=2.0,
         ylim=ylim,
         # DRY formatting in helper
-        y_label='ΔCorrelation (z)',
+        y_label='ΔCorrelation (Δr)',
         title=title,
         subtitle=subtitle,
         xtick_labels=terms,

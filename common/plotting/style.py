@@ -184,7 +184,7 @@ PLOT_YLIMITS = {
     # Used by: chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
     # Range: Tighter range for finer-grained ROI analysis
 
-    'rsa_neurosynth_corr': (-0.15, 0.19),
+    'rsa_neurosynth_corr': (-0.15, 0.25),
     # Used by: chess-neurosynth/92_plot_neurosynth_rsa.py (term correlation bars)
     #          chess-neurosynth/91_plot_neurosynth_univariate.py (within-group)
     # Range: Meta-analytic term correlations (within Expert or Novice group)
@@ -228,7 +228,7 @@ PLOT_YLIMITS = {
     # Neurosynth Meta-Analytic Correlations (Univariate Activation)
     # Correlations between univariate activation and meta-analytic term maps
     # -------------------------------------------------------------------------
-    'neurosynth_univariate_corr': (-0.15, 0.19),
+    'neurosynth_univariate_corr': (-0.15, 0.20),
     # Used by: chess-neurosynth/91_plot_neurosynth_univariate.py (term correlations)
     # Range: Within-group correlations with meta-analytic maps
 
