@@ -60,7 +60,8 @@ logger.info("Formatting table with centralized generator...")
 rows = []
 for _, row in sig_df.iterrows():
     ho = row['harvard_oxford_label'] if pd.notna(row['harvard_oxford_label']) else 'Unlabeled'
-    p_str = format_p_cell(row['p_val_fdr'])
+    p_raw_str = format_p_cell(row['p_val'])
+    p_fdr_str = format_p_cell(row['p_val_fdr'])
     ci_str = format_ci(float(row['ci95_low']), float(row['ci95_high']), precision=3, latex=False, use_numrange=True)
     roi_name = shorten_roi_name(row['pretty_name'])
     rows.append({
@@ -69,7 +70,8 @@ for _, row in sig_df.iterrows():
         'M_diff': float(row['mean_diff']),
         't': float(row['t_stat']),
         '95% CI': ci_str,
-        'p': p_str,
+        'p': p_raw_str,
+        'pFDR': p_fdr_str,
     })
 
 _df_out = pd.DataFrame(rows)
@@ -79,20 +81,20 @@ generate_styled_table(
     df=_df_out,
     output_path=tables_dir / 'roi_maps_univ.tex',
     caption=(
-        'Univariate contrast \emph{All} > \emph{Rest}: Experts > Novices. '
+        'Univariate contrast \\emph{All} > \\emph{Rest}: Experts > Novices. '
         'Glasser ROIs with higher second-level GLM contrast values in Experts than Novices. '
         'Columns show Glasser ROI label, Harvard–Oxford label, '
-        'mean group difference $M_{\text{diff}}$ (contrast units; Experts $-$ Novices), '
-        '$t$ statistic, 95% CI, and FDR-corrected $p$ value ($\alpha<.05$).'
+        'mean group difference $M_{\\text{diff}}$ (contrast units; Experts $-$ Novices), '
+        '$t$ statistic, 95\\% CI, raw $p$, and FDR-corrected $p$ value ($\\alpha<.05$).'
     ),
     label='supptab:roi_analysis_univ_allrest',
-    column_format='llcccc',
+    column_format='llccccc',
     logger=logger,
     manuscript_name='roi_maps_univ.tex',
 )
 logger.info("Saved LaTeX table via centralized generator")
 
-sig_df[['pretty_name', 'harvard_oxford_label', 'mean_diff', 't_stat', 'ci95_low', 'ci95_high', 'p_val_fdr']].to_csv(
+sig_df[['pretty_name', 'harvard_oxford_label', 'mean_diff', 't_stat', 'ci95_low', 'ci95_high', 'p_val', 'p_val_fdr']].to_csv(
     tables_dir / 'roi_maps_univ.csv',
     index=False
 )

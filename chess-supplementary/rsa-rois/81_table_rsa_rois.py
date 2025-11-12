@@ -154,12 +154,12 @@ for tgt in targets:
         table_name=f'rsa_{tgt}',
         caption=(
             f'RSA ROI summary — {tgt_label}. '
-            'Table reports group means with 95% CIs, expert–novice differences '
-            "(Welch's t-based 95% CIs), and both raw and FDR-corrected p-values."
+            'Table reports group means with 95\\% CIs, expert–novice differences '
+            "(Welch's t-based 95\\% CIs), and both raw and FDR-corrected p-values."
         ),
         label=f'tab:rsa_{tgt}',
         column_format='lSc|Sc|Sc|cc',
-        csv_only=True,  # Only generate CSV (no manuscript .tex file)
+        csv_only=False,  # Generate both LaTeX and CSV
         logger=logger,
     )
     logger.info(f"Saved RSA CSV for {tgt}: {csv_path}")

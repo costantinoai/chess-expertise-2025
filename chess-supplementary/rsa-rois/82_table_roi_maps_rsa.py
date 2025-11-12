@@ -183,14 +183,16 @@ def build_df(sig: pd.DataFrame) -> pd.DataFrame:
         roi_name = shorten_roi_name(row['pretty_name'])
         ho_label = row['harvard_oxford_label'] if pd.notna(row['harvard_oxford_label']) else 'Unlabeled'
         ci_str = format_ci(float(row['ci95_low']), float(row['ci95_high']), precision=3, latex=False, use_numrange=True)
-        p_str = format_p_cell(row['p_val_fdr'])
+        p_raw_str = format_p_cell(row['p_val'])
+        p_fdr_str = format_p_cell(row['p_val_fdr'])
         rows.append({
             'ROI': roi_name,
             'Harvard–Oxford Label': ho_label,
             'M_diff': float(row['mean_diff']),
             't': float(row['t_stat']),
             '95% CI': ci_str,
-            'p': p_str,
+            'p': p_raw_str,
+            'pFDR': p_fdr_str,
         })
     return pd.DataFrame(rows)
 
@@ -203,10 +205,10 @@ check_path = generate_styled_table(
     caption=(
         'Checkmate model (RSA): Experts > Novices. Glasser ROIs showing stronger model–brain correspondence '
         'in Experts than Novices. Columns: Glasser ROI label; Harvard–Oxford label; '
-        '$M_{\text{diff}}$ (Experts $-$ Novices); $t$; 95% CI; FDR-corrected $p$.'
+        '$M_{\\text{diff}}$ (Experts $-$ Novices); $t$; 95\\% CI; raw $p$; FDR-corrected $p$.'
     ),
     label='supptab:roi_analysis_rsa_check',
-    column_format='llcccc',
+    column_format='llccccc',
     logger=logger,
     manuscript_name='roi_maps_rsa_check.tex',
 )
@@ -217,10 +219,10 @@ strategy_path = generate_styled_table(
     caption=(
         'Strategy model (RSA): Experts > Novices. Glasser ROIs showing stronger model–brain correspondence '
         'in Experts than Novices. Columns: Glasser ROI label; Harvard–Oxford label; '
-        '$M_{\text{diff}}$ (Experts $-$ Novices); $t$; 95% CI; FDR-corrected $p$.'
+        '$M_{\\text{diff}}$ (Experts $-$ Novices); $t$; 95\\% CI; raw $p$; FDR-corrected $p$.'
     ),
     label='supptab:roi_analysis_rsa_strategy',
-    column_format='llcccc',
+    column_format='llccccc',
     logger=logger,
     manuscript_name='roi_maps_rsa_strategy.tex',
 )
@@ -252,8 +254,8 @@ except Exception:
 
 # Save combined CSV for reference
 combined_csv = pd.concat([
-    checkmate_sig.assign(Model='Checkmate')[['Model', 'pretty_name', 'harvard_oxford_label', 'mean_diff', 't_stat', 'ci95_low', 'ci95_high', 'p_val_fdr']],
-    strategy_sig.assign(Model='Strategy')[['Model', 'pretty_name', 'harvard_oxford_label', 'mean_diff', 't_stat', 'ci95_low', 'ci95_high', 'p_val_fdr']]
+    checkmate_sig.assign(Model='Checkmate')[['Model', 'pretty_name', 'harvard_oxford_label', 'mean_diff', 't_stat', 'ci95_low', 'ci95_high', 'p_val', 'p_val_fdr']],
+    strategy_sig.assign(Model='Strategy')[['Model', 'pretty_name', 'harvard_oxford_label', 'mean_diff', 't_stat', 'ci95_low', 'ci95_high', 'p_val', 'p_val_fdr']]
 ], ignore_index=True)
 
 csv_path = tables_dir / 'roi_maps_rsa.csv'

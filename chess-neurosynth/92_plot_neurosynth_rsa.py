@@ -292,6 +292,7 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
+import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
 plt.figure(1).set_size_inches(cm_to_inches(16.67), cm_to_inches(15.02), forward=True)
 plt.figure(1).ax_dict["1A_RSA_Corr_searchlight_checkmate"].legend(loc=(0.4579, 0.808), frameon=False)
@@ -299,26 +300,27 @@ plt.figure(1).ax_dict["1A_RSA_Corr_searchlight_checkmate"].set(position=[0.4549,
 plt.figure(1).ax_dict["1A_RSA_Corr_searchlight_checkmate"].set_position([0.496846, 0.104319, 0.234715, 0.187779])
 plt.figure(1).ax_dict["1B_RSA_Diff_searchlight_checkmate"].set(position=[0.7527, 0.1873, 0.1487, 0.1699])
 plt.figure(1).ax_dict["1B_RSA_Diff_searchlight_checkmate"].set_position([0.818364, 0.104319, 0.160543, 0.187779])
-plt.figure(1).ax_dict["1C_RSA_Flat_searchlight_checkmate"].set(position=[0.009016, 0.1395, 0.3802, 0.2176])
-plt.figure(1).ax_dict["1C_RSA_Flat_searchlight_checkmate"].set_position([0.017607, 0.052023, 0.406167, 0.239429])
+plt.figure(1).ax_dict["1B_RSA_Diff_searchlight_checkmate"].texts[3].set(position=(5., -0.1165))
+plt.figure(1).ax_dict["1C_RSA_Flat_searchlight_checkmate"].set(position=[0.01761, 0.05202, 0.4062, 0.2393])
 plt.figure(1).ax_dict["2A_RSA_Corr_searchlight_strategy"].legend(loc=(0.4483, 0.808), frameon=False)
 plt.figure(1).ax_dict["2A_RSA_Corr_searchlight_strategy"].set(position=[0.4568, 0.4725, 0.2136, 0.1699])
 plt.figure(1).ax_dict["2A_RSA_Corr_searchlight_strategy"].set_position([0.498897, 0.419532, 0.230612, 0.187779])
 plt.figure(1).ax_dict["2B_RSA_Diff_searchlight_strategy"].set(position=[0.7527, 0.4725, 0.1487, 0.1699])
 plt.figure(1).ax_dict["2B_RSA_Diff_searchlight_strategy"].set_position([0.818364, 0.419532, 0.160543, 0.187779])
-plt.figure(1).ax_dict["2C_RSA_Flat_searchlight_strategy"].set(position=[0.009016, 0.428, 0.3745, 0.2144])
-plt.figure(1).ax_dict["2C_RSA_Flat_searchlight_strategy"].set_position([0.017574, 0.370910, 0.400078, 0.235839])
+plt.figure(1).ax_dict["2B_RSA_Diff_searchlight_strategy"].texts[5].set(position=(5., -0.1255))
+plt.figure(1).ax_dict["2C_RSA_Flat_searchlight_strategy"].set(position=[0.01757, 0.3709, 0.4001, 0.2357])
 plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].legend(loc=(0.4543, 0.808), frameon=False)
 plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].set(position=[0.4549, 0.7577, 0.2174, 0.1699])
 plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].set_position([0.496846, 0.734745, 0.234715, 0.187779])
+plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].texts[5].set(position=(5.754, 0.0451))
+plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].texts[11].set(position=(6.289, 0.0451))
 plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].text(0.0960, 1.2573, 'Neurosynth-RSA Correlations', transform=plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].texts[0].new
 plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].text(-0.0801, 1.2520, 'b', transform=plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["3A_RSA_Corr_searchlight_visual_similarity"].texts[1].new
 plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].set(position=[0.7527, 0.7577, 0.1487, 0.1699])
 plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].set_position([0.818364, 0.734745, 0.160543, 0.187779])
 plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].text(0.0370, 1.2573, 'Correlation Difference', transform=plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].texts[0].new
 plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].text(-0.1373, 1.2520, 'c', transform=plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["3B_RSA_Diff_searchlight_visual_similarity"].texts[1].new
-plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].set(position=[0.009016, 0.7132, 0.3745, 0.2144])
-plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].set_position([0.017574, 0.686123, 0.400078, 0.235839])
+plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].set(position=[0.01757, 0.6861, 0.4001, 0.2357])
 plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].text(0.3458, 1.2039, 'Surface Projection', transform=plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].texts[0].new
 plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].text(0.0982, 1.2081, 'a', transform=plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["3C_RSA_Flat_searchlight_visual_similarity"].texts[1].new
 plt.figure(1).ax_dict["RDM_1_visual_similarity"].set(position=[0.3634, 0.7363, 0.04401, 0.04724])
