@@ -78,7 +78,7 @@ def _save_plotly(fig, title: str, output_file: Path | str | None):
     if not skip_static:
         pdf_path = output_file.with_suffix(".pdf")
         fig.write_image(str(pdf_path))
-
+    fig.show()
 
 def _flat_meshes():
     """Fetch fsaverage meshes; return (flat_left, flat_right, pial_left, pial_right).
