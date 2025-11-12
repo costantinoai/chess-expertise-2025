@@ -107,7 +107,7 @@ from .bids_utils import (
 from .rsa_utils import create_model_rdm, correlate_rdms, correlate_rdm_with_models, compute_pairwise_rdm_reliability
 
 # Neuroimaging IO (required dependency for neuro utilities)
-from .neuro_utils import load_nifti
+from .neuro_utils import load_nifti, create_glasser22_contours
 
 __all__ = [
     # Configuration
@@ -188,4 +188,5 @@ __all__ = [
     'compute_pairwise_rdm_reliability',
     # Neuro IO
     'load_nifti',
+    'create_glasser22_contours',
 ]

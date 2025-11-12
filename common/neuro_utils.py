@@ -1028,6 +1028,154 @@ def expand_roi22_to_roi180_values(
     return np.asarray(roi_ids_180, dtype=int), np.asarray(roi_vals_180, dtype=float)
 
 
+def create_glasser22_contours(
+    region_names: list[str],
+    hemisphere: str = 'both',
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Create per-vertex contour labels for specified Glasser-22 regions.
+
+    This function generates contour arrays suitable for use with surface plotting
+    functions that support ROI boundary overlays (e.g., plot_flat_pair with
+    contours_rois parameter).
+
+    Parameters
+    ----------
+    region_names : list of str
+        Region names or aliases to highlight. Supported names/aliases:
+        - 'V1', 'primary_visual', 'Primary_Visual' (region22_id=1)
+        - 'PCC', 'posterior_cingulate', 'Posterior_Cingulate' (region22_id=18)
+        - 'dLPFC', 'dlpfc', 'dorsolateral_prefrontal', 'Dorsolateral_Prefrontal' (region22_id=22)
+        Names are case-insensitive and support multiple aliases.
+    hemisphere : {'left', 'right', 'both'}, default='both'
+        Which hemispheres to process.
+
+    Returns
+    -------
+    contours_left : np.ndarray
+        Per-vertex integer labels for left hemisphere (same shape as fsaverage7).
+        Value is region22_id if vertex belongs to a target region, 0 otherwise.
+    contours_right : np.ndarray
+        Per-vertex integer labels for right hemisphere.
+
+    Raises
+    ------
+    ValueError
+        If hemisphere is invalid or region_names contains unrecognized names.
+    FileNotFoundError
+        If required annotation files are missing.
+
+    Examples
+    --------
+    >>> from common.neuro_utils import create_glasser22_contours
+    >>> from common.plotting import plot_flat_pair
+    >>>
+    >>> # Create contours for multiple regions
+    >>> contours_l, contours_r = create_glasser22_contours(
+    ...     ['dLPFC', 'posterior_cingulate', 'V1']
+    ... )
+    >>> # Use with plot_flat_pair
+    >>> fig = plot_flat_pair(
+    ...     textures=(tex_l, tex_r),
+    ...     contours_rois=(contours_l, contours_r),
+    ...     vmin=vmin, vmax=vmax
+    ... )
+
+    See Also
+    --------
+    load_glasser180_annotations : Load per-vertex Glasser-180 labels
+    map_180_to_22 : Map Glasser-180 parcels to 22 regions
+    """
+    # Define region name aliases mapping to region22_id
+    REGION_ALIASES = {
+        # Primary Visual (region22_id=1)
+        'v1': 1,
+        'primary_visual': 1,
+        'primary visual': 1,
+        # Ventral Stream Visual (region22_id=4)
+        'vvs': 4,
+        'ventral_stream_visual': 4,
+        'ventral stream visual': 4,
+        # Temporo-Parieto-Occipital Junction (region22_id=15)
+        'tpoj': 15,
+        'temporo parieto occipital junction': 15,
+        'temporo-parieto-occipital junction': 15,
+        # Superior Parietal (region22_id=16)
+        'sp': 16,
+        'superior_parietal': 16,
+        'superior parietal': 16,
+        # Posterior Cingulate (region22_id=18)
+        'pcc': 18,
+        'posterior_cingulate': 18,
+        'posterior cingulate': 18,
+        # Dorsolateral Prefrontal (region22_id=22)
+        'dlpfc': 22,
+        'dorsolateral_prefrontal': 22,
+        'dorsolateral prefrontal': 22,
+    }
+
+    # Normalize region names to region22_ids
+    target_region22_ids = set()
+    for name in region_names:
+        name_normalized = name.lower().replace('-', ' ').replace('_', ' ')
+        if name_normalized not in REGION_ALIASES:
+            raise ValueError(
+                f"Unknown region name: '{name}'. Supported names: "
+                f"{list(set(REGION_ALIASES.keys()))}"
+            )
+        target_region22_ids.add(REGION_ALIASES[name_normalized])
+
+    # Load Glasser-180 to Glasser-22 mapping
+    roi180_df = load_glasser180_region_info()
+
+    # Process hemispheres
+    process_left = hemisphere in {'left', 'both'}
+    process_right = hemisphere in {'right', 'both'}
+
+    if not (process_left or process_right):
+        raise ValueError("hemisphere must be 'left', 'right', or 'both'")
+
+    # Initialize output arrays (will be resized to match annotation length)
+    contours_left = np.array([])
+    contours_right = np.array([])
+
+    if process_left:
+        # Load left hemisphere annotations
+        labels_left = load_glasser180_annotations('left')
+        contours_left = np.zeros(len(labels_left), dtype=int)
+
+        # Build 180->22 mapping for left hemisphere
+        mapping_left = map_180_to_22(roi180_df, hemisphere='left')
+
+        # Assign region22_id to vertices belonging to target regions
+        for vertex_idx, label180 in enumerate(labels_left):
+            if label180 in mapping_left:
+                region22_id = mapping_left[label180]
+                if region22_id in target_region22_ids:
+                    contours_left[vertex_idx] = region22_id
+
+    if process_right:
+        # Load right hemisphere annotations
+        labels_right = load_glasser180_annotations('right')
+        contours_right = np.zeros(len(labels_right), dtype=int)
+
+        # Build 180->22 mapping for right hemisphere
+        # Note: annotation files use 1-180 for both hemispheres, but region_info.tsv
+        # uses 181-360 for right hemisphere. Offset by 180 to match.
+        mapping_right = map_180_to_22(roi180_df, hemisphere='right')
+
+        # Assign region22_id to vertices belonging to target regions
+        for vertex_idx, label180 in enumerate(labels_right):
+            # Offset label by 180 for right hemisphere to match region_info.tsv numbering
+            label180_offset = label180 + 180 if label180 > 0 else 0
+            if label180_offset in mapping_right:
+                region22_id = mapping_right[label180_offset]
+                if region22_id in target_region22_ids:
+                    contours_right[vertex_idx] = region22_id
+
+    return contours_left, contours_right
+
+
 def project_volume_to_surfaces(
     volume_img,
     surfaces: Tuple[str, ...] = ('pial_left', 'pial_right'),

@@ -76,7 +76,7 @@ from common.plotting import (
     PLOT_YLIMITS,
     cm_to_inches,
 )
-from common.neuro_utils import project_volume_to_surfaces
+from common.neuro_utils import project_volume_to_surfaces, create_glasser22_contours
 from modules.plot_utils import (
     plot_correlations_on_ax,
     plot_differences_on_ax,
@@ -225,6 +225,28 @@ vmin_univ, vmax_univ = compute_ylim_range(
     padding_pct=0.0
 )
 
+# Create contours for key regions of interest
+# dLPFC (Dorsolateral Prefrontal Cortex), PCC (Posterior Cingulate Cortex),
+# V1 (Primary Visual Cortex), TPOJ (Temporo-Parieto-Occipital Junction),
+# SP (Superior Parietal), VVS (Ventral Visual Stream)
+contours_l, contours_r = create_glasser22_contours(['dLPFC', 'PCC', 'V1', 'TPOJ', 'SP', 'VVS'])
+
+# Package contours and labels in a single dictionary (DRY principle - clean API)
+roi_contours = {
+    'contours_left': contours_l,
+    'contours_right': contours_r,
+    'labels': {
+        1: 'V1',        # Primary Visual
+        4: 'VVS',       # Ventral Visual Stream
+        15: 'TPOJ',     # Temporo-Parieto-Occipital Junction
+        16: 'SP',       # Superior Parietal
+        18: 'PCC',      # Posterior Cingulate
+        22: 'dLPFC',    # Dorsolateral Prefrontal
+    },
+    'color': 'black',
+    'width': 2.0
+}
+
 # -----------------------------------------------------------------------------
 # Panel C: Flat Surface Maps (All > Baseline)
 # -----------------------------------------------------------------------------
@@ -235,14 +257,15 @@ ax_C = plt.axes(); ax_C.set_label('C_Flat_All_gt_Rest')
 
 # Plot using pre-computed textures (no re-projection!)
 surface_fig_all = plot_flat_pair(
-    textures=(tex_all_l, tex_all_r),  # Pre-computed surface textures
-    threshold=0,                       # Show all values (no thresholding)
-    output_file=None,                  # Don't save (will embed in main figure)
-    show_hemi_labels=False,            # No hemisphere labels (added manually)
-    show_colorbar=False,               # Colorbar shown separately
-    vmin=vmin_univ,                    # Symmetric minimum
-    vmax=vmax_univ,                    # Symmetric maximum
-    show_directions=True,              # Show anterior/posterior labels
+    textures=(tex_all_l, tex_all_r),
+    threshold=0,
+    output_file=None,
+    show_hemi_labels=False,
+    show_colorbar=False,
+    vmin=vmin_univ,
+    vmax=vmax_univ,
+    show_directions=True,
+    roi_contours=roi_contours,  # Single dict with all contour settings (DRY)
 )
 embed_figure_on_ax(ax_C, surface_fig_all, title='Surface Projection', subtitle="All > Baseline")
 
@@ -254,14 +277,15 @@ ax_D = plt.axes(); ax_D.set_label('D_Flat_Check_gt_NoCheck')
 
 # Plot using pre-computed textures (no re-projection!)
 surface_fig_check = plot_flat_pair(
-    textures=(tex_check_l, tex_check_r),  # Pre-computed surface textures
-    threshold=0,                           # Show all values (no thresholding)
-    output_file=None,                      # Don't save (will embed in main figure)
-    show_hemi_labels=False,                # No hemisphere labels (added manually)
-    show_colorbar=False,                   # Colorbar shown separately
-    vmin=vmin_univ,                        # Symmetric minimum (same as Panel C)
-    vmax=vmax_univ,                        # Symmetric maximum (same as Panel C)
-    show_directions=True,                  # Show anterior/posterior labels
+    textures=(tex_check_l, tex_check_r),
+    threshold=0,
+    output_file=None,
+    show_hemi_labels=False,
+    show_colorbar=False,
+    vmin=vmin_univ,
+    vmax=vmax_univ,
+    show_directions=True,
+    roi_contours=roi_contours,  # Single dict with all contour settings (DRY)
 )
 embed_figure_on_ax(ax_D, surface_fig_check, title='Surface Projection', subtitle='Checkmate > Non-Checkmate')
 
@@ -305,12 +329,15 @@ plt.figure(1).set_size_inches(cm_to_inches(18.23), cm_to_inches(14.17), forward=
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].legend(loc=(0.4927, 0.8425), frameon=False)
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].set(position=[0.05757, 0.4808, 0.2188, 0.2177])
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].set_position([0.062204, 0.385487, 0.216904, 0.258545])
+plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].texts[7].set(position=(0.175, -0.1401))
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].texts[14].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].texts[15].set(position=(0.5, 1.016))
 plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].text(-0.1489, 1.0710, 'b', transform=plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["A1_Corr_All_gt_Rest"].texts[2].new
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].legend(loc=(0.3983, 0.8425), frameon=False)
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].set(position=[0.3343, 0.4808, 0.1422, 0.2177])
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].set_position([0.336506, 0.385487, 0.140968, 0.258545])
+plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].texts[5].set(position=(5., -0.1359))
+plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].texts[6].set(position=(6., -0.1359))
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].texts[7].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["A2_Diff_All_gt_Rest"].texts[8].set(position=(0.5, 1.016))
 plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].legend(loc=(0.5172, 0.8425), frameon=False)
@@ -321,6 +348,8 @@ plt.figure(1).ax_dict["B1_Corr_Check_gt_NoCheck"].texts[15].set(position=(0.5, 1
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].legend(loc=(0.3983, 0.8425), frameon=False)
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].set(position=[0.8381, 0.4808, 0.1422, 0.2177])
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].set_position([0.835940, 0.385487, 0.140968, 0.258545])
+plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].texts[4].set(position=(4., -0.1359))
+plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].texts[5].set(position=(5.041, -0.1359))
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].texts[7].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["B2_Diff_Check_gt_NoCheck"].texts[8].set(position=(0.5, 1.016))
 plt.figure(1).ax_dict["C_Flat_All_gt_Rest"].set(position=[0.04994, -0.02481, 0.4361, 0.2986])

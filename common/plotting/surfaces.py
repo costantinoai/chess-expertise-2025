@@ -25,6 +25,7 @@ import numpy as np
 from nilearn import plotting, surface, datasets
 
 from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
 from .colors import CMAP_BRAIN
 from .style import PLOT_PARAMS
@@ -105,6 +106,143 @@ def _pial_meshes():
     return fsavg.pial_left, fsavg.pial_right
 
 
+def _extract_roi_boundary_edges(
+    mesh,
+    roi_labels: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Extract 3D edge coordinates where ROI boundaries occur on a surface mesh.
+
+    Parameters
+    ----------
+    mesh : tuple, object, or str/Path
+        Surface mesh from nilearn (either tuple of (coords, faces), object
+        with .coordinates and .faces attributes, or path to mesh file).
+    roi_labels : np.ndarray
+        Per-vertex integer labels (same length as vertices). Vertices with
+        value > 0 are considered part of an ROI. Boundaries are drawn where
+        adjacent vertices have different non-zero labels.
+
+    Returns
+    -------
+    x, y, z : np.ndarray
+        1D arrays of edge coordinates with None separators for discontinuous
+        line segments (Plotly convention). Format: [x1, x2, None, x3, x4, None, ...]
+    """
+    # Extract coordinates and faces from mesh
+    if isinstance(mesh, tuple):
+        coords, faces = mesh
+    elif isinstance(mesh, (str, Path)):
+        # Mesh is a file path - load it using nilearn
+        coords, faces = surface.load_surf_mesh(str(mesh))
+    else:
+        coords = mesh.coordinates if hasattr(mesh, 'coordinates') else mesh.coords
+        faces = mesh.faces
+
+    coords = np.asarray(coords)
+    faces = np.asarray(faces)
+    roi_labels = np.asarray(roi_labels).astype(int)
+
+    # Collect boundary edges (avoid duplicates using set)
+    edge_coords = []
+    seen_edges = set()
+
+    for face in faces:
+        v1, v2, v3 = face
+        # Check all three edges of the triangle
+        edges = [(v1, v2), (v2, v3), (v3, v1)]
+
+        for va, vb in edges:
+            # Create canonical edge key (sorted to handle bidirectional)
+            edge_key = tuple(sorted([va, vb]))
+            if edge_key in seen_edges:
+                continue
+
+            label_a = roi_labels[va]
+            label_b = roi_labels[vb]
+
+            # Draw boundary if labels are different AND at least one is an ROI (>0)
+            # This captures:
+            # 1. ROI outline vs background (one is >0, other is 0)
+            # 2. Boundary between different ROIs (both >0 but different)
+            if label_a != label_b and (label_a > 0 or label_b > 0):
+                edge_coords.append((coords[va], coords[vb]))
+                seen_edges.add(edge_key)
+
+    # Convert to Plotly format: separate x, y, z arrays with None separators
+    if not edge_coords:
+        # No boundaries found, return empty arrays
+        return np.array([]), np.array([]), np.array([])
+
+    x_coords = []
+    y_coords = []
+    z_coords = []
+
+    for pt1, pt2 in edge_coords:
+        x_coords.extend([pt1[0], pt2[0], None])
+        y_coords.extend([pt1[1], pt2[1], None])
+        z_coords.extend([pt1[2], pt2[2], None])
+
+    return np.array(x_coords), np.array(y_coords), np.array(z_coords)
+
+
+def _compute_roi_centroids(
+    mesh,
+    roi_labels: np.ndarray,
+) -> dict:
+    """
+    Compute centroid coordinates for each ROI on a surface mesh.
+
+    Uses a robust approach that ensures the label point is actually inside the ROI
+    by finding the vertex closest to the geometric centroid that has the correct label.
+
+    Parameters
+    ----------
+    mesh : tuple, object, or str/Path
+        Surface mesh from nilearn.
+    roi_labels : np.ndarray
+        Per-vertex integer labels. Centroids computed for each unique value > 0.
+
+    Returns
+    -------
+    dict
+        Mapping of roi_id -> (x, y, z) centroid coordinates guaranteed to be inside ROI.
+    """
+    # Extract coordinates from mesh
+    if isinstance(mesh, tuple):
+        coords, _ = mesh
+    elif isinstance(mesh, (str, Path)):
+        coords, _ = surface.load_surf_mesh(str(mesh))
+    else:
+        coords = mesh.coordinates if hasattr(mesh, 'coordinates') else mesh.coords
+
+    coords = np.asarray(coords)
+    roi_labels = np.asarray(roi_labels).astype(int)
+
+    centroids = {}
+    unique_rois = np.unique(roi_labels)
+
+    for roi_id in unique_rois:
+        if roi_id == 0:  # Skip background
+            continue
+        # Get all vertices belonging to this ROI
+        mask = roi_labels == roi_id
+        roi_coords = coords[mask]
+
+        # Compute geometric centroid
+        geometric_centroid = roi_coords.mean(axis=0)
+
+        # Find the vertex in this ROI that is closest to the geometric centroid
+        # This guarantees the label point is actually inside the ROI
+        distances = np.linalg.norm(roi_coords - geometric_centroid, axis=1)
+        closest_idx = np.argmin(distances)
+        best_centroid = roi_coords[closest_idx]
+
+        centroids[roi_id] = tuple(best_centroid)
+
+    return centroids
+
+
 def _plot_hemisphere_flat(
     fig,
     mesh_flat,
@@ -118,8 +256,19 @@ def _plot_hemisphere_flat(
     col: int,
     show_colorbar: bool = False,
     colorbar_horizontal: bool = False,
+    contour_labels: Optional[np.ndarray] = None,
+    contour_color: str = "black",
+    contour_width: float = 2.0,
+    roi_text_labels: Optional[dict] = None,
 ):
-    """Internal helper: add a single flat hemisphere to a plotly subplot."""
+    """Internal helper: add a single flat hemisphere to a plotly subplot.
+
+    Parameters
+    ----------
+    roi_text_labels : dict, optional
+        Mapping of roi_id -> text label to display at ROI centroid.
+        Only used if contour_labels is also provided.
+    """
     mesh = mesh_flat if mesh_flat is not None else mesh_pial
     sub = plotting.plot_surf_stat_map(
         mesh,
@@ -152,6 +301,53 @@ def _plot_hemisphere_flat(
                 tr.colorbar.len = 0.6
         fig.add_trace(tr, row=row, col=col)
 
+    # Add contour lines if requested
+    if contour_labels is not None:
+        x, y, z = _extract_roi_boundary_edges(mesh, contour_labels)
+        if len(x) > 0:  # Only add trace if boundaries were found
+            # Offset z slightly to ensure contours render above surface (skip None values)
+            z_offset = []
+            for val in z:
+                if val is None:
+                    z_offset.append(None)
+                else:
+                    z_offset.append(val + 5.0)
+            contour_trace = go.Scatter3d(
+                x=x,
+                y=y,
+                z=z_offset,
+                mode='lines',
+                line=dict(color=contour_color, width=contour_width),
+                showlegend=False,
+                hoverinfo='skip',
+            )
+            fig.add_trace(contour_trace, row=row, col=col)
+
+        # Add text labels at ROI centroids if provided
+        if roi_text_labels is not None and len(roi_text_labels) > 0:
+            centroids = _compute_roi_centroids(mesh, contour_labels)
+            for roi_id, label_text in roi_text_labels.items():
+                if roi_id in centroids:
+                    cx, cy, cz = centroids[roi_id]
+                    # Offset z-coordinate to ensure text is above surface (prevents occlusion)
+                    cz_offset = cz + 10.0
+                    text_trace = go.Scatter3d(
+                        x=[cx],
+                        y=[cy],
+                        z=[cz_offset],
+                        mode='text',
+                        text=[label_text],
+                        textfont=dict(
+                            size=32,
+                            color='black',
+                            family=PLOT_PARAMS["font_family"],
+                        ),
+                        textposition='middle center',
+                        showlegend=False,
+                        hoverinfo='skip',
+                    )
+                    fig.add_trace(text_trace, row=row, col=col)
+
     return tmin, tmax
 
 
@@ -165,6 +361,7 @@ def plot_flat_pair(
     vmin: float | None = None,
     vmax: float | None = None,
     show_directions: bool = True,
+    roi_contours: dict | None = None,
 ):
     """
     Publication-style flat surface plot (left and right hemispheres), Plotly engine.
@@ -194,6 +391,15 @@ def plot_flat_pair(
         Use common.plotting.compute_ylim_range to compute from textures.
     show_directions : bool, default=True
         If True, add anatomical direction labels (A/P/D/V) and hemisphere labels
+    roi_contours : dict, optional
+        Dictionary specifying pre-computed ROI contours to draw and label. Set to None
+        (default) to disable contours. Required keys:
+        - 'contours_left': np.ndarray - Per-vertex integer labels for left hemisphere
+        - 'contours_right': np.ndarray - Per-vertex integer labels for right hemisphere
+        Optional keys:
+        - 'labels': dict[int, str] - Mapping of roi_id -> text label to display at centroids
+        - 'color': str, default='black' - Contour line color
+        - 'width': float, default=2.0 - Contour line width in pixels
 
     Raises
     ------
@@ -202,7 +408,7 @@ def plot_flat_pair(
 
     Examples
     --------
-    >>> # Project volume to surfaces
+    >>> # Basic usage: Project volume to surfaces and plot
     >>> from common.neuro_utils import project_volume_to_surfaces
     >>> from common.plotting import compute_ylim_range, plot_flat_pair
     >>>
@@ -216,9 +422,31 @@ def plot_flat_pair(
     ...     show_colorbar=True
     ... )
 
+    >>> # With ROI contours: Generate contours and labels separately
+    >>> from common.neuro_utils import create_glasser22_contours
+    >>>
+    >>> # Generate contours for specific Glasser-22 regions
+    >>> contours_l, contours_r = create_glasser22_contours(['dLPFC', 'PCC', 'V1', 'TPOJ'])
+    >>>
+    >>> # Plot with contours and labels
+    >>> fig = plot_flat_pair(
+    ...     textures=(tex_l, tex_r),
+    ...     roi_contours={
+    ...         'contours_left': contours_l,
+    ...         'contours_right': contours_r,
+    ...         'labels': {1: 'V1', 15: 'TPOJ', 18: 'PCC', 22: 'dLPFC'},
+    ...         'color': 'black',
+    ...         'width': 2.0
+    ...     },
+    ...     vmin=vmin,
+    ...     vmax=vmax,
+    ...     show_colorbar=True
+    ... )
+
     See Also
     --------
     common.neuro_utils.project_volume_to_surfaces : Project NIfTI volumes to surfaces
+    common.neuro_utils.create_glasser22_contours : Generate contours for Glasser-22 regions
     common.plotting.compute_ylim_range : Compute symmetric or anchored ranges
     """
     # Validate inputs
@@ -234,6 +462,39 @@ def plot_flat_pair(
     # Extract textures
     tex_l = np.asarray(textures[0])
     tex_r = np.asarray(textures[1])
+
+    # Parse roi_contours dictionary if provided
+    contours_l = None
+    contours_r = None
+    roi_text_labels = None
+    contour_color = 'black'
+    contour_width = 2.0
+
+    if roi_contours is not None:
+        if not isinstance(roi_contours, dict):
+            raise ValueError("roi_contours must be a dictionary")
+
+        # Required keys
+        if 'contours_left' not in roi_contours or 'contours_right' not in roi_contours:
+            raise ValueError("roi_contours must contain 'contours_left' and 'contours_right' keys")
+
+        contours_l = np.asarray(roi_contours['contours_left'])
+        contours_r = np.asarray(roi_contours['contours_right'])
+
+        # Validate shapes
+        if contours_l.shape[0] != tex_l.shape[0]:
+            raise ValueError(
+                f"contours_left length ({contours_l.shape[0]}) must match tex_left length ({tex_l.shape[0]})"
+            )
+        if contours_r.shape[0] != tex_r.shape[0]:
+            raise ValueError(
+                f"contours_right length ({contours_r.shape[0]}) must match tex_right length ({tex_r.shape[0]})"
+            )
+
+        # Optional keys
+        roi_text_labels = roi_contours.get('labels', None)
+        contour_color = roi_contours.get('color', 'black')
+        contour_width = roi_contours.get('width', 2.0)
 
     vmin_local = float(vmin)
     vmax_local = float(vmax)
@@ -257,6 +518,10 @@ def plot_flat_pair(
         row=1,
         col=1,
         show_colorbar=False,
+        contour_labels=contours_l,
+        contour_color=contour_color,
+        contour_width=contour_width,
+        roi_text_labels=roi_text_labels,
     )
 
     # Show a single horizontal colorbar on the right hemisphere traces (shared scale)
@@ -273,6 +538,10 @@ def plot_flat_pair(
         col=2,
         show_colorbar=show_colorbar,
         colorbar_horizontal=True,
+        contour_labels=contours_r,
+        contour_color=contour_color,
+        contour_width=contour_width,
+        roi_text_labels=roi_text_labels,
     )
 
     cam_left = dict(eye=dict(x=0.0, y=0.0, z=2.1), up=dict(x=0.0, y=1.0, z=0.0))

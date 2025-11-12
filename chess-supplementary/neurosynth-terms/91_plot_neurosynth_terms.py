@@ -76,7 +76,7 @@ from common.plotting import (
     save_panel_pdf,
     CMAP_BRAIN,
 )
-from common.neuro_utils import project_volume_to_surfaces
+from common.neuro_utils import project_volume_to_surfaces, create_glasser22_contours
 from common.logging_utils import setup_analysis, log_script_end
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-neurosynth')))
@@ -135,6 +135,16 @@ all_textures = [tex for tex_pair in surface_textures.values() for tex in tex_pai
 vmin, vmax = compute_ylim_range(*all_textures, symmetric=True, padding_pct=0.0)
 logger.info(f"Neurosynth shared symmetric color scale: vmin={vmin:.3f}, vmax={vmax:.3f}")
 
+# Create contours for key regions of interest
+contours_l, contours_r = create_glasser22_contours(['dLPFC', 'PCC', 'V1', 'TPOJ', 'SP', 'VVS'])
+roi_contours = {
+    'contours_left': contours_l,
+    'contours_right': contours_r,
+    'labels': {1: 'V1', 4: 'VVS', 15: 'TPOJ', 16: 'SP', 18: 'PCC', 22: 'dLPFC'},
+    'color': 'black',
+    'width': 2.0
+}
+
 
 # =============================================================================
 # Figure: Neurosynth Term Maps (Independent Axes for Pylustrator)
@@ -191,15 +201,16 @@ for i, term in enumerate(order, start=1):
 
     # Create flat surface plot using pre-computed textures (in-memory, no disk writes)
     surface_fig = plot_flat_pair(
-        textures=(tex_l, tex_r),       # Pre-computed surface textures
-        title='',                      # No title (added by embed_figure_on_ax)
-        threshold=1e-5,                # Minimal threshold (show all non-zero)
-        output_file=None,              # Don't save to disk (in-memory only)
-        show_hemi_labels=False,        # Don't show L/R labels
-        show_colorbar=False,           # Don't show colorbar (shown separately)
-        vmin=vmin,                     # Shared color scale minimum
-        vmax=vmax,                     # Shared color scale maximum
-        show_directions=True,          # Show anterior/posterior labels
+        textures=(tex_l, tex_r),
+        title='',
+        threshold=1e-5,
+        output_file=None,
+        show_hemi_labels=False,
+        show_colorbar=False,
+        vmin=vmin,
+        vmax=vmax,
+        show_directions=True,
+        roi_contours=roi_contours,
     )
 
     # Embed surface figure in matplotlib axis with title

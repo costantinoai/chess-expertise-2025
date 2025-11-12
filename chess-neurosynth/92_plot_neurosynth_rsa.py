@@ -77,7 +77,7 @@ from common.plotting import (
     PLOT_YLIMITS,
     cm_to_inches,
 )
-from common.neuro_utils import project_volume_to_surfaces
+from common.neuro_utils import project_volume_to_surfaces, create_glasser22_contours
 from common import setup_script, log_script_end
 from modules.plot_utils import (
     plot_correlations_on_ax,
@@ -156,6 +156,23 @@ vmin_rsa, vmax_rsa = compute_ylim_range(
     padding_pct=0.0
 )
 
+# Create contours for key regions of interest
+contours_l, contours_r = create_glasser22_contours(['dLPFC', 'PCC', 'V1', 'TPOJ', 'SP', 'VVS'])
+roi_contours = {
+    'contours_left': contours_l,
+    'contours_right': contours_r,
+    'labels': {
+        1: 'V1',
+        4: 'VVS',
+        15: 'TPOJ',
+        16: 'SP',
+        18: 'PCC',
+        22: 'dLPFC',
+    },
+    'color': 'black',
+    'width': 2.0
+}
+
 # Create panels for each RSA pattern (Checkmate, Strategy, Visual Similarity)
 for idx, (stem, pretty) in enumerate(PATTERNS, start=1):
     # Load term correlation data for this pattern
@@ -215,15 +232,16 @@ for idx, (stem, pretty) in enumerate(PATTERNS, start=1):
 
     # Create flat surface figure using pre-computed textures
     surface_fig_rsa = plot_flat_pair(
-        textures=(tex_l, tex_r),  # Pre-computed surface textures
-        title='',                  # No title (added by embed_figure_on_ax)
-        threshold=0,               # Show all values (no thresholding)
-        output_file=None,          # Don't save (will embed in main figure)
-        show_hemi_labels=False,    # No hemisphere labels (added manually)
-        show_colorbar=False,       # Colorbar shown separately
-        vmin=vmin_rsa,             # Symmetric minimum (same across all patterns)
-        vmax=vmax_rsa,             # Symmetric maximum (same across all patterns)
-        show_directions=True,      # Show anterior/posterior labels
+        textures=(tex_l, tex_r),
+        title='',
+        threshold=0,
+        output_file=None,
+        show_hemi_labels=False,
+        show_colorbar=False,
+        vmin=vmin_rsa,
+        vmax=vmax_rsa,
+        show_directions=True,
+        roi_contours=roi_contours,
     )
     embed_figure_on_ax(ax_flat, surface_fig_rsa, title="", subtitle=dimension)
 

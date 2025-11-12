@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 from nibabel.freesurfer import io as fsio
 from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
-from common.neuro_utils import roi_values_to_surface_texture
+from common.neuro_utils import roi_values_to_surface_texture, create_glasser22_contours
 from common.plotting import (
     apply_nature_rc,
     plot_flat_pair,
@@ -140,6 +140,15 @@ vmax_shared = float(np.max(all_abs)) if len(all_abs) else 1.0
 vmin_shared = -vmax_shared  # Symmetric range for diverging colormap
 logger.info(f"Univariate shared symmetric color scale (t): vmin={vmin_shared:.3f}, vmax={vmax_shared:.3f}")
 
+# Create contours for key regions of interest
+contours_l, contours_r = create_glasser22_contours(['dLPFC', 'PCC', 'V1', 'TPOJ', 'SP', 'VVS'])
+roi_contours = {
+    'contours_left': contours_l,
+    'contours_right': contours_r,
+    'labels': {1: 'V1', 4: 'VVS', 15: 'TPOJ', 16: 'SP', 18: 'PCC', 22: 'dLPFC'},
+    'color': 'black',
+    'width': 2.0
+}
 
 # =============================================================================
 # Figure: Univariate ROI Surfaces (Independent Axes for Pylustrator)
@@ -215,17 +224,17 @@ for idx, con_code in enumerate(contrasts, start=1):
     ax_all.set_label(f'{idx}_Univariate_{con_code}_all')
 
     # Create flat surface plot (in-memory, no disk writes)
-    # plot_flat_pair returns a matplotlib figure with L/R flat surfaces
     surface_fig_all = plot_flat_pair(
-        (tex_l_all, tex_r_all),  # Hemisphere textures (all ROIs)
-        title='',                      # No title (added by embed_figure_on_ax)
-        threshold=None,                # No thresholding
-        output_file=None,              # Don't save to disk (in-memory only)
-        show_hemi_labels=False,        # Don't show L/R labels
-        show_colorbar=False,           # Don't show colorbar (shown separately)
-        vmin=vmin_shared,              # Shared color scale minimum
-        vmax=vmax_shared,              # Shared color scale maximum
-        show_directions=True,          # Show anterior/posterior labels
+        (tex_l_all, tex_r_all),
+        title='',
+        threshold=None,
+        output_file=None,
+        show_hemi_labels=False,
+        show_colorbar=False,
+        vmin=vmin_shared,
+        vmax=vmax_shared,
+        show_directions=True,
+        roi_contours=roi_contours,
     )
 
     # Embed surface figure in matplotlib axis with title
@@ -244,15 +253,16 @@ for idx, con_code in enumerate(contrasts, start=1):
 
     # Create flat surface plot (in-memory, no disk writes)
     surface_fig_sig = plot_flat_pair(
-        (tex_l_sig, tex_r_sig),  # Hemisphere textures (significant ROIs only)
-        title='',                      # No title (added by embed_figure_on_ax)
-        threshold=None,                # No thresholding (already masked by sig_fdr)
-        output_file=None,              # Don't save to disk (in-memory only)
-        show_hemi_labels=False,        # Don't show L/R labels
-        show_colorbar=False,           # Don't show colorbar (shown separately)
-        vmin=vmin_shared,              # Same shared color scale minimum
-        vmax=vmax_shared,              # Same shared color scale maximum
-        show_directions=True,          # Show anterior/posterior labels
+        (tex_l_sig, tex_r_sig),
+        title='',
+        threshold=None,
+        output_file=None,
+        show_hemi_labels=False,
+        show_colorbar=False,
+        vmin=vmin_shared,
+        vmax=vmax_shared,
+        show_directions=True,
+        roi_contours=roi_contours,
     )
 
     # Embed surface figure in matplotlib axis with title
