@@ -49,7 +49,7 @@ This repository contains the complete analysis code for our study investigating 
 ### Clone Repository
 
 ```bash
-git clone https://github.com/your-username/chess-expertise-2025.git
+git clone https://github.com/costantinoai/chess-expertise-2025.git
 cd chess-expertise-2025
 ```
 
