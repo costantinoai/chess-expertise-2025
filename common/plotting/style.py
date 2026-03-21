@@ -208,6 +208,15 @@ PLOT_YLIMITS = {
     # Used by: chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
     # Range: Finer-grained ROI decoding, same scale as rsa_neural_rois_finer
 
+    'rsa_subcortical': (-0.03, 0.06),
+    # Used by: chess-supplementary/subcortical-rois/91_plot_subcortical_rsa.py
+    #          chess-supplementary/subcortical-rois/93_plot_subcortical_decoding.py
+    # Range: Subcortical ROIs have much smaller effect sizes than cortical
+
+    'decoding_subcortical': (-0.03, 0.06),
+    # Used by: chess-supplementary/subcortical-rois/93_plot_subcortical_decoding.py
+    # Range: Same as rsa_subcortical for visual comparison within panel
+
     # -------------------------------------------------------------------------
     # Behavioral Measures
     # Behavioral correlations and choice patterns
@@ -216,13 +225,13 @@ PLOT_YLIMITS = {
     # Used by: chess-behavioral/91_plot_behavioral_panels.py (RDM correlations)
     # Range: Partial correlation range, accommodates negative and strong positive
 
-    'behavioral_choice_counts': (0, 450),
+    'behavioral_choice_counts': (0, 500),
     # Used by: chess-behavioral/91_plot_behavioral_panels.py (choice histograms)
     # Range: Choice frequency counts across 40 stimuli
 
-    'behavioral_rsa_models': (-0.25, 0.8),
+    'behavioral_rsa_models': (-0.30, 1.0),
     # Used by: chess-behavioral/91_plot_behavioral_panels.py (model comparison)
-    # Range: RSA model fit correlations
+    # Range: RSA model fit correlations (updated for corrected data, checkmate r=0.70)
 
     # -------------------------------------------------------------------------
     # Neurosynth Meta-Analytic Correlations (Univariate Activation)

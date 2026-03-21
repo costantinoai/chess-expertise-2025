@@ -55,6 +55,7 @@ _ROI_ROOT = _EXTERNAL_DATA_ROOT / "rois"
 _ROI_GLASSER_22_DIR = _ROI_ROOT / "glasser22"
 _ROI_GLASSER_180_DIR = _ROI_ROOT / "glasser180"
 _ROI_GLASSER_180_SURFACE_DIR = _ROI_ROOT / "glasser180-surface"
+_ROI_CABNP_DIR = _ROI_ROOT / "cab-np"
 
 # BIDS base directories
 _BIDS_ROOT = _EXTERNAL_DATA_ROOT / "BIDS"
@@ -109,6 +110,10 @@ CONFIG = {
     'ROI_GLASSER_180_ANNOT_L': _ROI_GLASSER_180_SURFACE_DIR / "lh.HCPMMP1.annot",  # Left hemisphere annotation
     'ROI_GLASSER_180_ANNOT_R': _ROI_GLASSER_180_SURFACE_DIR / "rh.HCPMMP1.annot",  # Right hemisphere annotation
 
+    # --- CAB-NP Subcortical ROIs ---
+    'ROI_CABNP': _ROI_CABNP_DIR,
+    'ROI_CABNP_SUBCORTICAL_ATLAS': _ROI_CABNP_DIR / "tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii.gz",
+
     # --- BIDS Structure ---
     'BIDS_ROOT': _BIDS_ROOT,                                    # Main BIDS dataset root
     'BIDS_DERIVATIVES': _BIDS_DERIVATIVES,                      # Preprocessed/derived data
@@ -128,6 +133,8 @@ CONFIG = {
     'BIDS_RSA_SEARCHLIGHT': _BIDS_DERIVATIVES / "rsa_searchlight",  # RSA searchlight results
     'BIDS_BEHAVIORAL': _BIDS_DERIVATIVES / "chess-behavioural",  # Behavioral task data
     'BIDS_EYETRACK': _BIDS_DERIVATIVES / "eye-tracking",        # Eye-tracking derivatives
+    'BIDS_MVPA_RSA_SUBCORTICAL': _BIDS_DERIVATIVES / "mvpa-rsa-subcortical",  # Subcortical RSA results
+    'BIDS_MVPA_DECODING_SUBCORTICAL': _BIDS_DERIVATIVES / "mvpa-decoding-subcortical",  # Subcortical decoding results
 
     # --- External Resources ---
     'NEUROSYNTH_TERMS_DIR': _NEUROSYNTH_ROOT / "terms",         # Neurosynth term maps
