@@ -163,6 +163,30 @@ between experts and novices.
 2. Correlate each feature with the board's mean selection frequency per group (Spearman rho).
 3. Apply Benjamini-Hochberg FDR correction across all features within each group (alpha = 0.05).
 
+### 6. Perceptual-to-Relational Feature Gradient
+
+**What it measures**: The structure of the expert-novice preference dissociation across a gradient of 8 features ordered from purely perceptual (image statistics) to deeply relational (checkmate detection), using bivariate correlations, partial correlations, and hierarchical variance partitioning.
+
+**Rationale**: Diagnostic 5 identified individual feature predictors, but many of them are correlated (more pieces → more edges → higher entropy). This analysis (a) selects 8 features spanning the perceptual→relational gradient, (b) computes partial correlations to isolate unique contributions after removing shared variance, and (c) decomposes total explained variance into three ordered blocks (Perceptual, Structural, Strategic-Relational).
+
+**Features** (perceptual → relational):
+1. Image entropy (Shannon entropy of pixel histogram)
+2. Edge density (proportion of Sobel edge pixels)
+3. Piece count (total pieces)
+4. Officer count (N+B+R+Q)
+5. Center occupation (pieces in c3-f6)
+6. King exposure (mean proportion of king-adjacent squares under attack)
+7. Attack coverage (total squares attacked by either side)
+8. Checkmate status (binary)
+
+**Procedure**:
+1. Extract all 8 features for each of 40 boards.
+2. Bivariate Spearman correlations with FDR (8 features per group).
+3. Partial Spearman correlations: residualise both feature and preference on all other 7 features (OLS), then correlate residuals. FDR-corrected.
+4. Hierarchical variance partitioning: enter features in 3 blocks (Perceptual → Structural → Strategic-Relational); report delta-R² per block.
+
+**Important caveat**: These 8 features were not balanced or manipulated in the stimulus design — the 40-board stimulus set was constructed to vary checkmate status, strategy type, and visual pairing, not these secondary properties. As a result, features are not orthogonal (e.g., piece count and officer count correlate), and with n=40 boards statistical power is limited. This analysis is therefore **exploratory**: it characterises the pattern of preference drivers but should not be interpreted as causal evidence for specific feature-driven mechanisms.
+
 ### Statistical Tests
 
 - **Welch two-sample t-test**: Compares experts vs novices (unequal variance
@@ -245,6 +269,22 @@ python 92_plot_preference_features.py
 
 Produces board-image panels of top-preferred boards per group and feature-preference correlation plots.
 
+### Step 6: Run perceptual-to-relational gradient analysis
+
+```bash
+python 05_perceptual_relational_gradient.py
+```
+
+Extracts 8 features along the perceptual→relational gradient, computes bivariate and partial correlations, and performs hierarchical variance partitioning.
+
+### Step 7: Generate gradient figure
+
+```bash
+python 93_plot_gradient_panel.py
+```
+
+Produces a combined panel with bivariate vs partial correlation bars and stacked variance partitioning.
+
 ## Key Results
 
 ### Response Rate
@@ -319,25 +359,40 @@ shared visual features rather than checkmate status.
 
 **Key dissociation**: Expert preferences are driven exclusively by chess-relational content (whether there is a forced checkmate). Novice preferences are driven by low-level visual complexity (more pieces, more officers, busier images). This double dissociation provides direct behavioural evidence for the representational shift from perceptual to strategic encoding that the main RSA analysis measures neurally.
 
+### Perceptual-to-Relational Gradient
+
+**Bivariate correlations** (FDR < 0.05):
+- Experts: only checkmate status (r = +0.87). No other feature reaches significance.
+- Novices: 6 of 8 features significant — officer count (r = +0.59), edge density (r = +0.41), image entropy (r = +0.38), attack coverage (r = +0.35), king exposure (r = +0.35), piece count (r = +0.34). Checkmate status non-significant (r = +0.12).
+
+**Partial correlations** (unique contribution after controlling for all 7 other features):
+- Experts: checkmate status (partial r = +0.92, pFDR < 0.001) — strengthened by partialling, confirming it is the sole independent driver.
+- Novices: officer count (partial r = +0.63, pFDR < 0.001) — the unique driver after removing shared variance. Image entropy and edge density collapse to zero (fully mediated by piece/officer counts).
+
+**Variance partitioning** (hierarchical R²):
+- Experts: Perceptual 0.7%, Structural 2.3%, Strategic-Relational **92.7%** (total R² = 0.96).
+- Novices: Perceptual **12.8%**, Structural **29.2%**, Strategic-Relational 9.7% (total R² = 0.52).
+
+Expert preferences are almost entirely explained by the strategic-relational block (checkmate). Novice preferences are distributed across perceptual and structural blocks, with minimal contribution from strategic features. This quantitatively confirms the representational shift from perceptual to relational encoding with expertise.
+
+**Caveat**: These features were not balanced in the stimulus design (see Methods, Diagnostic 6). Results are exploratory.
+
 ## File Structure
 
 ```
 chess-supplementary/task-engagement/
-├── 01_task_engagement.py              # Main analysis (4 engagement diagnostics)
+├── 01_task_engagement.py              # Diagnostics 1-4 (engagement metrics)
 ├── 02_familiarisation_accuracy.py     # Pre-scan familiarisation task accuracy
-├── 04_quantify_preference_drivers.py  # Feature extraction (FEN + image) and feature-preference correlations
-├── 91_plot_novice_diagnostics.py      # Task engagement diagnostic figure panel
-├── 92_plot_preference_features.py     # Board preference feature drivers figure panel
+├── 04_quantify_preference_drivers.py  # Diagnostic 5: feature-preference correlations (20 features, FDR)
+├── 05_perceptual_relational_gradient.py  # Diagnostic 6: 8-feature gradient, partial correlations, variance partitioning
+├── 91_plot_novice_diagnostics.py      # Diagnostics 1-4 figure panel
+├── 92_plot_preference_features.py     # Diagnostic 5 figure: board images + scatter
+├── 93_plot_gradient_panel.py          # Diagnostic 6 figure: bivariate vs partial + variance bars
 ├── README.md
 ├── modules/
 │   ├── __init__.py
 │   └── io.py                          # Familiarisation data loading utilities
 └── results/
-    ├── familiarisation_accuracy/
-    │   ├── familiarisation_subject_accuracy.csv
-    │   ├── familiarisation_group_stats.csv
-    │   ├── familiarisation_detection_matrix.csv
-    │   └── familiarisation_response_matrix.csv
     └── novice_diagnostics/
         ├── response_rate.csv
         ├── checkmate_preference.csv
@@ -347,11 +402,17 @@ chess-supplementary/task-engagement/
         ├── preference_ranking_expert.csv
         ├── preference_ranking_novice.csv
         ├── extreme_boards_summary.csv
-        ├── feature_matrix.csv
-        ├── feature_correlations_full.csv
+        ├── feature_matrix.csv                       # Diagnostic 5 (20 features)
+        ├── feature_correlations_full.csv            # Diagnostic 5 (20 features, FDR)
+        ├── gradient_feature_matrix.csv              # Diagnostic 6 (8 features)
+        ├── gradient_bivariate_correlations.csv      # Diagnostic 6 bivariate r + FDR
+        ├── gradient_partial_correlations.csv        # Diagnostic 6 partial r + FDR
+        ├── gradient_variance_partitioning.csv       # Diagnostic 6 delta-R2 per block
         └── figures/
-            ├── novice_diagnostics_panel.pdf
-            ├── preference_drivers_panel.pdf
+            ├── novice_diagnostics_panel.pdf         # Diagnostics 1-4
+            ├── preference_drivers_panel.pdf         # Diagnostic 5
+            ├── gradient_panel.svg                   # Diagnostic 6
             └── panels/
-                └── preference_features_panel.pdf
+                ├── preference_features_panel.pdf    # Diagnostic 5
+                └── gradient_panel.pdf               # Diagnostic 6
 ```
