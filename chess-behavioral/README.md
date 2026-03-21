@@ -20,6 +20,18 @@ RDM[i,j] = |count(i > j) - count(j > i)|
 
 Higher values indicate greater inconsistency in preferences (stimuli are dissimilar in how they are perceived). Lower values indicate consistent preferences (stimuli are treated similarly).
 
+### Count-Normalized RDM (primary analysis)
+
+Because the 1-back task compares only consecutive boards, different stimulus pairs are compared different numbers of times depending on the random presentation sequence. Pairs compared more often accumulate higher raw counts, inflating their RDM values independently of preference consistency. To control for this exposure confound, the primary analysis uses count-normalized RDMs:
+
+```
+RDM_norm[i,j] = |count(i > j) - count(j > i)| / (count(i > j) + count(j > i))
+```
+
+Values range from 0 (perfectly tied preferences) to 1 (perfectly consistent preference direction). Pairs with zero comparisons are set to 0. The same normalization is applied to the directional preference matrix (DSM).
+
+The unnormalized (raw count) RDM is also computed and reported as a supplementary panel for comparison. The normalization does not change the qualitative pattern of results but provides a more interpretable dissimilarity metric that is not confounded with pair exposure frequency.
+
 ### Model RDMs
 
 Three theoretical model RDMs were constructed:
@@ -30,7 +42,7 @@ Three theoretical model RDMs were constructed:
 
 ### Statistical Analysis
 
-Behavioral RDMs were correlated with each model RDM using Pearson correlation. Significance was assessed via bootstrap resampling (10,000 iterations; `pingouin`). False discovery rate (FDR) correction was applied across models using the Benjamini–Hochberg procedure (α=0.05).
+Behavioral RDMs were correlated with each model RDM using Pearson correlation. Significance was assessed via bootstrap resampling (10,000 iterations; `pingouin`). False discovery rate (FDR) correction was applied separately within each group (family size = 3 models per group) using the Benjamini–Hochberg procedure (α=0.05).
 
 Separate analyses were conducted for experts and novices to test whether expertise modulates the cognitive dimensions underlying preference judgments.
 
@@ -122,16 +134,22 @@ python chess-behavioral/91_plot_behavioral_panels.py
 **Outputs** (saved to `chess-behavioral/results/behavioral_rsa/figures/`):
 - Individual axes as SVG/PDF: `behavioral_A1_RDM_Experts.svg`, etc.
 - Complete panels: `panels/behavioral_rsa_panel.pdf`
+- Normalized RDM panel: `panels/behavioral_rsa_normalized_panel.pdf`
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 
 ## Key Results
 
 **Experts**: Behavioral preferences correlate significantly with:
-- Checkmate status (Pearson r ≈ 0.56, pFDR < 0.001)
-- Strategy type (Pearson r ≈ 0.22, pFDR < 0.001)
+- Checkmate status (Pearson r = 0.73, pFDR < 0.001)
+- Strategy type (Pearson r = 0.25, pFDR < 0.001)
+- Visual similarity (Pearson r = −0.12, pFDR = 0.001)
 
-**Novices**: No significant correlations with any model RDM.
+Values are from the count-normalized RDM (primary analysis). Raw-count RDM correlations are similar (r = 0.70, 0.24, −0.10 respectively).
+
+**Novices**: No significant correlations with any model RDM (all pFDR > 0.14).
+
+The count-normalized analysis produces comparable results, confirming that the model fits are not driven by differential pair exposure.
 
 This demonstrates that chess expertise shapes behavioral similarity judgments along task-relevant dimensions (checkmate status, strategic content) but not low-level visual features.
 
@@ -146,8 +164,8 @@ chess-behavioral/
 ├── modules/
 │   ├── data_loading.py                    # BIDS data loaders
 │   └── rdm_utils.py                       # RDM computation and RSA
-├── local/                                 # Data preparation (optional)
-│   ├── convert_mat_to_bids_events.py      # MATLAB to BIDS conversion
+├── local/                                 # Data preparation (gitignored)
+│   ├── convert_mat_to_bids_events_v3.py   # MATLAB to BIDS conversion (authoritative)
 │   └── participants_descriptive_stats.py  # Demographic statistics
 └── results/
     └── behavioral_rsa/

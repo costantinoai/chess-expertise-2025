@@ -360,3 +360,52 @@ def correlate_with_all_models(
     model_rdms = [model_rdms_dict[col] for col in model_columns]
 
     return results, model_rdms
+
+
+def normalize_matrix_by_frequency(pairwise_df, matrix):
+    """
+    Normalize a dissimilarity matrix by total comparison count per pair.
+
+    Each cell is divided by the total number of comparisons for that pair,
+    removing the exposure confound where pairs compared more often accumulate
+    higher raw dissimilarity values.
+
+    Parameters
+    ----------
+    pairwise_df : pd.DataFrame
+        Pairwise comparison data with columns 'better', 'worse', and optionally
+        'count'. If 'count' is absent, each row is treated as a single comparison.
+    matrix : np.ndarray
+        Square dissimilarity matrix (n_stimuli x n_stimuli) with raw count-based
+        values. Stimulus IDs are assumed 1-indexed (matrix[0,0] corresponds to
+        stimulus 1 vs stimulus 1).
+
+    Returns
+    -------
+    np.ndarray
+        Normalized matrix where each cell is divided by the total number of
+        comparisons for that pair. Values range from 0 (tied) to 1 (perfectly
+        consistent). Pairs with zero comparisons are set to 0.
+    """
+    n = matrix.shape[0]
+    count_mat = np.zeros((n, n), dtype=float)
+    if 'count' in pairwise_df.columns:
+        for _, r in pairwise_df.iterrows():
+            i, j, c = int(r['better']) - 1, int(r['worse']) - 1, int(r['count'])
+            count_mat[i, j] = c
+    else:
+        for _, r in pairwise_df.iterrows():
+            i, j = int(r['better']) - 1, int(r['worse']) - 1
+            count_mat[i, j] += 1
+    total = count_mat + count_mat.T
+    return np.where(total > 0, matrix / total, 0.0)
+
+
+__all__ = [
+    'create_pairwise_df',
+    'compute_symmetric_rdm',
+    'compute_directional_dsm',
+    'aggregate_pairwise_counts',
+    'correlate_with_all_models',
+    'normalize_matrix_by_frequency',
+]

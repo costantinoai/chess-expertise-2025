@@ -37,6 +37,12 @@ Inputs
 - pairwise_data.pkl: Pairwise comparison data (expert_pairwise, novice_pairwise DataFrames)
 - correlation_results.pkl: RSA model correlation results with FDR correction
 
+Panel 2: Normalized Behavioral RSA (count-normalized RDMs)
+- File: figures/panels/behavioral_rsa_normalized_panel.pdf
+- Replicates Panel 1 using count-normalized RDMs where each cell is
+  divided by the total number of comparisons for that pair
+- Layout and content identical to Panel 1
+
 Dependencies
 ------------
 - pylustrator (optional; import is guarded by CONFIG['ENABLE_PYLUSTRATOR'])
@@ -92,6 +98,10 @@ from common.plotting import (
     create_standalone_colorbar,
     embed_figure_on_ax,
 )
+from common.rsa_utils import correlate_rdm_with_models
+from common.stats_utils import apply_fdr_correction
+from sklearn.manifold import MDS
+from modules.rdm_utils import normalize_matrix_by_frequency
 
 
 # =============================================================================
@@ -541,5 +551,225 @@ save_axes_svgs(fig, FIGURES_DIR, 'behavioral')  # e.g., behavioral_A1_RDM_Expert
 save_panel_pdf(fig, FIGURES_DIR / 'panels' / 'behavioral_rsa_panel.pdf')
 
 logger.info("✓ Panel: behavioral RSA panels complete")
+
+
+# =============================================================================
+# Figure 2: Normalized RDM Panel (identical layout, count-normalized RDMs)
+# =============================================================================
+# This panel replicates the standard behavioral RSA figure above, but uses
+# count-normalized RDMs where each cell is divided by the total number of
+# comparisons for that pair:
+#   RDM_norm[i,j] = |count(i>j) - count(j>i)| / (count(i>j) + count(j>i))
+# This removes the exposure confound (pairs compared more often no longer
+# have mechanically higher dissimilarity). Values range from 0 (perfectly
+# tied) to 1 (perfectly consistent preference).
+#
+# The directional DSM is similarly normalized:
+#   DSM_norm[i,j] = (count(i>j) - count(j>i)) / (count(i>j) + count(j>i))
+
+logger.info("\nBuilding normalized RDM panel...")
+
+# Compute normalized RDMs and DSMs
+expert_rdm_norm = normalize_matrix_by_frequency(expert_pairwise, expert_rdm)
+novice_rdm_norm = normalize_matrix_by_frequency(novice_pairwise, novice_rdm)
+expert_dsm_norm = normalize_matrix_by_frequency(expert_pairwise, expert_dsm)
+novice_dsm_norm = normalize_matrix_by_frequency(novice_pairwise, novice_dsm)
+
+# Symmetric color scale for normalized matrices
+norm_max = max(
+    np.abs(expert_rdm_norm).max(), np.abs(novice_rdm_norm).max(),
+    np.abs(expert_dsm_norm).max(), np.abs(novice_dsm_norm).max(),
+)
+norm_vmin, norm_vmax = -norm_max, norm_max
+
+# MDS on normalized RDMs
+mds_norm = MDS(n_components=2, dissimilarity="precomputed", random_state=CONFIG['RANDOM_SEED'])
+expert_mds_norm = mds_norm.fit_transform(expert_rdm_norm)
+novice_mds_norm = mds_norm.fit_transform(novice_rdm_norm)
+
+# Correlate normalized RDMs with models
+model_columns = CONFIG['MODEL_COLUMNS']
+norm_exp_corrs, _ = correlate_rdm_with_models(
+    expert_rdm_norm, {col: stimuli_df[col].values for col in model_columns},
+    categorical_features=model_columns, continuous_features=[])
+norm_nov_corrs, _ = correlate_rdm_with_models(
+    novice_rdm_norm, {col: stimuli_df[col].values for col in model_columns},
+    categorical_features=model_columns, continuous_features=[])
+
+# FDR correction
+norm_exp_p_raw = np.array([p for (_, _, p, _, _) in norm_exp_corrs])
+norm_nov_p_raw = np.array([p for (_, _, p, _, _) in norm_nov_corrs])
+_, norm_exp_fdr = apply_fdr_correction(norm_exp_p_raw)
+_, norm_nov_fdr = apply_fdr_correction(norm_nov_p_raw)
+norm_exp_fdr_map = {name: float(pf) for (name, _, _, _, _), pf in zip(norm_exp_corrs, norm_exp_fdr)}
+norm_nov_fdr_map = {name: float(pf) for (name, _, _, _, _), pf in zip(norm_nov_corrs, norm_nov_fdr)}
+
+# --- Build figure 2 using same plt.axes() pattern as figure 1 ---
+# This allows pylustrator to manage the layout interactively.
+
+fig2 = plt.figure(2)
+
+# Normalized DSM Experts
+ax_nA3 = plt.axes(); ax_nA3.set_label('nA3_NormDirPref_Experts')
+plot_rdm_on_ax(ax=ax_nA3, rdm=expert_dsm_norm, colors=strat_colors, alphas=strat_alphas,
+               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
+set_axis_title(ax_nA3, title="Directional preference", subtitle="Experts")
+ax_nA3.set_xticks([]); ax_nA3.set_yticks([])
+
+# Normalized DSM Novices
+ax_nA4 = plt.axes(); ax_nA4.set_label('nA4_NormDirPref_Novices')
+plot_rdm_on_ax(ax=ax_nA4, rdm=novice_dsm_norm, colors=strat_colors, alphas=strat_alphas,
+               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
+set_axis_title(ax_nA4, title="Directional preference", subtitle="Novices")
+ax_nA4.set_xticks([]); ax_nA4.set_yticks([])
+
+# Normalized RDM Experts
+ax_nA1 = plt.axes(); ax_nA1.set_label('nA1_NormRDM_Experts')
+plot_rdm_on_ax(ax=ax_nA1, rdm=expert_rdm_norm, colors=strat_colors, alphas=strat_alphas,
+               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
+set_axis_title(ax_nA1, title="Behavioral RDM", subtitle="Experts")
+ax_nA1.set_xticks([]); ax_nA1.set_yticks([])
+
+# Normalized RDM Novices
+ax_nA2 = plt.axes(); ax_nA2.set_label('nA2_NormRDM_Novices')
+plot_rdm_on_ax(ax=ax_nA2, rdm=novice_rdm_norm, colors=strat_colors, alphas=strat_alphas,
+               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
+set_axis_title(ax_nA2, title="Behavioral RDM", subtitle="Novices")
+ax_nA2.set_xticks([]); ax_nA2.set_yticks([])
+
+# MDS Experts (normalized)
+ax_nB1 = plt.axes(); ax_nB1.set_label('nB1_NormMDS_Experts')
+plot_2d_embedding_on_ax(ax=ax_nB1, coords=expert_mds_norm, point_colors=strat_colors,
+                         point_alphas=strat_alphas, params=PLOT_PARAMS,
+                         hide_tick_marks=True, x_label='Dimension 1', y_label='Dimension 2')
+set_axis_title(ax_nB1, title="MDS embedding", subtitle="Experts")
+
+# MDS Novices (normalized)
+ax_nB2 = plt.axes(); ax_nB2.set_label('nB2_NormMDS_Novices')
+plot_2d_embedding_on_ax(ax=ax_nB2, coords=novice_mds_norm, point_colors=strat_colors,
+                         point_alphas=strat_alphas, params=PLOT_PARAMS,
+                         hide_tick_marks=True, x_label='Dimension 1', y_label='Dimension 2')
+set_axis_title(ax_nB2, title="MDS embedding", subtitle="Novices")
+
+# Selection frequency (same data — not affected by normalization)
+ax_nC1 = plt.axes(); ax_nC1.set_label('nC1_NormChoice_Experts')
+plot_counts_on_ax(ax=ax_nC1, x_values=frequency_exp.index, counts=frequency_exp.values,
+                   colors=strat_colors[:len(frequency_exp)], alphas=strat_alphas[:len(frequency_exp)],
+                   xlabel='Stimulus ID', ylabel='Selection count',
+                   title='Stimulus selection frequency', subtitle='Experts',
+                   legend=legend_items, params=PLOT_PARAMS)
+ax_nC1.set_xlim(-1, 41); ax_nC1.set_ylim(*PLOT_YLIMITS['behavioral_choice_counts'])
+
+ax_nC2 = plt.axes(); ax_nC2.set_label('nC2_NormChoice_Novices')
+plot_counts_on_ax(ax=ax_nC2, x_values=frequency_nov.index, counts=frequency_nov.values,
+                   colors=strat_colors[:len(frequency_nov)], alphas=strat_alphas[:len(frequency_nov)],
+                   xlabel='Stimulus ID', ylabel='Selection count',
+                   title='Stimulus selection frequency', subtitle='Novices',
+                   legend=legend_items, params=PLOT_PARAMS)
+ax_nC2.set_xlim(-1, 41); ax_nC2.set_ylim(*PLOT_YLIMITS['behavioral_choice_counts'])
+
+# RSA correlations for normalized RDMs
+ax_nD = plt.axes(); ax_nD.set_label('nD_NormRSA_Models')
+
+nr_exp = [res[1] for res in norm_exp_corrs]
+nci_exp = [(res[3], res[4]) for res in norm_exp_corrs]
+np_exp = [norm_exp_fdr_map.get(res[0], res[2]) for res in norm_exp_corrs]
+nr_nov = [res[1] for res in norm_nov_corrs]
+nci_nov = [(res[3], res[4]) for res in norm_nov_corrs]
+np_nov = [norm_nov_fdr_map.get(res[0], res[2]) for res in norm_nov_corrs]
+
+column_labels_n = [res[0] for res in norm_exp_corrs]
+idx_order_n = [column_labels_n.index(lbl) for lbl in MODEL_ORDER]
+
+plot_grouped_bars_on_ax(
+    ax=ax_nD, x_positions=np.arange(len(MODEL_LABELS_PRETTY)),
+    group1_values=[nr_exp[i] for i in idx_order_n],
+    group1_cis=[nci_exp[i] for i in idx_order_n],
+    group1_color=COLORS_EXPERT_NOVICE['expert'],
+    group2_values=[nr_nov[i] for i in idx_order_n],
+    group2_cis=[nci_nov[i] for i in idx_order_n],
+    group2_color=COLORS_EXPERT_NOVICE['novice'],
+    group1_label="Experts", group2_label="Novices",
+    group1_pvals=[np_exp[i] for i in idx_order_n],
+    group2_pvals=[np_nov[i] for i in idx_order_n],
+    ylim=PLOT_YLIMITS['behavioral_rsa_models'],
+    y_label=PLOT_PARAMS['ylabel_correlation_r'],
+    title="Behavioral-model RSA", subtitle="FDR corrected",
+    xtick_labels=MODEL_LABELS_PRETTY, x_tick_rotation=0, x_tick_align='center',
+    show_legend=True, legend_loc='upper left',
+    visible_spines=['left', 'bottom'], params=PLOT_PARAMS,
+)
+ax_nD.set_ylim(*PLOT_YLIMITS['behavioral_rsa_models'])
+
+# Colorbar
+ax_nE = plt.axes(); ax_nE.set_label('nE_NormColorbar')
+cbar_fig2 = create_standalone_colorbar(cmap=CMAP_BRAIN, vmin=norm_vmin, vmax=norm_vmax,
+                                        orientation='vertical', label='Preference\n(normalized by pair count)',
+                                        params=PLOT_PARAMS, tick_position='left')
+embed_figure_on_ax(ax_nE, cbar_fig2, title='')
+
+# Enable pylustrator layout for figure 2
+fig2.ax_dict = {ax.get_label(): ax for ax in fig2.axes}
+
+#% start: automatic generated code from pylustrator
+plt.figure(2).ax_dict = {ax.get_label(): ax for ax in plt.figure(2).axes}
+getattr(plt.figure(2), '_pylustrator_init', lambda: ...)()
+plt.figure(2).set_size_inches(cm_to_inches(16.82), cm_to_inches(15.61), forward=True)
+plt.figure(2).ax_dict["nA1_NormRDM_Experts"].set(position=[0.3841, 0.6819, 0.2196, 0.2361])
+plt.figure(2).ax_dict["nA1_NormRDM_Experts"].texts[0].set(position=(0.5, 1.064))
+plt.figure(2).ax_dict["nA1_NormRDM_Experts"].texts[1].set(position=(0.5, 1.016))
+plt.figure(2).ax_dict["nA2_NormRDM_Novices"].set(position=[0.3841, 0.3773, 0.2196, 0.2361])
+plt.figure(2).ax_dict["nA2_NormRDM_Novices"].texts[0].set(position=(0.5, 1.067))
+plt.figure(2).ax_dict["nA2_NormRDM_Novices"].texts[1].set(position=(0.5, 1.016))
+plt.figure(2).ax_dict["nA3_NormDirPref_Experts"].set(position=[0.1125, 0.6819, 0.2196, 0.2361])
+plt.figure(2).ax_dict["nA3_NormDirPref_Experts"].texts[0].set(position=(0.5, 1.065))
+plt.figure(2).ax_dict["nA3_NormDirPref_Experts"].texts[1].set(position=(0.5, 1.016))
+plt.figure(2).ax_dict["nA4_NormDirPref_Novices"].set(position=[0.1125, 0.3773, 0.2196, 0.2361])
+plt.figure(2).ax_dict["nA4_NormDirPref_Novices"].texts[0].set(position=(0.5, 1.067))
+plt.figure(2).ax_dict["nA4_NormDirPref_Novices"].texts[1].set(position=(0.5, 1.016))
+plt.figure(2).ax_dict["nB1_NormMDS_Experts"].set(position=[0.6689, 0.6854, 0.2815, 0.2327])
+plt.figure(2).ax_dict["nB1_NormMDS_Experts"].texts[0].set(position=(0.5, 1.069))
+plt.figure(2).ax_dict["nB1_NormMDS_Experts"].texts[1].set(position=(0.5, 1.018))
+plt.figure(2).ax_dict["nB2_NormMDS_Novices"].set(position=[0.6689, 0.3807, 0.2815, 0.2327])
+plt.figure(2).ax_dict["nB2_NormMDS_Novices"].texts[0].set(position=(0.5, 1.071))
+plt.figure(2).ax_dict["nB2_NormMDS_Novices"].texts[1].set(position=(0.5, 1.018))
+plt.figure(2).ax_dict["nC1_NormChoice_Experts"].set(position=[0.04475, 0.2642, 0.204, 0.1883], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], yticks=[0., 100., 200., 300., 400., 500.], yticklabels=['0', '100', '200', '300', '400', '500'])
+plt.figure(2).ax_dict["nC1_NormChoice_Experts"].set_position([0.065104, 0.073662, 0.296728, 0.237033])
+plt.figure(2).ax_dict["nC1_NormChoice_Experts"].get_legend().set(visible=True)
+plt.figure(2).ax_dict["nC1_NormChoice_Experts"].texts[0].set(position=(0.5, 1.046))
+plt.figure(2).ax_dict["nC1_NormChoice_Experts"].texts[1].set(position=(0.5, 0.9879))
+plt.figure(2).ax_dict["nC2_NormChoice_Novices"].set(position=[0.2739, 0.2642, 0.204, 0.186], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], ylabel='', yticks=[0., 100., 200., 300., 400., 500.], yticklabels=['0', '100', '200', '300', '400', '500'])
+plt.figure(2).ax_dict["nC2_NormChoice_Novices"].set_position([0.398501, 0.073662, 0.296728, 0.234166])
+plt.figure(2).ax_dict["nC2_NormChoice_Novices"].get_legend().set(visible=False)
+plt.figure(2).ax_dict["nC2_NormChoice_Novices"].texts[0].set(position=(0.5, 1.059))
+plt.figure(2).ax_dict["nC2_NormChoice_Novices"].texts[1].set(position=(0.5, 1.))
+plt.figure(2).ax_dict["nC2_NormChoice_Novices"].get_yaxis().get_label().set(text='')
+plt.figure(2).ax_dict["nD_NormRSA_Models"].set(position=[0.5179, 0.2653, 0.1387, 0.1871], xticks=[0., 1., 2.])
+plt.figure(2).ax_dict["nD_NormRSA_Models"].set_position([0.753374, 0.075104, 0.201763, 0.235536])
+plt.figure(2).ax_dict["nD_NormRSA_Models"].spines[['right', 'top']].set_visible(False)
+plt.figure(2).ax_dict["nD_NormRSA_Models"].yaxis.labelpad = -0.262108
+plt.figure(2).ax_dict["nD_NormRSA_Models"].texts[3].set(position=(0.5, 1.046))
+plt.figure(2).ax_dict["nD_NormRSA_Models"].texts[4].set(position=(0.5, 0.9879))
+plt.figure(2).ax_dict["nE_NormColorbar"].set(position=[-0.00199, 0.4756, 0.08187, 0.3358])
+plt.figure(2).text(0.0959, 0.9421, 'a', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
+plt.figure(2).text(0.6620, 0.9421, 'b', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
+plt.figure(2).text(0.0340, 0.3347, 'c', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
+plt.figure(2).text(0.7288, 0.3347, 'd', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
+#% end: automatic generated code from pylustrator
+
+# Save normalized panel
+save_axes_svgs(fig2, FIGURES_DIR, 'behavioral_normalized')
+save_panel_pdf(fig2, FIGURES_DIR / 'panels' / 'behavioral_rsa_normalized_panel.pdf')
+
+# Log normalized correlation results
+logger.info("\n  Normalized RSA correlations:")
+for (name, r, p, ci_l, ci_u) in norm_exp_corrs:
+    fdr_p = norm_exp_fdr_map.get(name, p)
+    logger.info(f"    Expert {name}: r={r:.3f}, pFDR={fdr_p:.4e}, CI=[{ci_l:.3f}, {ci_u:.3f}]")
+for (name, r, p, ci_l, ci_u) in norm_nov_corrs:
+    fdr_p = norm_nov_fdr_map.get(name, p)
+    logger.info(f"    Novice {name}: r={r:.3f}, pFDR={fdr_p:.4e}, CI=[{ci_l:.3f}, {ci_u:.3f}]")
+
+logger.info("✓ Panel: normalized behavioral RSA panels complete")
 
 log_script_end(logger)
