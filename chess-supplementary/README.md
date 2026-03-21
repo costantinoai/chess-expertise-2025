@@ -136,6 +136,55 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
+### 9. Task Engagement and Board Preference (`task-engagement/`)
+
+**Purpose**: Characterise how experts and novices engage with the fMRI 1-back preference task, and identify which objective board features drive selection preferences.
+
+**Key Questions**: Do novices comply with the task? Do experts and novices base their preferences on different stimulus properties?
+
+**Method**:
+- Four engagement diagnostics: response rate, checkmate preference, transitivity, C-NC within-pair correlation
+- Board preference feature drivers: 16 board-level + 4 image-level features correlated with selection frequency (FDR-corrected)
+
+**Key Finding**: Experts prefer boards based on checkmate status (r=0.87); novices prefer visually complex boards with more officer pieces (r=0.59).
+
+**See**: [`task-engagement/README.md`](task-engagement/README.md)
+
+---
+
+### 10. Skill Gradient (`skill-gradient/`)
+
+**Purpose**: Test whether neural measures scale continuously with chess skill rather than differing only as a binary group split.
+
+**Key Question**: Is there a continuous expertise gradient in neural representations?
+
+**Method**:
+- Elo rating correlated with RSA, decoding, and participation ratio across ROIs (experts only, FDR-corrected)
+- Familiarisation accuracy correlated with neural metrics (all participants and experts only)
+
+**Key Finding**: Elo correlates with checkmate decoding in visual and parietal ROIs; familiarisation accuracy correlates with decoding across broader networks.
+
+**See**: [`skill-gradient/README.md`](skill-gradient/README.md)
+
+---
+
+### 11. Subcortical ROI Analysis (`subcortical-rois/`)
+
+**Purpose**: Extend the cortical MVPA pipeline to subcortical structures using the CAB-NP atlas (Ji et al., 2019).
+
+**Key Question**: Do expertise-related representational effects extend to subcortical regions (hippocampus, caudate, thalamus, cerebellum)?
+
+**Method**:
+- 9 bilateral subcortical ROIs from CAB-NP atlas
+- Identical SVM decoding and RSA pipeline as cortical analysis
+- FDR correction across 9 ROIs
+
+**Key Finding**: No FDR-significant subcortical effects; expertise-related representational reorganisation is predominantly cortical.
+
+**See**: [`subcortical-rois/README.md`](subcortical-rois/README.md)
+
+---
+
 ## Running All Supplementary Analyses
 
 To run all supplementary analyses together, use the top-level pipeline (supplementary folders are included by default):
