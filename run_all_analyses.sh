@@ -6,9 +6,9 @@
 # Purpose:
 #   1. Backup all existing results folders to ./backup/<timestamp>_full-results.zip
 #   2. Delete backed-up results folders
-#   3. Disable pylustrator in CONFIG (always off during runs)
+#   3. Disable pylustrator for this shell session (always off during runs)
 #   4. Run all analysis scripts (01_*, 81_*, 91_*, etc.) in parallel by folder
-#   5. Re-enable pylustrator in CONFIG (always on after run, even on failure)
+#   5. Clear the temporary pylustrator override after the run
 #   6. Generate summary report
 #
 # Usage:
@@ -450,29 +450,16 @@ fi
 
 print_header "PHASE 4: DISABLE PYLUSTRATOR"
 
-# Backup original CONFIG and force-disable for this run
-cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
-if grep -q "'ENABLE_PYLUSTRATOR'" "$CONFIG_FILE"; then
-  sed -i "s/'ENABLE_PYLUSTRATOR': *True/'ENABLE_PYLUSTRATOR': False/" "$CONFIG_FILE"
-  sed -i "s/'ENABLE_PYLUSTRATOR': *False/'ENABLE_PYLUSTRATOR': False/" "$CONFIG_FILE"
-  print_success "Pylustrator disabled in CONFIG for this run"
-else
-  print_error "Could not find ENABLE_PYLUSTRATOR setting in CONFIG"
-  exit 1
-fi
+# Disable interactive layout editing for child processes without mutating source.
+export CHESS_ENABLE_PYLUSTRATOR=false
+print_success "Pylustrator disabled for this run via CHESS_ENABLE_PYLUSTRATOR=false"
 
-# Always re-enable at the end, even on failure/interrupt
+# Always clear the override at the end, even on failure/interrupt.
 PYLU_RESTORED=false
 restore_pylustrator() {
   if [ "$PYLU_RESTORED" = true ]; then return 0; fi
-  if grep -q "'ENABLE_PYLUSTRATOR'" "$CONFIG_FILE"; then
-    sed -i "s/'ENABLE_PYLUSTRATOR': *False/'ENABLE_PYLUSTRATOR': True/" "$CONFIG_FILE"
-    sed -i "s/'ENABLE_PYLUSTRATOR': *True/'ENABLE_PYLUSTRATOR': True/" "$CONFIG_FILE"
-    print_info "Pylustrator re-enabled in CONFIG"
-  else
-    print_warning "ENABLE_PYLUSTRATOR setting not found during restore"
-  fi
-  rm -f "${CONFIG_FILE}.bak" || true
+  unset CHESS_ENABLE_PYLUSTRATOR
+  print_info "Cleared CHESS_ENABLE_PYLUSTRATOR override"
   PYLU_RESTORED=true
 }
 trap restore_pylustrator EXIT INT TERM
@@ -804,7 +791,7 @@ echo ""
 echo "  Log Directory:     $LOG_DIR"
 echo "  Total Runtime:     ${ELAPSED_MIN}m ${ELAPSED_SEC}s"
 echo ""
-PYLU_FLAG=$(grep -n "ENABLE_PYLUSTRATOR" "$CONFIG_FILE" | sed -n '1p' | sed -E "s/.*ENABLE_PYLUSTRATOR': *([A-Za-z]+).*/\1/")
+PYLU_FLAG="${CHESS_ENABLE_PYLUSTRATOR:-CONFIG_DEFAULT}"
 echo "  Pylustrator:       $PYLU_FLAG"
 echo "  Levels Run:        analysis=${RUN_ANALYSIS}, tables=${RUN_TABLES}, figures=${RUN_FIGURES}"
 echo ""

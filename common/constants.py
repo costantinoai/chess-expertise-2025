@@ -12,11 +12,51 @@ Usage
 >>> print(CONFIG['BIDS_ROOT'])
 PosixPath('/path/to/data/BIDS')
 
-Note: All dataset paths are set here in constants and should be
-configured explicitly. Environment overrides are not used.
+Note: Dataset paths are configured explicitly here. The only environment
+override is `CHESS_ENABLE_PYLUSTRATOR`, which is used by the batch pipeline to
+disable interactive layout editing without rewriting this file.
 """
 
+import os
 from pathlib import Path
+
+
+def _read_env_bool(name, default):
+    """
+    Read a strict boolean environment variable.
+
+    Parameters
+    ----------
+    name : str
+        Environment variable name.
+    default : bool
+        Value returned when the variable is unset.
+
+    Returns
+    -------
+    bool
+        Parsed boolean value.
+
+    Raises
+    ------
+    ValueError
+        If the variable is set to anything other than a recognized boolean
+        token.
+    """
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+
+    normalized = raw_value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+
+    raise ValueError(
+        f"{name} must be one of: true/false, 1/0, yes/no, on/off. "
+        f"Received: {raw_value!r}"
+    )
 
 # ============================================================================
 # Repository Paths (computed first for use in CONFIG)
@@ -173,7 +213,7 @@ CONFIG = {
     # ========================================================================
     # Display/Plotting Configuration
     # ========================================================================
-    'ENABLE_PYLUSTRATOR': True,                                 # Enable pylustrator for interactive plot editing (dev: True, production: False)
+    'ENABLE_PYLUSTRATOR': _read_env_bool('CHESS_ENABLE_PYLUSTRATOR', True),  # Interactive layout editing; batch runs disable via env override
     'NEUROSYNTH_TERM_ORDER': [                                  # Term ordering for plots
         'working memory',
         'navigation',
