@@ -27,8 +27,11 @@ Features (ordered perceptual to relational):
   3. Piece count         -- Total pieces on board
   4. Officer count       -- Non-pawn, non-king pieces (N+B+R+Q)
   5. Center occupation   -- Pieces in central 4x4 squares (c3-f6)
-  6. King exposure       -- Mean proportion of king-adjacent squares under attack
-  7. Attack coverage     -- Total squares attacked by either side
+  6. King advantage      -- Opponent king exposure minus own king exposure
+                            (positive = opponent's king more threatened;
+                            participants always play white)
+  7. Attack advantage    -- White attack coverage minus black attack coverage
+                            (positive = white controls more squares)
   8. Checkmate status    -- Binary: checkmate position or not
 
 Procedure
@@ -95,15 +98,17 @@ config, out_dir, logger = setup_analysis(
 STIMULI_DIR = CONFIG['EXTERNAL_DATA_ROOT'] / "stimuli"
 
 # The 8 features in perceptual → relational order
+# "Advantage" features use (white - black) or (black_exposure - white_exposure)
+# since participants always play as white
 FEATURE_ORDER = [
-    ('image_entropy',     'Image entropy'),
-    ('edge_density',      'Edge density'),
-    ('piece_count',       'Piece count'),
-    ('officer_count',     'Officer count'),
-    ('center_occupation', 'Center occupation'),
-    ('king_exposure',     'King exposure'),
-    ('attack_coverage',   'Attack coverage'),
-    ('is_checkmate',      'Checkmate status'),
+    ('image_entropy',      'Image entropy'),
+    ('edge_density',       'Edge density'),
+    ('piece_count',        'Piece count'),
+    ('officer_count',      'Officer count'),
+    ('center_occupation',  'Center occupation'),
+    ('king_advantage',     'King advantage'),
+    ('attack_advantage',   'Attack advantage'),
+    ('is_checkmate',       'Checkmate status'),
 ]
 
 FEATURE_KEYS = [fk for fk, _ in FEATURE_ORDER]
@@ -112,7 +117,7 @@ FEATURE_KEYS = [fk for fk, _ in FEATURE_ORDER]
 VP_BLOCKS = {
     'Perceptual': ['image_entropy', 'edge_density'],
     'Structural': ['piece_count', 'officer_count', 'center_occupation'],
-    'Strategic-Relational': ['king_exposure', 'attack_coverage', 'is_checkmate'],
+    'Strategic-Relational': ['king_advantage', 'attack_advantage', 'is_checkmate'],
 }
 
 # =============================================================================
@@ -145,11 +150,14 @@ def extract_board_features(fen, check_val):
                         if p.piece_type not in (chess.PAWN, chess.KING))
     center_occ = sum(1 for sq in CENTER_SQUARES if sq in pm)
 
-    # King exposure: mean proportion of king-adjacent squares under attack
-    exposures = []
+    # King advantage: opponent (black) king exposure minus own (white) king exposure
+    # Positive = opponent's king is more threatened (good for the player)
+    # Participants always play as white in this task
+    king_exp = {}
     for color in [chess.WHITE, chess.BLACK]:
         king_sq = board.king(color)
         if king_sq is None:
+            king_exp[color] = 0
             continue
         kf, kr = chess.square_file(king_sq), chess.square_rank(king_sq)
         adj = [chess.square(kf + df, kr + dr)
@@ -158,19 +166,20 @@ def extract_board_features(fen, check_val):
                and 0 <= kf + df <= 7 and 0 <= kr + dr <= 7]
         opp = not color
         attacked = sum(1 for sq in adj if board.is_attacked_by(opp, sq))
-        exposures.append(attacked / max(len(adj), 1))
-    king_exposure = np.mean(exposures) if exposures else 0
+        king_exp[color] = attacked / max(len(adj), 1)
+    king_advantage = king_exp[chess.BLACK] - king_exp[chess.WHITE]
 
-    # Attack coverage: total squares under attack by either side
+    # Attack advantage: white attack coverage minus black (positive = white dominates)
     w_att = sum(1 for sq in chess.SQUARES if board.is_attacked_by(chess.WHITE, sq))
     b_att = sum(1 for sq in chess.SQUARES if board.is_attacked_by(chess.BLACK, sq))
+    attack_advantage = w_att - b_att
 
     return {
         'piece_count': piece_count,
         'officer_count': officer_count,
         'center_occupation': center_occ,
-        'king_exposure': king_exposure,
-        'attack_coverage': w_att + b_att,
+        'king_advantage': king_advantage,
+        'attack_advantage': attack_advantage,
         'is_checkmate': int(check_val == 'checkmate'),
     }
 

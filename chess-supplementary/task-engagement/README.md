@@ -175,8 +175,8 @@ between experts and novices.
 3. Piece count (total pieces)
 4. Officer count (N+B+R+Q)
 5. Center occupation (pieces in c3-f6)
-6. King exposure (mean proportion of king-adjacent squares under attack)
-7. Attack coverage (total squares attacked by either side)
+6. King advantage (opponent king exposure minus own king exposure; positive = opponent more threatened; participants play white)
+7. Attack advantage (white attack coverage minus black; positive = white controls more squares)
 8. Checkmate status (binary)
 
 **Procedure**:
@@ -362,16 +362,16 @@ shared visual features rather than checkmate status.
 ### Perceptual-to-Relational Gradient
 
 **Bivariate correlations** (FDR < 0.05):
-- Experts: only checkmate status (r = +0.87). No other feature reaches significance.
-- Novices: 6 of 8 features significant — officer count (r = +0.59), edge density (r = +0.41), image entropy (r = +0.38), attack coverage (r = +0.35), king exposure (r = +0.35), piece count (r = +0.34). Checkmate status non-significant (r = +0.12).
+- Experts: only checkmate status (r = +0.87). No other feature reaches significance. King advantage and attack advantage show trends (r ≈ +0.24) but do not survive FDR.
+- Novices: 3 of 8 features significant — officer count (r = +0.59), edge density (r = +0.41), image entropy (r = +0.38). Advantage features (king, attack) and checkmate status are non-significant.
 
 **Partial correlations** (unique contribution after controlling for all 7 other features):
-- Experts: checkmate status (partial r = +0.92, pFDR < 0.001) — strengthened by partialling, confirming it is the sole independent driver.
-- Novices: officer count (partial r = +0.63, pFDR < 0.001) — the unique driver after removing shared variance. Image entropy and edge density collapse to zero (fully mediated by piece/officer counts).
+- Experts: checkmate status (partial r = +0.94, pFDR < 0.001) — strengthened by partialling, confirming it is the sole independent driver.
+- Novices: officer count (partial r = +0.55, pFDR = 0.002) — the unique driver after removing shared variance. Image entropy and edge density collapse to near-zero (fully mediated by piece/officer counts). Advantage features contribute no unique variance.
 
 **Variance partitioning** (hierarchical R²):
 - Experts: Perceptual 0.7%, Structural 2.3%, Strategic-Relational **92.7%** (total R² = 0.96).
-- Novices: Perceptual **12.8%**, Structural **29.2%**, Strategic-Relational 9.7% (total R² = 0.52).
+- Novices: Perceptual **12.8%**, Structural **29.2%**, Strategic-Relational 3.4% (total R² = 0.45).
 
 Expert preferences are almost entirely explained by the strategic-relational block (checkmate). Novice preferences are distributed across perceptual and structural blocks, with minimal contribution from strategic features. This quantitatively confirms the representational shift from perceptual to relational encoding with expertise.
 
