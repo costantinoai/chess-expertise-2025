@@ -16,7 +16,7 @@ This repository contains the complete analysis code for our study investigating 
 
 ### Key Findings
 
-- **Behavioral**: Expert preferences correlate with checkmate status (r=0.49) and strategy (r=0.20); novices show no model correlations
+- **Behavioral**: Expert preferences correlate with checkmate status (r=0.73) and strategy (r=0.25) using count-normalized RDMs; novices show no model correlations
 - **Neural (MVPA)**: Expertise modulates neural similarity structure in fronto-parietal regions
 - **Manifold**: Experts show higher-dimensional representations in task-relevant cortical regions
 - **Meta-analytic**: Expertise differences localize to brain networks associated with working memory and spatial navigation
@@ -190,6 +190,8 @@ BIDS/
     │           └── spmT_exp_gt_nonexp_check_gt_nocheck.nii.gz
     ├── mvpa-rsa/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv
     ├── mvpa-decoding/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv
+    ├── mvpa-rsa-subcortical/sub-*/sub-*_..._roi-cabnp_rdm.tsv
+    ├── mvpa-decoding-subcortical/sub-*/sub-*_..._roi-cabnp_accuracy.tsv
     ├── rsa_searchlight/sub-*/
     │   ├── sub-*_desc-searchlight_checkmate_stat-r_map.nii.gz
     │   ├── sub-*_desc-searchlight_strategy_stat-r_map.nii.gz
@@ -208,9 +210,12 @@ rois/
 ├── glasser180/
 │   ├── tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii.gz
 │   └── region_info.tsv
-└── glasser180-surface/
-    ├── lh.HCPMMP1.annot
-    └── rh.HCPMMP1.annot
+├── glasser180-surface/
+│   ├── lh.HCPMMP1.annot
+│   └── rh.HCPMMP1.annot
+└── cab-np/
+    ├── tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii.gz
+    └── region_info.tsv
 ```
 
 Neurosynth term maps
@@ -342,6 +347,9 @@ See [`chess-supplementary/README.md`](chess-supplementary/README.md) for details
 - RDM intercorrelation and variance partitioning
 - ROI-level summaries for 180 bilateral Glasser regions
 - Dataset and colorbar visualization
+- Task engagement diagnostics and board preference feature drivers
+- Skill gradient analysis (Elo and familiarisation correlations)
+- Subcortical ROI analysis (CAB-NP atlas, 9 bilateral ROIs)
 
 ## Citation
 

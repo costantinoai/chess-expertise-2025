@@ -184,6 +184,12 @@ ANALYSIS_FOLDERS=(
   "chess-supplementary/rdm-intercorrelation"
   "chess-supplementary/rsa-rois"
   "chess-supplementary/univariate-rois"
+  "chess-supplementary/task-engagement"
+  "chess-supplementary/skill-gradient"
+  # Note: chess-supplementary/subcortical-rois requires MATLAB for subject-level
+  # analysis (subcortical_rsa.m). The Python group stats and plotting scripts
+  # (02_*, 03_*, 91_*, 92_*, 93_*) can run after MATLAB outputs are available.
+  "chess-supplementary/subcortical-rois"
 )
 
 # ==============================================================================
