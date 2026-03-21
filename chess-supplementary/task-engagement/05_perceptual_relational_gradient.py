@@ -236,38 +236,79 @@ feat_df.to_csv(out_dir / "gradient_feature_matrix.csv", index=False)
 logger.info(f"Saved feature matrix: {len(feat_df)} boards x {len(FEATURE_KEYS)} features")
 
 # =============================================================================
-# 4. BIVARIATE CORRELATIONS WITH FDR
+# 4. PERMUTATION-BASED BIVARIATE CORRELATIONS WITH BOOTSTRAP CIs
 # =============================================================================
 
-logger.info("\nBivariate Spearman correlations:")
+N_PERM = 10000
+N_BOOT = 10000
+RNG = np.random.default_rng(config['RANDOM_SEED'])
+
+logger.info(f"\nBivariate Spearman correlations (permutation p, n_perm={N_PERM}; "
+            f"bootstrap 95% CI, n_boot={N_BOOT}):")
+
+
+def permutation_spearman(x, y, n_perm, rng):
+    """Spearman r with permutation-based two-tailed p-value."""
+    r_obs = stats.spearmanr(x, y).statistic
+    count = 0
+    for _ in range(n_perm):
+        r_perm = stats.spearmanr(rng.permutation(x), y).statistic
+        if abs(r_perm) >= abs(r_obs):
+            count += 1
+    p_perm = (count + 1) / (n_perm + 1)  # +1 for the observed value
+    return r_obs, p_perm
+
+
+def bootstrap_ci_spearman(x, y, n_boot, rng, ci=0.95):
+    """Bootstrap 95% CI for Spearman r."""
+    n = len(x)
+    rs = np.empty(n_boot)
+    for i in range(n_boot):
+        idx = rng.integers(0, n, size=n)
+        rs[i] = stats.spearmanr(x[idx], y[idx]).statistic
+    alpha = (1 - ci) / 2
+    return float(np.nanpercentile(rs, 100 * alpha)), float(np.nanpercentile(rs, 100 * (1 - alpha)))
+
 
 corr_rows = []
 for group in ['expert', 'novice']:
     pref_col = f'pref_{group}'
     rs, ps, names = [], [], []
+    ci_lows, ci_highs = [], []
+
     for fk, _ in FEATURE_ORDER:
         valid = feat_df.dropna(subset=[fk, pref_col])
         if len(valid) < 5 or valid[fk].nunique() < 2:
             continue
-        r, p = stats.spearmanr(valid[fk], valid[pref_col])
-        rs.append(r); ps.append(p); names.append(fk)
+        xv = valid[fk].values
+        yv = valid[pref_col].values
+
+        r, p_perm = permutation_spearman(xv, yv, N_PERM, RNG)
+        ci_lo, ci_hi = bootstrap_ci_spearman(xv, yv, N_BOOT, RNG)
+
+        rs.append(r); ps.append(p_perm); names.append(fk)
+        ci_lows.append(ci_lo); ci_highs.append(ci_hi)
 
     reject, p_fdr, _, _ = multipletests(ps, alpha=0.05, method='fdr_bh')
-    for fk, r, p, pf, sig in zip(names, rs, ps, p_fdr, reject):
+    for fk, r, p, pf, sig, clo, chi in zip(names, rs, ps, p_fdr, reject, ci_lows, ci_highs):
         corr_rows.append({'group': group, 'feature': fk,
-                          'spearman_r': round(r, 4), 'p_value': round(p, 6),
-                          'p_fdr': round(pf, 6), 'significant_fdr': bool(sig)})
+                          'spearman_r': round(r, 4),
+                          'p_perm': round(p, 6), 'p_fdr': round(pf, 6),
+                          'ci_low': round(clo, 4), 'ci_high': round(chi, 4),
+                          'significant_fdr': bool(sig)})
         star = " *" if sig else ""
-        logger.info(f"  {group:7s} | {fk:20s} | r={r:+.3f} | pFDR={pf:.4f}{star}")
+        logger.info(f"  {group:7s} | {fk:20s} | r={r:+.3f} [{clo:+.3f}, {chi:+.3f}] | "
+                    f"p_perm={p:.4f} | pFDR={pf:.4f}{star}")
 
 corr_df = pd.DataFrame(corr_rows)
 corr_df.to_csv(out_dir / "gradient_bivariate_correlations.csv", index=False)
 
 # =============================================================================
-# 5. PARTIAL CORRELATIONS
+# 5. PARTIAL CORRELATIONS (permutation p + bootstrap CI)
 # =============================================================================
 
-logger.info("\nPartial correlations (controlling for all other features):")
+logger.info(f"\nPartial correlations (permutation p, n_perm={N_PERM}; "
+            f"bootstrap 95% CI, n_boot={N_BOOT}):")
 
 partial_rows = []
 for group in ['expert', 'novice']:
@@ -275,6 +316,7 @@ for group in ['expert', 'novice']:
     valid = feat_df[FEATURE_KEYS + [pref_col]].dropna()
     X = valid[FEATURE_KEYS].values
     y = valid[pref_col].values
+    n = len(y)
 
     for i, (fk, fl) in enumerate(FEATURE_ORDER):
         others = [j for j in range(len(FEATURE_KEYS)) if j != i]
@@ -284,25 +326,51 @@ for group in ['expert', 'novice']:
         res_x = X[:, i] - LinearRegression().fit(X_others, X[:, i]).predict(X_others)
         res_y = y - LinearRegression().fit(X_others, y).predict(X_others)
 
-        r_part, p_part = stats.spearmanr(res_x, res_y)
+        # Observed partial r
+        r_obs = stats.spearmanr(res_x, res_y).statistic
+
+        # Permutation p-value: shuffle residualised feature, recompute
+        count = 0
+        for _ in range(N_PERM):
+            r_perm = stats.spearmanr(RNG.permutation(res_x), res_y).statistic
+            if abs(r_perm) >= abs(r_obs):
+                count += 1
+        p_perm = (count + 1) / (N_PERM + 1)
+
+        # Bootstrap CI on partial r
+        rs_boot = np.empty(N_BOOT)
+        for b in range(N_BOOT):
+            idx = RNG.integers(0, n, size=n)
+            X_b, y_b = X[idx], y[idx]
+            X_oth_b = X_b[:, others]
+            rx_b = X_b[:, i] - LinearRegression().fit(X_oth_b, X_b[:, i]).predict(X_oth_b)
+            ry_b = y_b - LinearRegression().fit(X_oth_b, y_b).predict(X_oth_b)
+            rs_boot[b] = stats.spearmanr(rx_b, ry_b).statistic
+        ci_lo = float(np.nanpercentile(rs_boot, 2.5))
+        ci_hi = float(np.nanpercentile(rs_boot, 97.5))
+
         partial_rows.append({'group': group, 'feature': fk,
-                             'partial_r': round(r_part, 4),
-                             'partial_p': round(p_part, 6)})
+                             'partial_r': round(r_obs, 4),
+                             'partial_p_perm': round(p_perm, 6),
+                             'ci_low': round(ci_lo, 4),
+                             'ci_high': round(ci_hi, 4)})
 
 partial_df = pd.DataFrame(partial_rows)
 
-# FDR within group
+# FDR within group on permutation p-values
 for group in ['expert', 'novice']:
     mask = partial_df['group'] == group
-    _, p_fdr, _, _ = multipletests(partial_df.loc[mask, 'partial_p'].values,
+    _, p_fdr, _, _ = multipletests(partial_df.loc[mask, 'partial_p_perm'].values,
                                     alpha=0.05, method='fdr_bh')
     partial_df.loc[mask, 'partial_p_fdr'] = p_fdr
     partial_df.loc[mask, 'significant_fdr'] = p_fdr < 0.05
 
 for _, row in partial_df.iterrows():
     star = " *" if row.get('significant_fdr', False) else ""
+    ci_str = f"[{row['ci_low']:+.3f}, {row['ci_high']:+.3f}]"
     logger.info(f"  {row['group']:7s} | {row['feature']:20s} | "
-                f"partial r={row['partial_r']:+.3f} | pFDR={row.get('partial_p_fdr', row['partial_p']):.4f}{star}")
+                f"partial r={row['partial_r']:+.3f} {ci_str} | "
+                f"p_perm={row['partial_p_perm']:.4f} | pFDR={row.get('partial_p_fdr', row['partial_p_perm']):.4f}{star}")
 
 partial_df.to_csv(out_dir / "gradient_partial_correlations.csv", index=False)
 

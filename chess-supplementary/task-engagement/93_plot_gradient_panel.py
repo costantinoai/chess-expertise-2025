@@ -127,46 +127,66 @@ for g_idx, (group, group_color, group_label) in enumerate([
 ]):
     ax = fig.add_subplot(gs[g_idx, 0])
 
-    # Bivariate r
+    # Bivariate r + CIs
     gdf_biv = biv_df[biv_df['group'] == group].set_index('feature')
-    r_biv = [gdf_biv.loc[fk, 'spearman_r'] if fk in gdf_biv.index else 0
-             for fk, _ in FEATURE_ORDER]
-    sig_biv = [gdf_biv.loc[fk, 'significant_fdr'] if fk in gdf_biv.index else False
-               for fk, _ in FEATURE_ORDER]
+    r_biv, ci_biv, sig_biv = [], [], []
+    for fk, _ in FEATURE_ORDER:
+        if fk in gdf_biv.index:
+            r_biv.append(gdf_biv.loc[fk, 'spearman_r'])
+            ci_biv.append((gdf_biv.loc[fk, 'ci_low'], gdf_biv.loc[fk, 'ci_high']))
+            sig_biv.append(bool(gdf_biv.loc[fk, 'significant_fdr']))
+        else:
+            r_biv.append(0); ci_biv.append((0, 0)); sig_biv.append(False)
 
-    # Partial r
+    # Partial r + CIs
     gdf_part = part_df[part_df['group'] == group].set_index('feature')
-    r_part = [gdf_part.loc[fk, 'partial_r'] if fk in gdf_part.index else 0
-              for fk, _ in FEATURE_ORDER]
-    sig_part = [bool(gdf_part.loc[fk, 'significant_fdr']) if fk in gdf_part.index else False
-                for fk, _ in FEATURE_ORDER]
+    r_part, ci_part, sig_part = [], [], []
+    for fk, _ in FEATURE_ORDER:
+        if fk in gdf_part.index:
+            r_part.append(gdf_part.loc[fk, 'partial_r'])
+            ci_part.append((gdf_part.loc[fk, 'ci_low'], gdf_part.loc[fk, 'ci_high']))
+            sig_part.append(bool(gdf_part.loc[fk, 'significant_fdr']))
+        else:
+            r_part.append(0); ci_part.append((0, 0)); sig_part.append(False)
+
+    # Bootstrap CI error bars (asymmetric: bar height = r, errors = CI bounds - r)
+    biv_err_lo = [r - ci[0] for r, ci in zip(r_biv, ci_biv)]
+    biv_err_hi = [ci[1] - r for r, ci in zip(r_biv, ci_biv)]
+    part_err_lo = [r - ci[0] for r, ci in zip(r_part, ci_part)]
+    part_err_hi = [ci[1] - r for r, ci in zip(r_part, ci_part)]
 
     # Block shading (behind bars, aligned to feature boundaries)
     for (x0, x1), (bname, bcol) in zip(block_edges, BLOCK_COLORS.items()):
         ax.axvspan(x0, x1, alpha=0.06, color=bcol, zorder=0)
 
-    # Bivariate bars (solid)
+    # Bivariate bars (solid) with CI error bars
     colors_biv = [group_color if s else '#CCCCCC' for s in sig_biv]
     ax.bar(x - bar_w / 2, r_biv, bar_w, color=colors_biv, edgecolor='none',
            alpha=PP['bar_alpha'], label='Bivariate', zorder=2)
+    ax.errorbar(x - bar_w / 2, r_biv, yerr=[biv_err_lo, biv_err_hi],
+                fmt='none', color='black', elinewidth=PP['errorbar_linewidth'],
+                capsize=PP['errorbar_capsize'] * 0.6, zorder=3)
 
-    # Partial bars (hatched)
+    # Partial bars (hatched) with CI error bars
     colors_part = [group_color if s else '#CCCCCC' for s in sig_part]
     bars_part = ax.bar(x + bar_w / 2, r_part, bar_w, color=colors_part,
                        edgecolor=group_color, linewidth=0.4,
                        alpha=PP['bar_alpha'] * 0.6, label='Partial', zorder=2)
     for bar in bars_part:
         bar.set_hatch('///')
+    ax.errorbar(x + bar_w / 2, r_part, yerr=[part_err_lo, part_err_hi],
+                fmt='none', color='black', elinewidth=PP['errorbar_linewidth'],
+                capsize=PP['errorbar_capsize'] * 0.6, zorder=3)
 
-    # Significance stars
-    for i, (rv, sig) in enumerate(zip(r_biv, sig_biv)):
+    # Significance stars (above CI upper bound)
+    for i, (rv, ci, sig) in enumerate(zip(r_biv, ci_biv, sig_biv)):
         if sig:
-            ax.text(i - bar_w / 2, rv + 0.03, '*', ha='center',
+            ax.text(i - bar_w / 2, ci[1] + 0.02, '*', ha='center',
                     fontsize=PP['font_size_annotation'], fontweight='bold',
-                    color=group_color, zorder=3)
-    for i, (rv, sig) in enumerate(zip(r_part, sig_part)):
+                    color=group_color, zorder=4)
+    for i, (rv, ci, sig) in enumerate(zip(r_part, ci_part, sig_part)):
         if sig:
-            ax.text(i + bar_w / 2, rv + 0.03, '*', ha='center',
+            ax.text(i + bar_w / 2, ci[1] + 0.02, '*', ha='center',
                     fontsize=PP['font_size_annotation'], fontweight='bold',
                     color=group_color, zorder=3)
 
@@ -178,7 +198,15 @@ for g_idx, (group, group_color, group_label) in enumerate([
     ax.axhline(0, color='grey', linewidth=0.4, zorder=1)
     ax.set_ylim(-0.35, 1.05)
     ax.set_xlim(-0.6, n_feat - 0.4)
-    ax.legend(fontsize=PP['font_size_legend'], loc='upper left', frameon=False)
+
+    # Explicit legend with group color (not gray from first non-sig bar)
+    from matplotlib.patches import Patch as _P
+    biv_patch = _P(facecolor=group_color, alpha=PP['bar_alpha'], label='Bivariate')
+    part_patch = _P(facecolor=group_color, alpha=PP['bar_alpha'] * 0.6,
+                    edgecolor=group_color, linewidth=0.4, label='Partial')
+    part_patch.set_hatch('///')
+    ax.legend(handles=[biv_patch, part_patch], fontsize=PP['font_size_legend'],
+              loc='upper left', frameon=False)
     style_spines(ax)
 
 # --- Right column: Variance partitioning stacked bars (side by side) ---

@@ -97,15 +97,14 @@ preferences indicate noisy or context-dependent judgments.
    A > C. The transitivity proportion = (number of transitive triples) /
    (total testable triples).
 
-**Baseline**: In a complete random tournament (every pair compared), the
-expected transitivity under random preferences is 75%. However, the 1-back
-task produces incomplete pairwise data (not all pairs are compared), so the
-75% baseline is not directly applicable to absolute values. The group
-comparison (expert vs novice) remains valid because both groups have
-comparable pairwise coverage.
+**Interpretation**: The 1-back task produces incomplete pairwise data (not
+all pairs are compared), so absolute transitivity values are descriptive
+rather than benchmarked against a theoretical random-tournament baseline.
+The inferential target is the group comparison (expert vs novice), which
+remains valid because both groups have comparable pairwise coverage.
 
-**Expected result**: Both groups near or below the 75% baseline, with no
-significant group difference. This confirms that within-category preference
+**Expected result**: Low transitivity in both groups, with no significant
+group difference. This would indicate that within-category preference
 rankings are noisy for both groups, as expected from the sparse 1-back
 design.
 
@@ -159,9 +158,10 @@ between experts and novices.
 **Rationale**: The C-NC correlation shows *that* novices use visual rather than relational features, but does not specify *which* visual features. This analysis extracts 16 board-level features (from FEN: piece count, officer count, center density, material, etc.) and 4 image-level features (entropy, edge density, luminance, contrast) and tests each against selection frequency using Spearman correlations with FDR correction.
 
 **Procedure**:
-1. For each board (1-40), extract board-level features from FEN (via python-chess) and image-level features from stimulus PNGs (Shannon entropy, Sobel edge density, luminance statistics).
-2. Correlate each feature with the board's mean selection frequency per group (Spearman rho).
-3. Apply Benjamini-Hochberg FDR correction across all features within each group (alpha = 0.05).
+1. For each board (1-40), extract board-level features from FEN (via python-chess) and image-level features from stimulus PNGs (Shannon entropy, Sobel edge density).
+2. Compute Spearman rank correlations between each feature and the board's mean selection frequency per group. Statistical significance assessed via permutation testing (10,000 permutations: feature values shuffled, correlation recomputed; two-tailed p = proportion of permuted |r| >= observed |r|). 95% confidence intervals computed via bootstrap resampling (10,000 iterations, percentile method).
+3. Apply Benjamini-Hochberg FDR correction across the 8 features within each group (alpha = 0.05) on permutation p-values.
+4. Partial correlations: for each feature, residualise both the feature and the preference on all other 7 features via OLS, then compute Spearman correlation on residuals. Significance via permutation (10,000 iterations: shuffle residualised feature). Bootstrap 95% CIs computed by resampling boards, re-residualising, and recomputing the partial correlation. FDR-corrected within group.
 
 ### 6. Perceptual-to-Relational Feature Gradient
 
@@ -192,8 +192,8 @@ between experts and novices.
 - **Welch two-sample t-test**: Compares experts vs novices (unequal variance
   assumed). Reports t-statistic, degrees of freedom (Welch-Satterthwaite),
   and two-tailed p-value.
-- **One-sample t-test**: Tests group mean against a theoretical baseline
-  (50% for checkmate preference, 75% for transitivity, 0 for C-NC r).
+- **One-sample t-test**: Tests group mean against an interpretable theoretical
+  baseline (50% for checkmate preference, 0 for C-NC r).
 - **Cohen's d**: Effect size using pooled SD:
   d = (M_expert − M_novice) / sqrt((SD²_expert + SD²_novice) / 2).
 - **Fisher z-test**: Tests difference between two independent Pearson
@@ -307,9 +307,8 @@ v3 events conversion (see chess-bh-debugging/tasks.md).
 
 ### Transitivity
 
-Expert M = 0.373 (SD = 0.113), Novice M = 0.336 (SD = 0.052). Both groups
-significantly below the 0.75 random baseline (experts: p < 0.001, novices:
-p < 0.001). Group difference not significant.
+Expert M = 0.373 (SD = 0.113), Novice M = 0.336 (SD = 0.052). Group
+difference not significant.
 
 Low transitivity in both groups reflects the sparse pairwise coverage of the
 1-back design rather than genuinely intransitive preferences. With most pairs
@@ -361,17 +360,17 @@ shared visual features rather than checkmate status.
 
 ### Perceptual-to-Relational Gradient
 
-**Bivariate correlations** (FDR < 0.05):
-- Experts: only checkmate status (r = +0.87). No other feature reaches significance. King advantage and attack advantage show trends (r ≈ +0.24) but do not survive FDR.
-- Novices: 3 of 8 features significant — officer count (r = +0.59), edge density (r = +0.41), image entropy (r = +0.38). Advantage features (king, attack) and checkmate status are non-significant.
+**Bivariate correlations** (permutation p, n=10,000; bootstrap 95% CI; FDR < 0.05):
+- Experts: only checkmate status (r = +0.87, 95% CI [+0.81, +0.87], p_FDR < .001). No other feature reaches significance. King advantage and attack advantage show trends (r ~ +0.24, CIs crossing zero) but do not survive FDR.
+- Novices: 3 of 8 features significant -- officer count (r = +0.59, CI [+0.36, +0.75], p_FDR = .002), edge density (r = +0.41, CI [+0.14, +0.64], p_FDR = .032), image entropy (r = +0.38, CI [+0.12, +0.61], p_FDR = .049). Advantage features and checkmate status are non-significant.
 
-**Partial correlations** (unique contribution after controlling for all 7 other features):
-- Experts: checkmate status (partial r = +0.94, pFDR < 0.001) — strengthened by partialling, confirming it is the sole independent driver.
-- Novices: officer count (partial r = +0.55, pFDR = 0.002) — the unique driver after removing shared variance. Image entropy and edge density collapse to near-zero (fully mediated by piece/officer counts). Advantage features contribute no unique variance.
+**Partial correlations** (permutation p, bootstrap 95% CI, FDR-corrected; unique contribution controlling for all 7 other features):
+- Experts: checkmate status (partial r = +0.94, CI [+0.91, +0.99], p_FDR < .001) -- strengthened by partialling, confirming it is the sole independent driver.
+- Novices: officer count (partial r = +0.55, CI [+0.27, +0.77], p_FDR = .006) -- the unique driver after removing shared variance. Image entropy and edge density collapse to non-significant partial correlations (CIs crossing zero), indicating full mediation by officer/piece counts. Advantage features contribute no unique variance.
 
-**Variance partitioning** (hierarchical R²):
-- Experts: Perceptual 0.7%, Structural 2.3%, Strategic-Relational **92.7%** (total R² = 0.96).
-- Novices: Perceptual **12.8%**, Structural **29.2%**, Strategic-Relational 3.4% (total R² = 0.45).
+**Variance partitioning** (hierarchical R-squared):
+- Experts: Perceptual 0.7%, Structural 2.3%, Strategic-Relational **92.7%** (total R-squared = 0.96).
+- Novices: Perceptual **12.8%**, Structural **29.2%**, Strategic-Relational 3.4% (total R-squared = 0.45).
 
 Expert preferences are almost entirely explained by the strategic-relational block (checkmate). Novice preferences are distributed across perceptual and structural blocks, with minimal contribution from strategic features. This quantitatively confirms the representational shift from perceptual to relational encoding with expertise.
 
