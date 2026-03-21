@@ -220,6 +220,59 @@ def compute_symmetric_rdm(pairwise_df: pd.DataFrame) -> np.ndarray:
     return rdm
 
 
+def compute_normalized_rdm(pairwise_df: pd.DataFrame) -> np.ndarray:
+    """
+    Compute count-normalized symmetric RDM from pairwise data.
+
+    Because the 1-back task compares only consecutive boards, different
+    stimulus pairs are compared different numbers of times depending on
+    the randomized presentation sequence. To control for this exposure
+    confound, the normalized RDM divides each entry by the total number
+    of comparisons for that pair:
+
+    RDM_norm[i,j] = |count(i>j) - count(j>i)| / (count(i>j) + count(j>i))
+
+    Values range from 0 (perfectly tied) to 1 (perfectly consistent).
+    Pairs with zero comparisons are set to 0.
+
+    Parameters
+    ----------
+    pairwise_df : pd.DataFrame
+        Pairwise comparison data with 'better' and 'worse' columns.
+        Optionally includes 'count' column if aggregated.
+
+    Returns
+    -------
+    np.ndarray
+        Count-normalized symmetric RDM matrix (n_stimuli x n_stimuli)
+    """
+    # Build count matrix (same logic as compute_symmetric_rdm)
+    if "count" in pairwise_df.columns:
+        counts_dict = {}
+        for _, row in pairwise_df.iterrows():
+            counts_dict[(row["better"], row["worse"])] = row["count"]
+    else:
+        counts = pairwise_df.groupby(["better", "worse"]).size()
+        counts_dict = counts.to_dict()
+
+    all_stimuli = sorted(set(pairwise_df["better"]).union(set(pairwise_df["worse"])))
+    n_stimuli = int(max(all_stimuli))
+
+    count_matrix = np.zeros((n_stimuli, n_stimuli), dtype=float)
+    for (i, j), count in counts_dict.items():
+        count_matrix[int(i) - 1, int(j) - 1] = count
+
+    # Numerator: |count(i>j) - count(j>i)|
+    numerator = np.abs(count_matrix - count_matrix.T)
+    # Denominator: count(i>j) + count(j>i)
+    denominator = count_matrix + count_matrix.T
+    # Avoid division by zero for pairs never compared
+    with np.errstate(divide='ignore', invalid='ignore'):
+        rdm_norm = np.where(denominator > 0, numerator / denominator, 0.0)
+
+    return rdm_norm
+
+
 def compute_directional_dsm(pairwise_df: pd.DataFrame) -> np.ndarray:
     """
     Compute directional dissimilarity/preference matrix (DSM) from pairwise data.

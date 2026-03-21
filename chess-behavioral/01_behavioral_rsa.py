@@ -66,6 +66,7 @@ from modules.data_loading import load_participant_trial_data
 from modules.rdm_utils import (
     create_pairwise_df,
     compute_symmetric_rdm,
+    compute_normalized_rdm,
     compute_directional_dsm,
     correlate_with_all_models,
     aggregate_pairwise_counts,
@@ -129,36 +130,33 @@ def analyze_group(
     logger.info(f"Analyzing {expertise_label} group...")
     logger.info(f"  {len(group_pairwise)} unique pairwise comparisons")
 
-    # Convert aggregated pairwise preference counts into a symmetric dissimilarity matrix.
-    # For each pair (i,j), dissimilarity reflects how inconsistent preferences were:
-    # - Low dissimilarity: participants consistently preferred one stimulus over the other
-    # - High dissimilarity: preferences were random or split
-    # The RDM is symmetric because we don't care about direction, only consistency.
-    group_rdm = compute_symmetric_rdm(group_pairwise)
-    logger.info("  Computed behavioral RDM")
+    # Compute raw-count RDM (kept for reference/supplementary)
+    group_rdm_raw = compute_symmetric_rdm(group_pairwise)
+    logger.info("  Computed raw-count behavioral RDM")
+
+    # Compute count-normalized RDM (PRIMARY for RSA correlations).
+    # Normalization controls for the exposure confound: different pairs are compared
+    # different numbers of times in the 1-back task due to random stimulus ordering.
+    group_rdm = compute_normalized_rdm(group_pairwise)
+    logger.info("  Computed count-normalized behavioral RDM (primary)")
 
     # Also create a directional dissimilarity matrix that preserves which stimulus was preferred.
-    # DSM(i,j) = proportion of times i was preferred over j. This is asymmetric: DSM(i,j) ≠ DSM(j,i).
-    # Useful for understanding directional preference biases (e.g., always prefer check positions).
     group_dsm = compute_directional_dsm(group_pairwise)
     logger.info("  Computed directional DSM")
 
     # Test whether behavioral preferences align with theoretical models of similarity.
-    # For each model (check status, strategy, visual appearance), compute Pearson correlation
-    # between behavioral RDM and model RDM. Bootstrap resampling (10,000 iterations; percentile
-    # method via pingouin) provides 95% confidence intervals and parametric p-values, testing
-    # whether the correlation significantly differs from zero.
+    # Uses the count-normalized RDM as input to RSA correlations.
     model_columns = CONFIG['MODEL_COLUMNS']
     correlation_results, model_rdms = correlate_with_all_models(
         group_rdm, category_df, model_columns
     )
 
     # Log results for each model
-    logger.info(f"\n  Correlation Results ({expertise_label}):")
+    logger.info(f"\n  Count-Normalized Correlation Results ({expertise_label}):")
     for col, r, p, ci_l, ci_u in correlation_results:
         logger.info(f"    {col}: r={r:.3f}, p={p:.3e}, 95%CI=[{ci_l:.3f}, {ci_u:.3f}]")
 
-    return group_rdm, group_dsm, correlation_results, model_rdms
+    return group_rdm, group_rdm_raw, group_dsm, correlation_results, model_rdms
 
 
 # ============================================================================
@@ -234,11 +232,11 @@ logger.info(f"Loaded categories for {len(category_df)} stimuli")
 # Analyze Groups
 # ============================================================================
 
-expert_rdm, expert_dsm, expert_correlations, expert_model_rdms = analyze_group(
+expert_rdm, expert_rdm_raw, expert_dsm, expert_correlations, expert_model_rdms = analyze_group(
     expert_pairwise, category_df, "Experts"
 )
 
-novice_rdm, novice_dsm, novice_correlations, novice_model_rdms = analyze_group(
+novice_rdm, novice_rdm_raw, novice_dsm, novice_correlations, novice_model_rdms = analyze_group(
     novice_pairwise, category_df, "Novices"
 )
 
@@ -248,12 +246,14 @@ novice_rdm, novice_dsm, novice_correlations, novice_model_rdms = analyze_group(
 
 logger.info("Saving all results...")
 
-# Save RDMs and DSMs
-np.save(output_dir / "expert_behavioral_rdm.npy", expert_rdm)
-np.save(output_dir / "novice_behavioral_rdm.npy", novice_rdm)
+# Save RDMs and DSMs (normalized = primary; raw = supplementary reference)
+np.save(output_dir / "expert_behavioral_rdm.npy", expert_rdm)  # normalized (primary)
+np.save(output_dir / "novice_behavioral_rdm.npy", novice_rdm)  # normalized (primary)
+np.save(output_dir / "expert_behavioral_rdm_raw.npy", expert_rdm_raw)
+np.save(output_dir / "novice_behavioral_rdm_raw.npy", novice_rdm_raw)
 np.save(output_dir / "expert_directional_dsm.npy", expert_dsm)
 np.save(output_dir / "novice_directional_dsm.npy", novice_dsm)
-logger.info("  Saved behavioral RDMs and DSMs")
+logger.info("  Saved behavioral RDMs (normalized + raw) and DSMs")
 
 # Compute 2D multidimensional scaling (MDS) embeddings for visualization.
 # MDS finds a low-dimensional (2D here) representation that preserves pairwise dissimilarities
