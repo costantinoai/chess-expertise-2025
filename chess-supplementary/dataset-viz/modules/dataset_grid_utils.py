@@ -8,6 +8,7 @@ from stimulus metadata, with optional colored borders encoding stimulus properti
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -69,6 +70,7 @@ def _collect_image_paths(
         image_col = candidate_cols[0] if candidate_cols else None
 
     paths: List[Path] = []
+    used_filename_col = False  # Track whether Strategy 1 was used
 
     # Strategy 1: Use image column from metadata
     if image_col is not None and image_col in stimuli_df.columns:
@@ -78,6 +80,7 @@ def _collect_image_paths(
             if not p.is_absolute() and images_dir is not None:
                 p = Path(images_dir) / p
             paths.append(p)
+        used_filename_col = True
 
     # Strategy 2: Pattern-based lookup in images_dir
     elif images_dir is not None:
@@ -127,23 +130,25 @@ def _collect_image_paths(
             uniq.append(p)
             seen.add(p)
 
-    # Sort by stim_id order if available
-    if stimuli_df is not None and "stim_id" in stimuli_df.columns:
-        id_to_idx = {
-            int(r["stim_id"]): i
-            for i, r in stimuli_df.reset_index().iterrows()
-            if "stim_id" in r
-        }
+    # Sort by stim_id order if available (skip if paths came from filename column,
+    # since they are already in stimuli_df row order)
+    if not used_filename_col:
+        if stimuli_df is not None and "stim_id" in stimuli_df.columns:
+            id_to_idx = {
+                int(r["stim_id"]): i
+                for i, r in stimuli_df.reset_index().iterrows()
+                if "stim_id" in r
+            }
 
-        def _key(p: Path):
-            """Extract stim_id from filename for sorting."""
-            name = p.stem
-            m = re.search(r"(\d+)$", name)
-            return id_to_idx.get(int(m.group(1))) if m else 1e9
+            def _key(p: Path):
+                """Extract stim_id from filename for sorting."""
+                name = p.stem
+                m = re.search(r"(\d+)$", name)
+                return id_to_idx.get(int(m.group(1))) if m else 1e9
 
-        uniq.sort(key=_key)
-    else:
-        uniq.sort()
+            uniq.sort(key=_key)
+        else:
+            uniq.sort()
 
     return uniq
 
@@ -250,7 +255,6 @@ def create_chess_dataset_grid_bordered(
 
     Borders use colors from the stimulus palette where:
     - Color (green/red) indicates checkmate status
-    - Alpha intensity encodes strategy rank within each group
 
     Each image is labeled with: S{stim_id} • C/NC • SY{strategy+1} • P{visual+1}
 
@@ -285,8 +289,8 @@ def create_chess_dataset_grid_bordered(
     if len(paths) == 0:
         raise ValueError("No images found to plot")
 
-    # Compute stimulus palette (colors and alphas based on check/strategy)
-    palette_colors, palette_alphas = compute_stimulus_palette(stimuli_df)
+    # Compute stimulus palette (colors based on check status)
+    palette_colors, _ = compute_stimulus_palette(stimuli_df)
 
     # Build lookup tables: stim_id -> index and filename -> index
     id_to_idx = {}
@@ -303,22 +307,20 @@ def create_chess_dataset_grid_bordered(
             for i, r in stimuli_df.iterrows()
         }
 
-    def color_alpha_for(p: Path):
-        """Look up border color and alpha for a given image path."""
+    def color_for(p: Path) -> str:
+        """Look up border color for a given image path."""
         stem = p.stem
-        # Try to extract stim_id from filename
+        # Try filename lookup first (most reliable)
+        if stem in fname_to_idx:
+            return palette_colors[fname_to_idx[stem]]
+        # Fallback: try to extract stim_id from trailing number
         m = re.search(r"(\d+)$", stem)
         if m and id_to_idx:
             sid = int(m.group(1))
             if sid in id_to_idx:
-                idx = id_to_idx[sid]
-                return palette_colors[idx], float(palette_alphas[idx])
-        # Fallback to filename lookup
-        if stem in fname_to_idx:
-            idx = fname_to_idx[stem]
-            return palette_colors[idx], float(palette_alphas[idx])
+                return palette_colors[id_to_idx[sid]]
         # Default color if no match
-        return "#4C78A8", 1.0
+        return "#4C78A8"
 
     # Calculate grid dimensions
     n = len(paths)
@@ -344,6 +346,18 @@ def create_chess_dataset_grid_bordered(
         fontweight="bold"
     )
 
+    # Pre-compute numeric series for strategy/visual (used for 0-indexed detection)
+    strat_series = (
+        pd.to_numeric(stimuli_df.get('strategy'), errors='coerce')
+        if 'strategy' in stimuli_df.columns else None
+    )
+    vis_series = (
+        pd.to_numeric(stimuli_df.get('visual'), errors='coerce')
+        if 'visual' in stimuli_df.columns else None
+    )
+    strat_min = strat_series.min() if strat_series is not None else None
+    vis_min = vis_series.min() if vis_series is not None else None
+
     # Plot each image with colored border and label
     for idx in range(n_rows * n_cols):
         r, c = divmod(idx, n_cols)
@@ -362,16 +376,21 @@ def create_chess_dataset_grid_bordered(
             # Resolve stimulus row from metadata
             stem = paths[idx].stem
             row = None
-            m = re.search(r"(\d+)$", stem)
 
-            # Try stim_id lookup
-            if m and 'stim_id' in stimuli_df.columns:
-                sid = int(m.group(1))
-                hit = stimuli_df[stimuli_df['stim_id'] == sid]
-                if not hit.empty:
-                    row = hit.iloc[0]
+            # Try filename lookup first (most reliable)
+            if stem in fname_to_idx:
+                row = stimuli_df.iloc[fname_to_idx[stem]]
 
-            # Fallback to filename lookup
+            # Fallback to stim_id from trailing number
+            if row is None:
+                m = re.search(r"(\d+)$", stem)
+                if m and 'stim_id' in stimuli_df.columns:
+                    sid = int(m.group(1))
+                    hit = stimuli_df[stimuli_df['stim_id'] == sid]
+                    if not hit.empty:
+                        row = hit.iloc[0]
+
+            # Fallback to substring match
             if row is None and 'filename' in stimuli_df.columns:
                 hit = stimuli_df[
                     stimuli_df['filename'].astype(str).str.contains(stem, regex=False)
@@ -384,32 +403,25 @@ def create_chess_dataset_grid_bordered(
 
                 # Check status (C = checkmate, NC = non-checkmate)
                 check_raw = str(row.get('check', '')).lower()
-                check_tag = 'C' if 'check' in check_raw or check_raw == '1' else 'NC'
+                check_tag = 'C' if check_raw in ('checkmate', '1', 'true', 'yes') else 'NC'
 
                 # Strategy and visual ranks (1-indexed for display)
-                strat_series = pd.to_numeric(
-                    stimuli_df.get('strategy'), errors='coerce'
-                ) if 'strategy' in stimuli_df.columns else None
-                vis_series = pd.to_numeric(
-                    stimuli_df.get('visual'), errors='coerce'
-                ) if 'visual' in stimuli_df.columns else None
-
                 strat_val = int(row.get('strategy', 0))
                 vis_val = int(row.get('visual', 0))
 
                 # Adjust to 1-indexed if metadata is 0-indexed
                 strat_disp = (
                     strat_val + 1
-                    if (strat_series is not None and
-                        pd.notna(strat_series.min()) and
-                        int(strat_series.min()) == 0)
+                    if (strat_min is not None and
+                        pd.notna(strat_min) and
+                        int(strat_min) == 0)
                     else strat_val
                 )
                 vis_disp = (
                     vis_val + 1
-                    if (vis_series is not None and
-                        pd.notna(vis_series.min()) and
-                        int(vis_series.min()) == 0)
+                    if (vis_min is not None and
+                        pd.notna(vis_min) and
+                        int(vis_min) == 0)
                     else vis_val
                 )
             else:
@@ -427,12 +439,14 @@ def create_chess_dataset_grid_bordered(
                 pad=2,
                 loc='center'
             )
-        except Exception:
-            # Skip labeling if any error occurs
-            pass
+        except Exception as exc:
+            warnings.warn(
+                f"Failed to build label for image {paths[idx].name}: {exc}",
+                stacklevel=2,
+            )
 
         # Draw colored border using stimulus palette
-        color, _alpha = color_alpha_for(paths[idx])
+        color = color_for(paths[idx])
         rect = Rectangle(
             (0, 0), 1, 1,
             fill=False,
