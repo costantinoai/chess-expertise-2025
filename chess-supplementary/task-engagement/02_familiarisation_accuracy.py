@@ -179,22 +179,28 @@ def group_stats(df, metric, label):
 
 
 def comparison_stats(e_vals, n_vals, label):
-    """Welch t-test and Cohen's d comparing two groups."""
-    e = e_vals.dropna()
-    n = n_vals.dropna()
+    """Welch t-test and Cohen's d comparing two groups.
+
+    Uses common.stats_utils.welch_ttest for the t-test and computes
+    Cohen's d with pooled SD using Hedges' denominator (n-1 weighted).
+    """
+    from common.stats_utils import welch_ttest as _wt
+    e = np.asarray(e_vals.dropna(), dtype=float)
+    n = np.asarray(n_vals.dropna(), dtype=float)
     if len(e) < 2 or len(n) < 2:
         return None
 
-    t, p = stats.ttest_ind(e, n, equal_var=False)
-    pooled_sd = np.sqrt((e.std()**2 + n.std()**2) / 2)
-    d = (e.mean() - n.mean()) / pooled_sd if pooled_sd > 0 else np.nan
+    mean1, mean2, mean_diff, ci_low, ci_high, t, p = _wt(e, n)
+    n1, n2 = len(e), len(n)
+    pooled_sd = np.sqrt(((n1 - 1) * e.var(ddof=1) + (n2 - 1) * n.var(ddof=1)) / (n1 + n2 - 2))
+    d = mean_diff / pooled_sd if pooled_sd > 0 else np.nan
 
     return {
         'metric': label,
         'group': 'expert_vs_novice',
-        'n': f"{len(e)}/{len(n)}",
-        'mean': f"{e.mean():.3f}/{n.mean():.3f}",
-        'sd': f"{e.std():.3f}/{n.std():.3f}",
+        'n': f"{n1}/{n2}",
+        'mean': f"{mean1:.3f}/{mean2:.3f}",
+        'sd': f"{e.std(ddof=1):.3f}/{n.std(ddof=1):.3f}",
         't_welch': t,
         'p_welch': p,
         'cohens_d': d,
@@ -248,8 +254,10 @@ for metric, label in [
     e = experts[metric].dropna()
     n = novices[metric].dropna()
     if len(e) > 1 and len(n) > 1:
-        t, p = stats.ttest_ind(e, n, equal_var=False)
-        pooled_sd = np.sqrt((e.std()**2 + n.std()**2) / 2)
+        from common.stats_utils import welch_ttest as _wt
+        _, _, _, _, _, t, p = _wt(np.asarray(e, dtype=float), np.asarray(n, dtype=float))
+        n1, n2 = len(e), len(n)
+        pooled_sd = np.sqrt(((n1 - 1) * e.var(ddof=1) + (n2 - 1) * n.var(ddof=1)) / (n1 + n2 - 2))
         d = (e.mean() - n.mean()) / pooled_sd if pooled_sd > 0 else np.nan
         logger.info(f"  Group: t={t:.2f}, p={p:.4f}, d={d:.2f}")
 

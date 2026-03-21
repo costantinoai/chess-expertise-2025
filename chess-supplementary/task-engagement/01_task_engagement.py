@@ -93,23 +93,29 @@ BIDS_ROOT = Path(config['BIDS_ROOT'])
 # Helper functions
 # ============================================================================
 
-def cohens_d(group_a, group_b):
-    """Compute Cohen's d using pooled SD."""
-    pooled_sd = np.sqrt((group_a.var() + group_b.var()) / 2)
-    if pooled_sd == 0:
-        return np.nan
-    return (group_a.mean() - group_b.mean()) / pooled_sd
-
-
-def welch_ttest(a, b):
-    """Welch's t-test returning t, p, and Welch-Satterthwaite df."""
-    res = stats.ttest_ind(a, b, equal_var=False)
+def _welch_ttest_with_df(a, b):
+    """Welch's t-test returning (t, p, df) using common.stats_utils.welch_ttest."""
+    from common.stats_utils import welch_ttest as _wt
+    mean1, mean2, mean_diff, ci_low, ci_high, t_stat, p_val = _wt(
+        np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    )
+    # Compute Welch-Satterthwaite df for reporting
     n1, n2 = len(a), len(b)
     s1, s2 = np.var(a, ddof=1), np.var(b, ddof=1)
     num = (s1 / n1 + s2 / n2) ** 2
     den = (s1 / n1) ** 2 / (n1 - 1) + (s2 / n2) ** 2 / (n2 - 1)
-    df = num / den
-    return res.statistic, res.pvalue, df
+    df = num / den if den > 0 else np.nan
+    return t_stat, p_val, df
+
+
+def _cohens_d(group_a, group_b):
+    """Cohen's d using pooled SD (consistent with common.stats_utils)."""
+    a, b = np.asarray(group_a, dtype=float), np.asarray(group_b, dtype=float)
+    n1, n2 = len(a), len(b)
+    pooled_sd = np.sqrt(((n1 - 1) * a.var(ddof=1) + (n2 - 1) * b.var(ddof=1)) / (n1 + n2 - 2))
+    if pooled_sd == 0:
+        return np.nan
+    return (a.mean() - b.mean()) / pooled_sd
 
 
 def fisher_z_test(r1, n1, r2, n2):
@@ -131,14 +137,17 @@ n_experts = (ppt['group'] == 'expert').sum()
 n_novices = (ppt['group'] == 'novice').sum()
 logger.info(f"Participants: {len(ppt)} ({n_experts} experts, {n_novices} novices)")
 
-stim = pd.read_csv(config['STIMULI_FILE'], sep="\t")
+from common.bids_utils import load_stimulus_metadata
+stim = load_stimulus_metadata(return_all=True)
+# Column is 'check' after load_stimulus_metadata standardisation
+check_col = 'check' if 'check' in stim.columns else 'check_status'
 
 # Build visual pair mapping: each checkmate stim_id -> its NC counterpart
 check_to_nc = {}
 for v in stim['visual'].unique():
     pair = stim[stim['visual'] == v]
-    c_row = pair[pair['check_status'] == 'checkmate']
-    nc_row = pair[pair['check_status'] == 'non_checkmate']
+    c_row = pair[pair[check_col] == 'checkmate']
+    nc_row = pair[pair[check_col] == 'non_checkmate']
     if len(c_row) == 1 and len(nc_row) == 1:
         check_to_nc[int(c_row['stim_id'].values[0])] = int(nc_row['stim_id'].values[0])
 
@@ -212,8 +221,8 @@ for g in ['expert', 'novice']:
 
 exp_rr = resp_rate.loc[resp_rate['group'] == 'expert', 'response_rate']
 nov_rr = resp_rate.loc[resp_rate['group'] == 'novice', 'response_rate']
-t, p, df = welch_ttest(exp_rr, nov_rr)
-d = cohens_d(exp_rr, nov_rr)
+t, p, df = _welch_ttest_with_df(exp_rr, nov_rr)
+d = _cohens_d(exp_rr, nov_rr)
 logger.info(f"  t({df:.1f})={t:.3f}, p={p:.4f}, Cohen's d={d:.3f}")
 
 resp_rate.to_csv(out_dir / "response_rate.csv", index=False)
@@ -283,8 +292,8 @@ for g in ['expert', 'novice']:
 
 exp_cp = cp_df.loc[cp_df['group'] == 'expert', 'prop_check_preferred'].dropna()
 nov_cp = cp_df.loc[cp_df['group'] == 'novice', 'prop_check_preferred'].dropna()
-t, p, df = welch_ttest(exp_cp, nov_cp)
-d = cohens_d(exp_cp, nov_cp)
+t, p, df = _welch_ttest_with_df(exp_cp, nov_cp)
+d = _cohens_d(exp_cp, nov_cp)
 logger.info(f"  Group diff: t({df:.1f})={t:.3f}, p={p:.4f}, Cohen's d={d:.3f}")
 
 cp_df.to_csv(out_dir / "checkmate_preference.csv", index=False)
@@ -363,8 +372,8 @@ for g in ['expert', 'novice']:
 
 exp_tr = tr_df.loc[tr_df['group'] == 'expert', 'prop_transitive'].dropna()
 nov_tr = tr_df.loc[tr_df['group'] == 'novice', 'prop_transitive'].dropna()
-t, p, df = welch_ttest(exp_tr, nov_tr)
-d = cohens_d(exp_tr, nov_tr)
+t, p, df = _welch_ttest_with_df(exp_tr, nov_tr)
+d = _cohens_d(exp_tr, nov_tr)
 logger.info(f"  Group diff: t({df:.1f})={t:.3f}, p={p:.4f}, Cohen's d={d:.3f}")
 
 for g in ['expert', 'novice']:
@@ -496,8 +505,8 @@ logger.info(f"  Fisher z-test (group C-NC): z={z_diff:.2f}, p={p_diff:.4f}")
 # Per-subject group difference (t-test on per-subject correlations)
 exp_subj_r = subject_corr_df.loc[subject_corr_df['group'] == 'expert', 'cnc_r'].dropna()
 nov_subj_r = subject_corr_df.loc[subject_corr_df['group'] == 'novice', 'cnc_r'].dropna()
-t, p, df = welch_ttest(exp_subj_r, nov_subj_r)
-d = cohens_d(exp_subj_r, nov_subj_r)
+t, p, df = _welch_ttest_with_df(exp_subj_r, nov_subj_r)
+d = _cohens_d(exp_subj_r, nov_subj_r)
 logger.info(f"  Per-subject C-NC r group diff: t({df:.1f})={t:.2f}, p={p:.4f}, Cohen's d={d:.2f}")
 
 # ============================================================================
