@@ -24,10 +24,10 @@ Analyses
 
 3. **Within-subject transitivity**: For each subject, pairwise preference
    relations are extracted from 1-back comparisons, and transitive triples
-   (A > B > C => A > C?) are evaluated. Note: the theoretical 75% baseline
-   assumes a complete tournament; the 1-back task yields incomplete pairwise
-   data, so absolute transitivity values are not directly interpretable
-   against this baseline. The group comparison remains valid.
+   (A > B > C => A > C?) are evaluated. Because the 1-back task yields
+   incomplete pairwise data, absolute transitivity values are reported
+   descriptively and the inferential focus is the expert-vs-novice group
+   comparison.
 
 4. **Board preference profile**: For each group, compute per-board mean
    selection frequency and correlate checkmate vs non-checkmate frequencies
@@ -45,8 +45,8 @@ Data
 Statistical Tests
 -----------------
 - Welch two-sample t-tests comparing expert vs novice
-- One-sample t-tests vs chance baselines (50% for preference, 75% for
-  transitivity)
+- One-sample t-tests vs interpretable chance baselines (50% for checkmate
+  preference)
 - Cohen's d effect size (pooled SD)
 - Fisher z-test for group difference in C-NC correlations
 
@@ -74,6 +74,11 @@ if str(repo_root) not in sys.path:
 
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
+from common.stats_utils import (
+    compare_independent_groups,
+    compute_mean_ci_and_ttest_vs_value,
+    fisher_z_test_independent_correlations,
+)
 
 
 # ============================================================================
@@ -87,45 +92,6 @@ config, out_dir, logger = setup_analysis(
 )
 
 BIDS_ROOT = Path(config['BIDS_ROOT'])
-
-
-# ============================================================================
-# Helper functions
-# ============================================================================
-
-def _welch_ttest_with_df(a, b):
-    """Welch's t-test returning (t, p, df) using common.stats_utils.welch_ttest."""
-    from common.stats_utils import welch_ttest as _wt
-    mean1, mean2, mean_diff, ci_low, ci_high, t_stat, p_val = _wt(
-        np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    )
-    # Compute Welch-Satterthwaite df for reporting
-    n1, n2 = len(a), len(b)
-    s1, s2 = np.var(a, ddof=1), np.var(b, ddof=1)
-    num = (s1 / n1 + s2 / n2) ** 2
-    den = (s1 / n1) ** 2 / (n1 - 1) + (s2 / n2) ** 2 / (n2 - 1)
-    df = num / den if den > 0 else np.nan
-    return t_stat, p_val, df
-
-
-def _cohens_d(group_a, group_b):
-    """Cohen's d using pooled SD (consistent with common.stats_utils)."""
-    a, b = np.asarray(group_a, dtype=float), np.asarray(group_b, dtype=float)
-    n1, n2 = len(a), len(b)
-    pooled_sd = np.sqrt(((n1 - 1) * a.var(ddof=1) + (n2 - 1) * b.var(ddof=1)) / (n1 + n2 - 2))
-    if pooled_sd == 0:
-        return np.nan
-    return (a.mean() - b.mean()) / pooled_sd
-
-
-def fisher_z_test(r1, n1, r2, n2):
-    """Two-tailed Fisher z-test for difference between independent correlations."""
-    z1 = np.arctanh(r1)
-    z2 = np.arctanh(r2)
-    se = np.sqrt(1 / (n1 - 3) + 1 / (n2 - 3))
-    z_diff = (z1 - z2) / se
-    p = 2 * stats.norm.sf(np.abs(z_diff))
-    return z_diff, p
 
 
 # ============================================================================
@@ -221,9 +187,11 @@ for g in ['expert', 'novice']:
 
 exp_rr = resp_rate.loc[resp_rate['group'] == 'expert', 'response_rate']
 nov_rr = resp_rate.loc[resp_rate['group'] == 'novice', 'response_rate']
-t, p, df = _welch_ttest_with_df(exp_rr, nov_rr)
-d = _cohens_d(exp_rr, nov_rr)
-logger.info(f"  t({df:.1f})={t:.3f}, p={p:.4f}, Cohen's d={d:.3f}")
+resp_rate_cmp = compare_independent_groups(exp_rr, nov_rr)
+logger.info(
+    f"  t({resp_rate_cmp['df']:.1f})={resp_rate_cmp['t_stat']:.3f}, "
+    f"p={resp_rate_cmp['p_value']:.4f}, Cohen's d={resp_rate_cmp['cohens_d']:.3f}"
+)
 
 resp_rate.to_csv(out_dir / "response_rate.csv", index=False)
 
@@ -282,7 +250,7 @@ cp_df = pd.DataFrame(check_pref_results)
 
 for g in ['expert', 'novice']:
     vals = cp_df.loc[cp_df['group'] == g, 'prop_check_preferred'].dropna()
-    t_1s, p_1s = stats.ttest_1samp(vals, 0.5)
+    _, _, _, t_1s, p_1s = compute_mean_ci_and_ttest_vs_value(vals, popmean=0.5)
     mean_pairs = cp_df.loc[cp_df['group'] == g, 'n_pairs'].mean()
     logger.info(
         f"  {g.capitalize()}: M={vals.mean():.3f}, SD={vals.std():.3f}, "
@@ -292,9 +260,11 @@ for g in ['expert', 'novice']:
 
 exp_cp = cp_df.loc[cp_df['group'] == 'expert', 'prop_check_preferred'].dropna()
 nov_cp = cp_df.loc[cp_df['group'] == 'novice', 'prop_check_preferred'].dropna()
-t, p, df = _welch_ttest_with_df(exp_cp, nov_cp)
-d = _cohens_d(exp_cp, nov_cp)
-logger.info(f"  Group diff: t({df:.1f})={t:.3f}, p={p:.4f}, Cohen's d={d:.3f}")
+checkmate_pref_cmp = compare_independent_groups(exp_cp, nov_cp)
+logger.info(
+    f"  Group diff: t({checkmate_pref_cmp['df']:.1f})={checkmate_pref_cmp['t_stat']:.3f}, "
+    f"p={checkmate_pref_cmp['p_value']:.4f}, Cohen's d={checkmate_pref_cmp['cohens_d']:.3f}"
+)
 
 cp_df.to_csv(out_dir / "checkmate_preference.csv", index=False)
 
@@ -372,14 +342,15 @@ for g in ['expert', 'novice']:
 
 exp_tr = tr_df.loc[tr_df['group'] == 'expert', 'prop_transitive'].dropna()
 nov_tr = tr_df.loc[tr_df['group'] == 'novice', 'prop_transitive'].dropna()
-t, p, df = _welch_ttest_with_df(exp_tr, nov_tr)
-d = _cohens_d(exp_tr, nov_tr)
-logger.info(f"  Group diff: t({df:.1f})={t:.3f}, p={p:.4f}, Cohen's d={d:.3f}")
-
-for g in ['expert', 'novice']:
-    vals = tr_df.loc[tr_df['group'] == g, 'prop_transitive'].dropna()
-    t_1s, p_1s = stats.ttest_1samp(vals, 0.75)
-    logger.info(f"  {g.capitalize()} vs random baseline (0.75): t={t_1s:.3f}, p={p_1s:.4f}")
+transitivity_cmp = compare_independent_groups(exp_tr, nov_tr)
+logger.info(
+    f"  Group diff: t({transitivity_cmp['df']:.1f})={transitivity_cmp['t_stat']:.3f}, "
+    f"p={transitivity_cmp['p_value']:.4f}, Cohen's d={transitivity_cmp['cohens_d']:.3f}"
+)
+logger.info(
+    "  Absolute transitivity values are descriptive only for the sparse 1-back design; "
+    "no one-sample baseline test is reported."
+)
 
 tr_df.to_csv(out_dir / "transitivity.csv", index=False)
 
@@ -478,7 +449,7 @@ subject_corr_df.to_csv(out_dir / "board_preference_profile.csv", index=False)
 # Report per-subject correlations by group
 for g in ['expert', 'novice']:
     vals = subject_corr_df.loc[subject_corr_df['group'] == g, 'cnc_r'].dropna()
-    t_1s, p_1s = stats.ttest_1samp(vals, 0)
+    _, _, _, t_1s, p_1s = compute_mean_ci_and_ttest_vs_value(vals, popmean=0.0)
     logger.info(
         f"  {g.capitalize()} per-subject C-NC r: M={vals.mean():.2f}, "
         f"SD={vals.std():.2f}, n={len(vals)}, vs 0: t={t_1s:.2f}, p={p_1s:.4f}"
@@ -499,15 +470,22 @@ nov_valid = ~np.isnan(nov_c) & ~np.isnan(nov_nc)
 r_exp, _ = stats.pearsonr(exp_c[exp_valid], exp_nc[exp_valid])
 r_nov, _ = stats.pearsonr(nov_c[nov_valid], nov_nc[nov_valid])
 
-z_diff, p_diff = fisher_z_test(r_exp, int(exp_valid.sum()), r_nov, int(nov_valid.sum()))
+z_diff, p_diff = fisher_z_test_independent_correlations(
+    r_exp,
+    int(exp_valid.sum()),
+    r_nov,
+    int(nov_valid.sum()),
+)
 logger.info(f"  Fisher z-test (group C-NC): z={z_diff:.2f}, p={p_diff:.4f}")
 
 # Per-subject group difference (t-test on per-subject correlations)
 exp_subj_r = subject_corr_df.loc[subject_corr_df['group'] == 'expert', 'cnc_r'].dropna()
 nov_subj_r = subject_corr_df.loc[subject_corr_df['group'] == 'novice', 'cnc_r'].dropna()
-t, p, df = _welch_ttest_with_df(exp_subj_r, nov_subj_r)
-d = _cohens_d(exp_subj_r, nov_subj_r)
-logger.info(f"  Per-subject C-NC r group diff: t({df:.1f})={t:.2f}, p={p:.4f}, Cohen's d={d:.2f}")
+subj_corr_cmp = compare_independent_groups(exp_subj_r, nov_subj_r)
+logger.info(
+    f"  Per-subject C-NC r group diff: t({subj_corr_cmp['df']:.1f})={subj_corr_cmp['t_stat']:.2f}, "
+    f"p={subj_corr_cmp['p_value']:.4f}, Cohen's d={subj_corr_cmp['cohens_d']:.2f}"
+)
 
 # ============================================================================
 

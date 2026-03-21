@@ -46,6 +46,73 @@ from common.rsa_utils import (
 )
 
 
+def _pairwise_counts_series(pairwise_df: pd.DataFrame) -> pd.Series:
+    """
+    Normalize raw or aggregated pairwise preferences to a count series.
+
+    Parameters
+    ----------
+    pairwise_df : pd.DataFrame
+        Pairwise data with 'better' and 'worse' columns and an optional 'count'
+        column.
+
+    Returns
+    -------
+    pd.Series
+        MultiIndex series keyed by (better, worse) with comparison counts.
+    """
+    if pairwise_df.empty:
+        return pd.Series(dtype=float)
+
+    if "count" in pairwise_df.columns:
+        return pairwise_df.set_index(["better", "worse"])["count"].sort_index()
+
+    return pairwise_df.groupby(["better", "worse"]).size().sort_index()
+
+
+def _build_count_matrix(
+    pairwise_df: pd.DataFrame,
+    dtype=float,
+    n_stimuli: int | None = None,
+) -> np.ndarray:
+    """
+    Build a directed count matrix from raw or aggregated pairwise preferences.
+
+    Parameters
+    ----------
+    pairwise_df : pd.DataFrame
+        Pairwise data with 'better' and 'worse' columns and an optional 'count'
+        column.
+    dtype : data-type, default=float
+        Output dtype for the matrix.
+    n_stimuli : int or None, default=None
+        Matrix size. If None, infer from the largest stimulus ID present.
+
+    Returns
+    -------
+    np.ndarray
+        Square matrix where entry (i, j) contains the count of times stimulus i
+        was preferred over stimulus j.
+    """
+    counts = _pairwise_counts_series(pairwise_df)
+    if counts.empty:
+        size = 0 if n_stimuli is None else int(n_stimuli)
+        return np.zeros((size, size), dtype=dtype)
+
+    inferred_n = int(max(max(pair) for pair in counts.index))
+    if n_stimuli is None:
+        n_stimuli = inferred_n
+    elif inferred_n > int(n_stimuli):
+        raise ValueError(
+            f"pairwise_df contains stimulus ID {inferred_n}, which exceeds n_stimuli={n_stimuli}"
+        )
+
+    count_matrix = np.zeros((int(n_stimuli), int(n_stimuli)), dtype=dtype)
+    pairs = np.asarray(counts.index.tolist(), dtype=int)
+    count_matrix[pairs[:, 0] - 1, pairs[:, 1] - 1] = counts.to_numpy(dtype=dtype)
+    return count_matrix
+
+
 def create_pairwise_df(trial_df: pd.DataFrame) -> pd.DataFrame:
     """
     Convert trial-level data to pairwise comparison DataFrame.
@@ -191,27 +258,7 @@ def compute_symmetric_rdm(pairwise_df: pd.DataFrame) -> np.ndarray:
     >>> print(f"RDM shape: {rdm.shape}")
     >>> print(f"RDM range: [{rdm.min()}, {rdm.max()}]")
     """
-    # Check if data is already aggregated (has 'count' column)
-    if "count" in pairwise_df.columns:
-        # Data is aggregated - use the count column
-        counts_dict = {}
-        for _, row in pairwise_df.iterrows():
-            counts_dict[(row["better"], row["worse"])] = row["count"]
-    else:
-        # Data is not aggregated - count occurrences
-        counts = pairwise_df.groupby(["better", "worse"]).size()
-        counts_dict = counts.to_dict()
-
-    # Get all unique stimulus IDs
-    all_stimuli = sorted(set(pairwise_df["better"]).union(set(pairwise_df["worse"])))
-    n_stimuli = int(max(all_stimuli))  # Assuming IDs from 1 to n
-
-    # Initialize count matrix (0-indexed, so subtract 1 from stimulus IDs)
-    count_matrix = np.zeros((n_stimuli, n_stimuli), dtype=int)
-
-    # Fill count matrix from pairwise counts
-    for (i, j), count in counts_dict.items():
-        count_matrix[int(i) - 1, int(j) - 1] = count
+    count_matrix = _build_count_matrix(pairwise_df, dtype=int)
 
     # Compute symmetric RDM as absolute difference
     # RDM[i,j] = |count(i>j) - count(j>i)|
@@ -246,21 +293,7 @@ def compute_normalized_rdm(pairwise_df: pd.DataFrame) -> np.ndarray:
     np.ndarray
         Count-normalized symmetric RDM matrix (n_stimuli x n_stimuli)
     """
-    # Build count matrix (same logic as compute_symmetric_rdm)
-    if "count" in pairwise_df.columns:
-        counts_dict = {}
-        for _, row in pairwise_df.iterrows():
-            counts_dict[(row["better"], row["worse"])] = row["count"]
-    else:
-        counts = pairwise_df.groupby(["better", "worse"]).size()
-        counts_dict = counts.to_dict()
-
-    all_stimuli = sorted(set(pairwise_df["better"]).union(set(pairwise_df["worse"])))
-    n_stimuli = int(max(all_stimuli))
-
-    count_matrix = np.zeros((n_stimuli, n_stimuli), dtype=float)
-    for (i, j), count in counts_dict.items():
-        count_matrix[int(i) - 1, int(j) - 1] = count
+    count_matrix = _build_count_matrix(pairwise_df, dtype=float)
 
     # Numerator: |count(i>j) - count(j>i)|
     numerator = np.abs(count_matrix - count_matrix.T)
@@ -311,27 +344,7 @@ def compute_directional_dsm(pairwise_df: pd.DataFrame) -> np.ndarray:
     >>> print(f"DSM range: [{dsm.min()}, {dsm.max()}]")
     >>> print(f"Is antisymmetric: {np.allclose(dsm, -dsm.T)}")
     """
-    # Check if data is already aggregated (has 'count' column)
-    if "count" in pairwise_df.columns:
-        # Data is aggregated - use the count column
-        counts_dict = {}
-        for _, row in pairwise_df.iterrows():
-            counts_dict[(row["better"], row["worse"])] = row["count"]
-    else:
-        # Data is not aggregated - count occurrences
-        counts = pairwise_df.groupby(["better", "worse"]).size()
-        counts_dict = counts.to_dict()
-
-    # Get all unique stimulus IDs
-    all_stimuli = sorted(set(pairwise_df["better"]).union(set(pairwise_df["worse"])))
-    n_stimuli = max(all_stimuli)
-
-    # Initialize count matrix
-    count_matrix = np.zeros((n_stimuli, n_stimuli), dtype=int)
-
-    # Fill count matrix
-    for (i, j), count in counts_dict.items():
-        count_matrix[i - 1, j - 1] = count
+    count_matrix = _build_count_matrix(pairwise_df, dtype=int)
 
     # Compute directional DSM as signed difference
     # DSM[i,j] = count(i>j) - count(j>i)
@@ -441,17 +454,10 @@ def normalize_matrix_by_frequency(pairwise_df, matrix):
         consistent). Pairs with zero comparisons are set to 0.
     """
     n = matrix.shape[0]
-    count_mat = np.zeros((n, n), dtype=float)
-    if 'count' in pairwise_df.columns:
-        for _, r in pairwise_df.iterrows():
-            i, j, c = int(r['better']) - 1, int(r['worse']) - 1, int(r['count'])
-            count_mat[i, j] = c
-    else:
-        for _, r in pairwise_df.iterrows():
-            i, j = int(r['better']) - 1, int(r['worse']) - 1
-            count_mat[i, j] += 1
+    count_mat = _build_count_matrix(pairwise_df, dtype=float, n_stimuli=n)
     total = count_mat + count_mat.T
-    return np.where(total > 0, matrix / total, 0.0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return np.where(total > 0, matrix / total, 0.0)
 
 
 __all__ = [

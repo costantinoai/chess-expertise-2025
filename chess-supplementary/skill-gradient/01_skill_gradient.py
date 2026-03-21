@@ -54,6 +54,7 @@ if str(repo_root) not in sys.path:
 
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
+from utils import compute_subject_mean_pr, load_bids_tsvs
 from common.stats_utils import apply_fdr_correction
 
 
@@ -77,24 +78,6 @@ def compute_correlations(x, y):
     r_p, p_p = stats.pearsonr(x, y)
     r_s, p_s = stats.spearmanr(x, y)
     return r_p, p_p, r_s, p_s
-
-
-def load_bids_tsvs(bids_dir, pattern='*.tsv'):
-    """Load per-subject TSVs from a BIDS derivatives directory."""
-    rows = []
-    for sub_dir in sorted(Path(bids_dir).iterdir()):
-        if not sub_dir.is_dir():
-            continue
-        sub_id = sub_dir.name
-        tsv_files = list(sub_dir.glob(pattern))
-        if not tsv_files:
-            continue
-        df = pd.read_csv(tsv_files[0], sep='\t', index_col=0)
-        for target in df.index:
-            row = {'subject': sub_id, 'target': target}
-            row.update(df.loc[target].to_dict())
-            rows.append(row)
-    return pd.DataFrame(rows)
 
 
 # ============================================================================
@@ -162,13 +145,12 @@ for roi_label in sorted(pr_expert['ROI_Label'].unique()):
     })
 
 # PR mean across ROIs
-pr_wide = pr_expert.pivot(index='subject_id', columns='ROI_Label', values='PR')
-pr_mean = pr_wide.mean(axis=1)
-elo_vals = pd.Series({s: elo_map[s] for s in pr_wide.index})
-r_p, p_p, r_s, p_s = compute_correlations(elo_vals, pr_mean)
+expert_mean_pr = compute_subject_mean_pr(pr_long, subject_ids=expert_ids)
+elo_vals = expert_mean_pr['participant_id'].map(elo_map)
+r_p, p_p, r_s, p_s = compute_correlations(elo_vals, expert_mean_pr['mean_pr'])
 pr_results.append({
     'measure': 'PR', 'roi_id': 'mean', 'roi_name': 'Mean (22 ROIs)',
-    'n': len(pr_mean), 'pearson_r': r_p, 'pearson_p': p_p,
+    'n': len(expert_mean_pr), 'pearson_r': r_p, 'pearson_p': p_p,
     'spearman_rho': r_s, 'spearman_p': p_s,
 })
 
@@ -335,8 +317,7 @@ if fam_file.exists():
 
     # Enrich with neural metrics (mean across 22 ROIs per subject)
     # PR
-    subject_pr = pr_long.groupby('subject_id')['PR'].mean().reset_index()
-    subject_pr.columns = ['participant_id', 'mean_pr']
+    subject_pr = compute_subject_mean_pr(pr_long)
     fam_df = fam_df.merge(subject_pr, on='participant_id', how='left')
 
     # RSA (mean across ROIs per subject per target model)

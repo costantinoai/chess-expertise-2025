@@ -25,6 +25,7 @@ if str(repo_root) not in sys.path:
 from common import CONFIG
 from common.script_utils import setup_script
 from common.logging_utils import log_script_end
+from common.stats_utils import compute_mean_ci_and_ttest_vs_value
 from common.plotting import (
     apply_nature_rc,
     PLOT_PARAMS,
@@ -125,13 +126,10 @@ def plot_group_comparison(ax, expert_vals, novice_vals, ylabel, title,
     # Within-group vs chance stars
     for i, vals in enumerate(groups):
         if len(vals) > 1 and chance is not None:
-            t_ch, p_ch = stats.ttest_1samp(vals, chance)
+            mean, _, ci_high, t_ch, p_ch = compute_mean_ci_and_ttest_vs_value(vals, popmean=chance)
             if p_ch < 0.05:
-                mean = vals.mean()
-                sem = stats.sem(vals)
-                ci = sem * stats.t.ppf(0.975, len(vals) - 1)
                 star = '***' if p_ch < 0.001 else '**' if p_ch < 0.01 else '*'
-                ax.text(x[i], mean + ci + 0.02, star, ha='center', va='bottom',
+                ax.text(x[i], ci_high + 0.02, star, ha='center', va='bottom',
                         fontsize=PP['font_size_annotation'], fontweight='bold',
                         color='black', zorder=6)
 

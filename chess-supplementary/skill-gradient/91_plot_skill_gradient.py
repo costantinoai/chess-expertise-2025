@@ -25,6 +25,7 @@ if str(repo_root) not in sys.path:
 from common import CONFIG
 from common.script_utils import setup_script
 from common.logging_utils import log_script_end
+from utils import compute_subject_mean_pr, load_bids_tsvs
 from common.plotting import (
     apply_nature_rc,
     PLOT_PARAMS,
@@ -74,36 +75,12 @@ logger.info(f"Loaded Elo correlations: {len(elo_all)} rows")
 logger.info(f"Loaded familiarisation data: {len(fam_subj)} subjects")
 logger.info(f"Experts with Elo: {len(expert_ids)}")
 
-# Build per-subject expert data for Elo row (all 20 experts, not limited
-# to the 19 with familiarisation data)
-
-def load_bids_tsvs(bids_dir, pattern='*.tsv'):
-    """Load per-subject TSVs from a BIDS derivatives directory."""
-    # Same loader as in 01_skill_gradient.py
-    rows = []
-    for sub_dir in sorted(Path(bids_dir).iterdir()):
-        if not sub_dir.is_dir():
-            continue
-        sub_id = sub_dir.name
-        tsv_files = list(sub_dir.glob(pattern))
-        if not tsv_files:
-            continue
-        df = pd.read_csv(tsv_files[0], sep='\t', index_col=0)
-        for target in df.index:
-            row = {'subject': sub_id, 'target': target}
-            row.update(df.loc[target].to_dict())
-            rows.append(row)
-    return pd.DataFrame(rows)
-
 # PR: load from pickle (same source as analysis script)
 pr_pkl = Path(CONFIG['REPO_ROOT']) / 'chess-manifold/results/manifold/pr_results.pkl'
 with open(pr_pkl, 'rb') as f:  # nosec B301 — trusted internal pkl
     pr_data = pickle.load(f)  # nosec B301
 pr_long = pr_data['pr_long_format']
-pr_expert = pr_long[pr_long['subject_id'].isin(expert_ids)]
-pr_wide = pr_expert.pivot(index='subject_id', columns='ROI_Label', values='PR')
-expert_mean_pr = pr_wide.mean(axis=1).reset_index()
-expert_mean_pr.columns = ['participant_id', 'mean_pr']
+expert_mean_pr = compute_subject_mean_pr(pr_long, subject_ids=expert_ids)
 
 # RSA: load from BIDS derivatives
 rsa_df = load_bids_tsvs(CONFIG['BIDS_MVPA_RSA'])

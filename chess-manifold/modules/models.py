@@ -68,29 +68,11 @@ def train_logreg_on_pr(
     """
     logger.info("Training logistic regression on PR features (expert vs novice)...")
 
-    # Merge PR data with group labels
-    from common.bids_utils import merge_group_labels
-    from .utils import ensure_roi_order
-    pr_with_group = merge_group_labels(pr_df, participants, subject_col='subject_id')
-
-    # Convert to wide format (subjects × ROIs)
-    expert_pr = pr_with_group[pr_with_group['group'] == 'expert'].pivot(
-        index='subject_id',
-        columns='ROI_Label',
-        values='PR'
+    all_pr, labels, n_expert, n_novice = build_feature_matrix(
+        pr_df,
+        participants,
+        roi_labels,
     )
-    expert_pr = ensure_roi_order(expert_pr, roi_labels)[roi_labels].values
-
-    novice_pr = pr_with_group[pr_with_group['group'] == 'novice'].pivot(
-        index='subject_id',
-        columns='ROI_Label',
-        values='PR'
-    )
-    novice_pr = ensure_roi_order(novice_pr, roi_labels)[roi_labels].values
-
-    # Stack data: experts first, then novices
-    all_pr = np.vstack([expert_pr, novice_pr])
-    labels = np.array([1] * len(expert_pr) + [0] * len(novice_pr))
 
     # Standardize features
     scaler = StandardScaler()
@@ -101,7 +83,7 @@ def train_logreg_on_pr(
     clf.fit(all_pr_scaled, labels)
 
     logger.info(f"  Trained on {len(all_pr)} subjects "
-                f"({len(expert_pr)} experts, {len(novice_pr)} novices)")
+                f"({n_expert} experts, {n_novice} novices)")
     logger.info(f"  Using {len(roi_labels)} ROI features")
 
     return clf, scaler, all_pr_scaled, labels
@@ -225,49 +207,6 @@ __all__ = [
 ]
 
 
-def _build_feature_matrix(
-    pr_df: pd.DataFrame,
-    participants: pd.DataFrame,
-    roi_labels: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray, int, int]:
-    """
-    Construct X (subjects × ROIs) and y (1=expert, 0=novice) from long PR data.
-
-    Returns
-    -------
-    X : np.ndarray
-        Feature matrix ordered by [experts, novices]
-    y : np.ndarray
-        Binary labels (1=expert, 0=novice)
-    n_expert : int
-        Number of expert subjects
-    n_novice : int
-        Number of novice subjects
-    """
-    pr_with_group = pr_df.merge(
-        participants[['participant_id', 'group']],
-        left_on='subject_id',
-        right_on='participant_id',
-        how='left'
-    )
-
-    expert_pr = pr_with_group[pr_with_group['group'] == 'expert'].pivot(
-        index='subject_id',
-        columns='ROI_Label',
-        values='PR'
-    )[roi_labels].values
-
-    novice_pr = pr_with_group[pr_with_group['group'] == 'novice'].pivot(
-        index='subject_id',
-        columns='ROI_Label',
-        values='PR'
-    )[roi_labels].values
-
-    X = np.vstack([expert_pr, novice_pr])
-    y = np.array([1] * len(expert_pr) + [0] * len(novice_pr))
-    return X, y, len(expert_pr), len(novice_pr)
-
-
 def build_feature_matrix(
     pr_df: pd.DataFrame,
     participants: pd.DataFrame,
@@ -296,7 +235,28 @@ def build_feature_matrix(
     n_novice : int
         Number of novice subjects
     """
-    return _build_feature_matrix(pr_df, participants, roi_labels)
+    from common.bids_utils import merge_group_labels
+    from .utils import ensure_roi_order
+
+    pr_with_group = merge_group_labels(pr_df, participants, subject_col='subject_id')
+
+    expert_pr = pr_with_group[pr_with_group['group'] == 'expert'].pivot(
+        index='subject_id',
+        columns='ROI_Label',
+        values='PR'
+    )
+    expert_pr = ensure_roi_order(expert_pr, roi_labels)[roi_labels].values
+
+    novice_pr = pr_with_group[pr_with_group['group'] == 'novice'].pivot(
+        index='subject_id',
+        columns='ROI_Label',
+        values='PR'
+    )
+    novice_pr = ensure_roi_order(novice_pr, roi_labels)[roi_labels].values
+
+    X = np.vstack([expert_pr, novice_pr])
+    y = np.array([1] * len(expert_pr) + [0] * len(novice_pr))
+    return X, y, len(expert_pr), len(novice_pr)
 
 
 def evaluate_classification_significance(
@@ -361,7 +321,7 @@ def evaluate_classification_significance(
 
     logger.info(f"Evaluating classification significance in '{space}' space...")
 
-    X, y, n_expert, n_novice = _build_feature_matrix(pr_df, participants, roi_labels)
+    X, y, n_expert, n_novice = build_feature_matrix(pr_df, participants, roi_labels)
     n_subjects = X.shape[0]
 
     # Determine feasible number of splits

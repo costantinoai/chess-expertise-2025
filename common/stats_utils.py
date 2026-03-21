@@ -8,10 +8,32 @@ including Welch t-tests, FDR correction, effect sizes, and confidence intervals.
 import numpy as np
 import pandas as pd
 from typing import Tuple
-from scipy.stats import ttest_ind, ttest_1samp
+from scipy.stats import ttest_ind, ttest_1samp, norm
 from statsmodels.stats.multitest import multipletests
 from pingouin import compute_effsize
 import pingouin as pg
+
+
+def _clean_two_groups(
+    group1: np.ndarray,
+    group2: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Convert two independent samples to finite-valued float vectors.
+
+    Parameters
+    ----------
+    group1, group2 : array-like
+        Input samples for two groups.
+
+    Returns
+    -------
+    g1, g2 : np.ndarray
+        One-dimensional float arrays with NaN/Inf values removed.
+    """
+    g1 = np.asarray(group1, dtype=float)
+    g2 = np.asarray(group2, dtype=float)
+    return g1[np.isfinite(g1)], g2[np.isfinite(g2)]
 
 
 def welch_ttest(
@@ -65,8 +87,7 @@ def welch_ttest(
     >>> m1, m2, diff, ci_low, ci_high, t, p = welch_ttest(expert_vals, novice_vals, equal_var=True)
     """
     # Remove NaNs
-    g1 = np.asarray(group1)[~np.isnan(group1)]
-    g2 = np.asarray(group2)[~np.isnan(group2)]
+    g1, g2 = _clean_two_groups(group1, group2)
 
     # Check sufficient data
     if g1.size < 2 or g2.size < 2:
@@ -88,6 +109,46 @@ def welch_ttest(
     ci_high = float(ci.high)
 
     return (mean1, mean2, mean_diff, ci_low, ci_high, t_stat, p_value)
+
+
+def compute_ttest_df(
+    group1: np.ndarray,
+    group2: np.ndarray,
+    equal_var: bool = False
+) -> float:
+    """
+    Compute degrees of freedom for an independent-samples t-test.
+
+    Parameters
+    ----------
+    group1, group2 : np.ndarray
+        Independent group data vectors.
+    equal_var : bool, default=False
+        If False, compute Welch-Satterthwaite degrees of freedom.
+        If True, compute pooled-variance t-test degrees of freedom.
+
+    Returns
+    -------
+    float
+        Degrees of freedom, or NaN if either group has fewer than 2 observations.
+    """
+    g1, g2 = _clean_two_groups(group1, group2)
+
+    if g1.size < 2 or g2.size < 2:
+        return np.nan
+
+    result = ttest_ind(g1, g2, equal_var=equal_var, nan_policy='omit')
+    if hasattr(result, 'df'):
+        return float(result.df)
+
+    if equal_var:
+        return float(g1.size + g2.size - 2)
+
+    n1, n2 = g1.size, g2.size
+    v1, v2 = np.var(g1, ddof=1), np.var(g2, ddof=1)
+    num = (v1 / n1 + v2 / n2) ** 2
+    den = ((v1 ** 2) / ((n1 ** 2) * (n1 - 1))) + ((v2 ** 2) / ((n2 ** 2) * (n2 - 1)))
+    return float(num / den) if den > 0 else np.nan
 
 
 def compute_group_mean_and_ci(
@@ -387,8 +448,7 @@ def compute_cohens_d(
     >>> d = compute_cohens_d(g1, g2)
     """
     # Remove NaNs
-    g1 = np.asarray(group1)[~np.isnan(group1)]
-    g2 = np.asarray(group2)[~np.isnan(group2)]
+    g1, g2 = _clean_two_groups(group1, group2)
 
     if g1.size < 2 or g2.size < 2:
         return np.nan
@@ -396,6 +456,143 @@ def compute_cohens_d(
     # Pingouin compute_effsize (required dependency)
     d = compute_effsize(g1, g2, eftype='cohen', paired=False)
     return float(d)
+
+
+def compute_cohens_d_ci(
+    group1: np.ndarray,
+    group2: np.ndarray,
+    confidence_level: float = 0.95
+) -> Tuple[float, float, float]:
+    """
+    Compute Cohen's d and an approximate confidence interval.
+
+    Parameters
+    ----------
+    group1, group2 : np.ndarray
+        Independent group data vectors.
+    confidence_level : float, default=0.95
+        Confidence level for the approximate interval.
+
+    Returns
+    -------
+    d, ci_low, ci_high : float
+        Cohen's d and approximate confidence interval bounds.
+
+    Notes
+    -----
+    The interval uses the large-sample Hedges & Olkin variance approximation.
+    Returns NaNs if either group has fewer than 2 valid observations.
+    """
+    g1, g2 = _clean_two_groups(group1, group2)
+
+    if g1.size < 2 or g2.size < 2:
+        return np.nan, np.nan, np.nan
+
+    d = compute_cohens_d(g1, g2)
+    if not np.isfinite(d):
+        return np.nan, np.nan, np.nan
+
+    n1, n2 = g1.size, g2.size
+    denom = max(n1 + n2 - 2, 1)
+    var_d = ((n1 + n2) / (n1 * n2)) + (d ** 2) / (2 * denom)
+    se_d = np.sqrt(var_d) if var_d >= 0 else np.nan
+    if not np.isfinite(se_d):
+        return float(d), np.nan, np.nan
+
+    z_crit = float(norm.ppf(0.5 + confidence_level / 2.0))
+    ci_low = float(d - z_crit * se_d)
+    ci_high = float(d + z_crit * se_d)
+    return float(d), ci_low, ci_high
+
+
+def compare_independent_groups(
+    group1: np.ndarray,
+    group2: np.ndarray,
+    confidence_level: float = 0.95,
+    equal_var: bool = False
+) -> dict:
+    """
+    Summarize an independent-groups comparison using shared helpers.
+
+    Parameters
+    ----------
+    group1, group2 : np.ndarray
+        Independent group data vectors.
+    confidence_level : float, default=0.95
+        Confidence level used for mean-difference and Cohen's d intervals.
+    equal_var : bool, default=False
+        Variance assumption for the t-test.
+
+    Returns
+    -------
+    dict
+        Summary dictionary with means, mean difference, CI, t-statistic, p-value,
+        degrees of freedom, and Cohen's d with approximate CI.
+    """
+    mean1, mean2, mean_diff, ci_low, ci_high, t_stat, p_value = welch_ttest(
+        group1,
+        group2,
+        confidence_level=confidence_level,
+        equal_var=equal_var,
+    )
+    df = compute_ttest_df(group1, group2, equal_var=equal_var)
+    cohen_d, d_ci_low, d_ci_high = compute_cohens_d_ci(
+        group1,
+        group2,
+        confidence_level=confidence_level,
+    )
+    g1, g2 = _clean_two_groups(group1, group2)
+
+    return {
+        'mean1': mean1,
+        'mean2': mean2,
+        'mean_diff': mean_diff,
+        'ci_low': ci_low,
+        'ci_high': ci_high,
+        't_stat': t_stat,
+        'p_value': p_value,
+        'df': df,
+        'cohens_d': cohen_d,
+        'cohens_d_ci_low': d_ci_low,
+        'cohens_d_ci_high': d_ci_high,
+        'n_group1': int(g1.size),
+        'n_group2': int(g2.size),
+    }
+
+
+def fisher_z_test_independent_correlations(
+    r1: float,
+    n1: int,
+    r2: float,
+    n2: int
+) -> Tuple[float, float]:
+    """
+    Compare two independent correlations using Fisher's z transform.
+
+    Parameters
+    ----------
+    r1, r2 : float
+        Correlation coefficients to compare.
+    n1, n2 : int
+        Sample sizes associated with r1 and r2.
+
+    Returns
+    -------
+    z_diff, p_value : float
+        Fisher z-statistic and two-sided p-value.
+        Returns NaNs when the test is undefined (e.g., n <= 3).
+    """
+    if n1 <= 3 or n2 <= 3 or not np.isfinite(r1) or not np.isfinite(r2):
+        return np.nan, np.nan
+
+    r1_clipped = float(np.clip(r1, -0.999999, 0.999999))
+    r2_clipped = float(np.clip(r2, -0.999999, 0.999999))
+    z1 = np.arctanh(r1_clipped)
+    z2 = np.arctanh(r2_clipped)
+    se = np.sqrt(1 / (n1 - 3) + 1 / (n2 - 3))
+    z_diff = (z1 - z2) / se
+    p_value = 2 * norm.sf(np.abs(z_diff))
+    return float(z_diff), float(p_value)
 
 
 def correlate_vectors_bootstrap(
@@ -645,13 +842,17 @@ def variance_partitioning_rdms(
 
 __all__ = [
     'welch_ttest',
+    'compute_ttest_df',
     'compute_group_mean_and_ci',
     'compute_mean_ci_and_ttest_vs_value',
     'binomial_test_accuracy',
     'binomial_test_from_predictions',
     'apply_fdr_correction',
     'compute_cohens_d',
+    'compute_cohens_d_ci',
+    'compare_independent_groups',
     'correlate_vectors_bootstrap',
+    'fisher_z_test_independent_correlations',
     'partial_correlation_rdms',
     'variance_partitioning_rdms',
     'ci_to_errorbar_format',
@@ -795,50 +996,24 @@ def per_roi_welch_and_fdr(
             })
             continue
 
-        # T-test with configurable variance assumption
-        mean1, mean2, mean_diff, ci_low, ci_high, t_stat, p_val = welch_ttest(
-            expert_clean, novice_clean, confidence_level=0.95, equal_var=equal_var
+        comparison = compare_independent_groups(
+            expert_clean,
+            novice_clean,
+            confidence_level=0.95,
+            equal_var=equal_var,
         )
-
-        # Degrees of freedom
-        result_obj = ttest_ind(expert_clean, novice_clean, equal_var=equal_var)
-        if hasattr(result_obj, 'df'):
-            dof = result_obj.df
-        else:
-            # Compute df manually
-            n1, n2 = expert_clean.size, novice_clean.size
-            if equal_var:
-                # Standard t-test: n1 + n2 - 2
-                dof = n1 + n2 - 2
-            else:
-                # Welch-Satterthwaite approximation
-                v1, v2 = np.var(expert_clean, ddof=1), np.var(novice_clean, ddof=1)
-                num = (v1/n1 + v2/n2) ** 2
-                den = ((v1**2)/((n1**2)*(n1-1))) + ((v2**2)/((n2**2)*(n2-1)))
-                dof = num/den if den > 0 else np.nan
-
-        # Cohen's d (pingouin)
-        cohen_d = compute_effsize(expert_clean, novice_clean, eftype='cohen')
-        # Approximate 95% CI for Cohen's d (Hedges & Olkin variance)
-        n1, n2 = expert_clean.size, novice_clean.size
-        denom = max(n1 + n2 - 2, 1)
-        var_d = ((n1 + n2) / (n1 * n2)) + (cohen_d ** 2) / (2 * denom)
-        se_d = np.sqrt(var_d) if var_d >= 0 else np.nan
-        z_crit = 1.96
-        d_ci_low = float(cohen_d - z_crit * se_d) if np.isfinite(se_d) else np.nan
-        d_ci_high = float(cohen_d + z_crit * se_d) if np.isfinite(se_d) else np.nan
 
         results.append({
             'ROI_Label': int(roi_label),
-            't_stat': t_stat,
-            'p_val': p_val,
-            'dof': float(dof),
-            'cohen_d': float(cohen_d),
-            'cohen_d_ci_low': d_ci_low,
-            'cohen_d_ci_high': d_ci_high,
-            'mean_diff': mean_diff,
-            'ci95_low': ci_low,
-            'ci95_high': ci_high,
+            't_stat': comparison['t_stat'],
+            'p_val': comparison['p_value'],
+            'dof': comparison['df'],
+            'cohen_d': comparison['cohens_d'],
+            'cohen_d_ci_low': comparison['cohens_d_ci_low'],
+            'cohen_d_ci_high': comparison['cohens_d_ci_high'],
+            'mean_diff': comparison['mean_diff'],
+            'ci95_low': comparison['ci_low'],
+            'ci95_high': comparison['ci_high'],
         })
 
     # Convert to DataFrame
