@@ -53,7 +53,7 @@ To assess whether PR profiles distinguish experts from novices, we trained a log
 
 **Training procedure**:
 - Features standardized (z-scored) before training
-- Leave-one-out cross-validation (LOOCV) to estimate accuracy
+- Stratified K-fold cross-validation with up to 5 folds (limited by group sizes) to estimate accuracy
 - Logistic regression with default regularization
 
 **Permutation test for significance**:
@@ -109,8 +109,7 @@ python 01_manifold_analysis.py
 ```
 
 **Outputs** (saved to `chess-manifold/results/manifold/`):
-- `pr_results.pkl`: Complete results dictionary (for plotting scripts)
-- `pr_long_format.csv`: Subject-level PR values in long format (one row per subject-ROI)
+- `pr_results.pkl`: Complete results dictionary (includes the long-format PR table used by plots/tables)
 - `pr_summary_stats.csv`: Group means, standard errors, and 95% CIs per ROI
 - `pr_statistical_tests.csv`: Welch t-tests, FDR-corrected q-values, Cohen's d per ROI
 - `pr_classification_tests.csv`: Classification accuracy and permutation p-values for ROI and PCA-2D spaces
@@ -125,8 +124,8 @@ python chess-manifold/81_table_manifold_pr.py
 ```
 
 **Outputs** (saved to `chess-manifold/results/manifold/tables/`):
-- `manifold_pr_tests.tex`: LaTeX table with group statistics and t-test results
-- `manifold_pr_tests.csv`: CSV version of the table
+- `manifold_pr_results.tex`: LaTeX table with group statistics and t-test results
+- `manifold_pr_results.csv`: CSV version of the table
 
 ### Step 3: Generate Figures
 
@@ -135,13 +134,21 @@ python chess-manifold/91_plot_manifold_panels.py
 ```
 
 **Outputs** (saved to `chess-manifold/results/manifold/figures/`):
-- Individual axes as SVG/PDF:
-  - `manifold_A_PRHeatmap.svg`: Subject × ROI heatmap of PR values
-  - `manifold_B_GroupComparison.svg`: Expert vs novice PR distributions
-  - `manifold_C_PCA2D.svg`: 2D PCA projection with decision boundary
-  - `manifold_D_ClassifierWeights.svg`: ROI contributions to classification
-  - `manifold_E_VoxelCorrelation.svg`: PR vs ROI size correlation
-- Complete panels: `panels/manifold_pr_panel.pdf`
+- Individual axes as SVG:
+  - `manifold_bars__Bars_Top_Mean_PR.svg`
+  - `manifold_bars__Bars_Bottom_Diff_PR.svg`
+  - `manifold_bars__ROI_Groups_Legend.svg`
+  - `manifold_matrix_pca__A_PR_Matrix.svg`
+  - `manifold_matrix_pca__B_PCA_Projection.svg`
+  - `manifold_matrix_pca__C_Feature_Importance.svg`
+  - `manifold_matrix_pca__D_PCA_Loadings.svg`
+  - `manifold_pr_voxels__E_PR_vs_Voxels_Experts.svg`
+  - `manifold_pr_voxels__F_PR_vs_Voxels_Novices.svg`
+  - `manifold_pr_voxels__G_PRdiff_vs_VoxelsAvg.svg`
+- Complete panel PDFs:
+  - `panels/manifold_bars_panel.pdf`
+  - `panels/manifold_matrix_pca_panel.pdf`
+  - `panels/manifold_pr_voxels_panel.pdf`
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 
@@ -152,9 +159,9 @@ python chess-manifold/91_plot_manifold_panels.py
 - Effect sizes (Cohen's d) range from small to medium across significant ROIs
 
 **Classification**:
-- Leave-one-out cross-validation accuracy in full 22D ROI space: typically 65-75%
-- Permutation tests confirm that accuracy significantly exceeds chance (p < 0.05)
-- 2D PCA space also shows above-chance classification, indicating robust group separation
+- 5-fold stratified CV accuracy in full 22D ROI space: 82.5% (permutation p = 0.0002)
+- 2D PCA space also shows above-chance classification: 80.0% (permutation p = 0.0003)
+- Both spaces support robust expert-vs-novice separation from PR profiles
 
 **Interpretation**:
 - Expert and novice groups differ in the effective dimensionality of neural representations in task-relevant regions

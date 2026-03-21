@@ -618,7 +618,7 @@ def load_stimulus_metadata(stimuli_file=None, return_all: bool = False):
         - stim_id: Stimulus ID (1-40)
         - check: Checkmate status ('checkmate' or 'non_checkmate')
         - visual: Visual similarity category (1-20)
-        - strategy: Strategy type category (1-5)
+        - strategy: Strategy type category (1-10; 5 checkmate classes, 5 non-checkmate classes)
     
     Notes
     -----

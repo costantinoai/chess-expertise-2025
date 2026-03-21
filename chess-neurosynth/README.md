@@ -105,18 +105,18 @@ Paths (under external data root):
 ### Input Files
 
 **For univariate analysis**:
-- **Group t-maps**: `data/BIDS/derivatives/spm-glm/smooth4/group/spmT_*.nii`
+- **Group t-maps**: `BIDS/derivatives/SPM/GLM-smooth4/group/spmT_exp-gt-nonexp_*.nii.gz`
   - SPM12 second-level GLM outputs
   - Contrasts: Experts > Novices for various first-level contrasts
-- **Neurosynth term maps**: `data/neurosynth_terms/*.nii.gz`
+- **Neurosynth term maps**: `neurosynth/terms/*.nii.gz`
   - Z-scored association test maps for cognitive terms
   - Downloaded from https://neurosynth.org/
 
 **For RSA analysis**:
-- **Subject-level searchlight maps**: `data/BIDS/derivatives/rsa-searchlight/sub-*/sub-*_space-MNI152NLin2009cAsym_model-<pattern>_rsa.nii.gz`
+- **Subject-level searchlight maps**: `BIDS/derivatives/rsa_searchlight/sub-*/sub-*_desc-searchlight_<pattern>_stat-r_map.nii.gz`
   - Correlation coefficient maps from whole-brain RSA searchlight
   - Models: checkmate, strategy, visual_similarity
-- **Participant data**: `data/BIDS/participants.tsv`
+- **Participant data**: `BIDS/participants.tsv`
   - Columns: `participant_id`, `group` (expert/novice)
 - **Neurosynth term maps**: Same as above
 
@@ -165,11 +165,13 @@ python chess-neurosynth/82_table_neurosynth_rsa.py
 
 **Outputs**:
 - Univariate tables → `chess-neurosynth/results/neurosynth_univariate/tables/`
-  - `neurosynth_univariate_<contrast>.tex`: LaTeX tables
-  - `neurosynth_univariate_<contrast>.csv`: CSV tables
+  - `neurosynth_univariate_summary.tex`: Combined LaTeX summary table
+  - `neurosynth_univariate_summary.csv`: Combined CSV summary table
+  - `neurosynth_univariate_full_stats.csv`: Full statistics with CIs and p-values
 - RSA tables → `chess-neurosynth/results/neurosynth_rsa/tables/`
-  - `neurosynth_rsa_<pattern>.tex`: LaTeX tables
-  - `neurosynth_rsa_<pattern>.csv`: CSV tables
+  - `neurosynth_rsa_summary.tex`: Combined LaTeX summary table
+  - `neurosynth_rsa_summary.csv`: Combined CSV summary table
+  - `neurosynth_rsa_full_stats.csv`: Full statistics with CIs and p-values
 
 ### Step 4: Generate Figures
 
@@ -183,11 +185,11 @@ python chess-neurosynth/92_plot_neurosynth_rsa.py
 
 **Outputs**:
 - Univariate figures → `chess-neurosynth/results/neurosynth_univariate/figures/`
-  - Individual axes as SVG/PDF: `neurosynth_univariate_<contrast>_<panel>.svg`, etc.
-  - Complete panel: `panels/neurosynth_univariate_panel.pdf`
+  - Individual axes as SVG: `neurosynth_univariate__*.svg`
+  - Complete panel PDF: `panels/neurosynth_univariate_panel.pdf`
 - RSA figures → `chess-neurosynth/results/neurosynth_rsa/figures/`
-  - Individual axes as SVG/PDF
-  - Complete panel: `panels/neurosynth_rsa_panel.pdf`
+  - Individual axes as SVG: `neurosynth_rsa__*.svg`
+  - Complete panel PDF: `panels/neurosynth_rsa_panel.pdf`
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 

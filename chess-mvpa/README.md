@@ -22,7 +22,7 @@ Multivariate pattern analysis (MVPA) moves beyond traditional univariate approac
 Three theoretical model RDMs were used as prediction targets:
 
 1. **Checkmate status**: Binary RDM (0 if same status, 1 if different)
-2. **Strategy type**: Categorical RDM based on chess strategies
+2. **Strategy type**: 10-level categorical RDM (5 checkmate-specific strategy classes, 5 non-checkmate-specific classes)
 3. **Visual similarity**: Perceptual feature-based dissimilarity
 
 These models reflect high-level conceptual dimensions (checkmate, strategy) and lower-level perceptual features (visual similarity).
@@ -49,7 +49,7 @@ These models reflect high-level conceptual dimensions (checkmate, strategy) and 
 
 **Classification procedure**:
 1. Extract multivoxel patterns from each ROI for all 40 conditions
-2. Construct classification targets from categorical regressors (checkmate, strategy, visual)
+2. Construct classification targets from categorical regressors (checkmate: 2-way, strategy: 10-way, visual similarity: 20-way)
 3. Partition data using leave-one-run-out cross-validation
 4. Balance folds to ensure equal class representation (`cosmo_balance_partitions`)
 5. Train linear SVM classifier (`cosmo_classify_svm`) on each fold
@@ -213,10 +213,10 @@ python chess-mvpa/82_table_mvpa_decoding.py
 ```
 
 **Outputs** (saved to `chess-mvpa/results/mvpa_group/tables/`):
-- `mvpa_rsa_<target>.tex`: LaTeX tables for each model target
-- `mvpa_rsa_<target>.csv`: CSV tables for each model target
-- `mvpa_decoding_<target>.tex`: LaTeX tables for each classification target
-- `mvpa_decoding_<target>.csv`: CSV tables for each classification target
+- `mvpa_rsa_summary.tex`: Combined LaTeX table for the three main RSA targets
+- `mvpa_rsa_summary.csv`: CSV version of the RSA summary table
+- `mvpa_decoding_summary.tex`: Combined LaTeX table for the main decoding targets
+- `mvpa_decoding_summary.csv`: CSV version of the decoding summary table
 
 ### Step 5: Generate Figures
 
@@ -229,8 +229,9 @@ python chess-mvpa/93_plot_mvpa_decoding.py
 ```
 
 **Outputs** (saved to `chess-mvpa/results/mvpa_group/figures/`):
-- Individual axes as SVG/PDF: `mvpa_rsa_<target>_<panel>.svg`, etc.
-- Complete panels: `panels/mvpa_rsa_panel.pdf`, `panels/mvpa_decoding_panel.pdf`
+- Individual RSA axes as SVG: `mvpa_rsa__*.svg`
+- Individual decoding axes as SVG: `mvpa_svm__*.svg`
+- Complete panels: `panels/mvpa_rsa_panel.pdf`, `panels/mvpa_svm_panel.pdf`
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 

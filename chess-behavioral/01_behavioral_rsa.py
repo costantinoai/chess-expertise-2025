@@ -36,8 +36,9 @@ Outputs (saved to results/behavioral_rsa/):
 
 Analysis 1 from manuscript: Main Fig 2, Methods Sec 3.5.3
 
-Key Result: Experts' preferences correlate with Checkmate (r=0.49) and
-Strategy (r=0.20); Novices show no significant correlations.
+Key Result: Experts' preferences correlate with Checkmate (r=0.733),
+Strategy (r=0.251), and Visual Similarity (r=-0.116); Novices show no
+significant correlations after FDR correction.
 """
 
 import sys
