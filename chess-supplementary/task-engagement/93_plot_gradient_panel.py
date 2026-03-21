@@ -15,9 +15,9 @@ Figures Produced
 
 Inputs
 ------
-- gradient_bivariate_correlations.csv
-- gradient_partial_correlations.csv
-- gradient_variance_partitioning.csv
+- feature_correlations.csv
+- feature_partial_correlations.csv
+- feature_variance_partitioning.csv
 """
 
 import sys
@@ -69,7 +69,7 @@ PP = PLOT_PARAMS
 EXP_COL = COLORS_EXPERT_NOVICE['expert']
 NOV_COL = COLORS_EXPERT_NOVICE['novice']
 
-# Feature order (must match 05_perceptual_relational_gradient.py)
+# Feature order (must match 04_quantify_preference_drivers.py)
 FEATURE_ORDER = [
     ('image_entropy',     'Image\nentropy'),
     ('edge_density',      'Edge\ndensity'),
@@ -91,9 +91,9 @@ BLOCK_COLORS = {
 # Load data
 # ============================================================================
 
-biv_df = pd.read_csv(results_dir / 'gradient_bivariate_correlations.csv')
-part_df = pd.read_csv(results_dir / 'gradient_partial_correlations.csv')
-vp_df = pd.read_csv(results_dir / 'gradient_variance_partitioning.csv')
+biv_df = pd.read_csv(results_dir / 'feature_correlations.csv')
+part_df = pd.read_csv(results_dir / 'feature_partial_correlations.csv')
+vp_df = pd.read_csv(results_dir / 'feature_variance_partitioning.csv')
 
 logger.info("Loaded gradient analysis results")
 

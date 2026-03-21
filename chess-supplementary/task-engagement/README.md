@@ -269,15 +269,7 @@ python 92_plot_preference_features.py
 
 Produces board-image panels of top-preferred boards per group and feature-preference correlation plots.
 
-### Step 6: Run perceptual-to-relational gradient analysis
-
-```bash
-python 05_perceptual_relational_gradient.py
-```
-
-Extracts 8 features along the perceptual→relational gradient, computes bivariate and partial correlations, and performs hierarchical variance partitioning.
-
-### Step 7: Generate gradient figure
+### Step 6: Generate gradient figure
 
 ```bash
 python 93_plot_gradient_panel.py
@@ -382,11 +374,10 @@ Expert preferences are almost entirely explained by the strategic-relational blo
 chess-supplementary/task-engagement/
 ├── 01_task_engagement.py              # Diagnostics 1-4 (engagement metrics)
 ├── 02_familiarisation_accuracy.py     # Pre-scan familiarisation task accuracy
-├── 04_quantify_preference_drivers.py  # Diagnostic 5: feature-preference correlations (20 features, FDR)
-├── 05_perceptual_relational_gradient.py  # Diagnostic 6: 8-feature gradient, partial correlations, variance partitioning
+├── 04_quantify_preference_drivers.py  # Diagnostic 5: 8-feature gradient, partial correlations, variance partitioning
 ├── 91_plot_novice_diagnostics.py      # Diagnostics 1-4 figure panel
 ├── 92_plot_preference_features.py     # Diagnostic 5 figure: board images + scatter
-├── 93_plot_gradient_panel.py          # Diagnostic 6 figure: bivariate vs partial + variance bars
+├── 93_plot_gradient_panel.py          # Diagnostic 5 figure: bivariate vs partial + variance bars
 ├── README.md
 ├── modules/
 │   ├── __init__.py
@@ -401,12 +392,10 @@ chess-supplementary/task-engagement/
         ├── preference_ranking_expert.csv
         ├── preference_ranking_novice.csv
         ├── extreme_boards_summary.csv
-        ├── feature_matrix.csv                       # Diagnostic 5 (20 features)
-        ├── feature_correlations_full.csv            # Diagnostic 5 (20 features, FDR)
-        ├── gradient_feature_matrix.csv              # Diagnostic 6 (8 features)
-        ├── gradient_bivariate_correlations.csv      # Diagnostic 6 bivariate r + FDR
-        ├── gradient_partial_correlations.csv        # Diagnostic 6 partial r + FDR
-        ├── gradient_variance_partitioning.csv       # Diagnostic 6 delta-R2 per block
+        ├── feature_matrix.csv                       # Diagnostic 5 (8 features)
+        ├── feature_correlations.csv                 # Diagnostic 5 bivariate r + FDR
+        ├── feature_partial_correlations.csv         # Diagnostic 5 partial r + FDR
+        ├── feature_variance_partitioning.csv        # Diagnostic 5 delta-R2 per block
         └── figures/
             ├── novice_diagnostics_panel.pdf         # Diagnostics 1-4
             ├── preference_drivers_panel.pdf         # Diagnostic 5

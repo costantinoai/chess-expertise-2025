@@ -4,42 +4,63 @@ Quantify Visual and Structural Drivers of Board Preference
 
 Extracts objective board-level features (from FEN) and image-level features
 (from stimulus PNGs) and tests which features predict selection frequency
-in experts vs novices using Spearman correlations and multiple regression.
+in experts vs novices.
+
+This analysis quantifies the structure of the expert-novice dissociation by
+testing 8 board features spanning a gradient from purely perceptual to deeply
+relational, computing both bivariate and partial correlations to isolate unique
+contributions, and decomposing explained variance into perceptual, structural,
+and strategic-relational blocks.
 
 METHODS
 -------
 
-Board-Level Features (from FEN via python-chess)
--------------------------------------------------
-1. piece_count: Total number of pieces on the board
-2. density: piece_count / 64 (proportion of occupied squares)
-3. white_material / black_material: Summed piece values (P=1,N=3,B=3,R=5,Q=9)
-4. material_imbalance: |white_material - black_material|
-5. center_occupation: Number of pieces in the central 16 squares (c3-f6)
-6. center_density: center_occupation / 16
-7. pawn_count: Total pawns
-8. officer_count: Total non-pawn, non-king pieces (N, B, R, Q)
-9. piece_spread: Standard deviation of piece positions (spatial dispersion)
-10. is_checkmate: Binary (checkmate board = 1)
+Data
+----
+Board selection frequencies from the 1-back preference task (same as
+Diagnostics 4--5). Eight features extracted per board from FEN (via
+python-chess) and stimulus PNG images.
 
-Image-Level Features (from PNG pixel analysis)
------------------------------------------------
-11. image_entropy: Shannon entropy of grayscale pixel histogram (visual complexity)
-12. edge_density: Proportion of edge pixels (Sobel filter, visual busyness)
-13. luminance_mean: Mean pixel intensity (brightness)
-14. luminance_std: Pixel intensity SD (contrast)
+Features (ordered perceptual to relational):
+  1. Image entropy       -- Shannon entropy of grayscale pixel histogram
+  2. Edge density        -- Proportion of edge pixels (Sobel filter, 90th pct)
+  3. Piece count         -- Total pieces on board
+  4. Officer count       -- Non-pawn, non-king pieces (N+B+R+Q)
+  5. Center occupation   -- Pieces in central 4x4 squares (c3-f6)
+  6. King advantage      -- Opponent king exposure minus own king exposure
+                            (positive = opponent's king more threatened;
+                            participants always play white)
+  7. Attack advantage    -- White attack coverage minus black attack coverage
+                            (positive = white controls more squares)
+  8. Checkmate status    -- Binary: checkmate position or not
 
-Statistical Analysis
---------------------
-- Spearman correlations between each feature and preference frequency, per group
-- FDR correction across features within each group
-- Stepwise comparison: which features explain unique variance?
+Procedure
+---------
+1. Extract all 8 features for each of the 40 boards.
+2. Compute Spearman correlations between each feature and the board's mean
+   selection frequency per group. Apply Benjamini-Hochberg FDR correction
+   across the 8 features within each group (alpha = 0.05).
+3. Compute partial Spearman correlations: for each feature, residualise both
+   the feature and the preference on all other 7 features (OLS), then
+   correlate the residuals. This isolates the unique predictive contribution
+   of each feature beyond shared variance.
+4. Hierarchical variance partitioning: enter features in three ordered blocks
+   (Perceptual, Structural, Strategic-Relational) into a cumulative linear
+   regression. Delta-R-squared per block quantifies how much unique variance
+   each category adds beyond what was already explained.
+
+Statistical Tests
+-----------------
+- Spearman rank correlation (bivariate and partial)
+- Benjamini-Hochberg FDR correction (alpha = 0.05, family = 8 features per group)
+- Hierarchical OLS regression for variance partitioning
 
 Outputs
 -------
-- feature_matrix.csv: All 40 boards x all features + preference per group
-- feature_correlations_full.csv: Spearman r, p, pFDR for each feature x group
-- figures/panels/preference_drivers_panel.pdf
+- feature_matrix.csv: 40 boards x 8 features + preference per group
+- feature_correlations.csv: Spearman r, p, pFDR per feature x group
+- feature_partial_correlations.csv: Partial r, p, pFDR per feature x group
+- feature_variance_partitioning.csv: Delta-R2 per block per group
 """
 
 import sys
@@ -51,16 +72,17 @@ if str(repo_root) not in sys.path:
 
 import numpy as np
 import pandas as pd
+from scipy import stats
+from scipy.ndimage import sobel
+from statsmodels.stats.multitest import multipletests
+from sklearn.linear_model import LinearRegression
+import chess
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from scipy import stats
-from statsmodels.stats.multitest import multipletests
-import chess
 
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
-from common.plotting import apply_nature_rc
 from common.bids_utils import load_stimulus_metadata
 
 # =============================================================================
@@ -72,11 +94,31 @@ config, out_dir, logger = setup_analysis(
     results_base=Path(__file__).parent / "results",
     script_file=__file__,
 )
-FIGURES_DIR = out_dir / "figures"
-FIGURES_DIR.mkdir(exist_ok=True)
-(FIGURES_DIR / "panels").mkdir(exist_ok=True)
 
 STIMULI_DIR = CONFIG['EXTERNAL_DATA_ROOT'] / "stimuli"
+
+# The 8 features in perceptual → relational order
+# "Advantage" features use (white - black) or (black_exposure - white_exposure)
+# since participants always play as white
+FEATURE_ORDER = [
+    ('image_entropy',      'Image entropy'),
+    ('edge_density',       'Edge density'),
+    ('piece_count',        'Piece count'),
+    ('officer_count',      'Officer count'),
+    ('center_occupation',  'Center occupation'),
+    ('king_advantage',     'King advantage'),
+    ('attack_advantage',   'Attack advantage'),
+    ('is_checkmate',       'Checkmate status'),
+]
+
+FEATURE_KEYS = [fk for fk, _ in FEATURE_ORDER]
+
+# Variance partitioning blocks
+VP_BLOCKS = {
+    'Perceptual': ['image_entropy', 'edge_density'],
+    'Structural': ['piece_count', 'officer_count', 'center_occupation'],
+    'Strategic-Relational': ['king_advantage', 'attack_advantage', 'is_checkmate'],
+}
 
 # =============================================================================
 # 2. LOAD DATA
@@ -84,97 +126,71 @@ STIMULI_DIR = CONFIG['EXTERNAL_DATA_ROOT'] / "stimuli"
 
 logger.info("Loading data...")
 
-pref_path = (CONFIG['REPO_ROOT'] / "chess-supplementary" / "task-engagement" /
-             "results" / "novice_diagnostics" / "board_preference_group.csv")
+pref_path = out_dir / "board_preference_group.csv"
 pref_df = pd.read_csv(pref_path)
 stim_df = load_stimulus_metadata(return_all=True)
+ck = 'check' if 'check' in stim_df.columns else 'check_status'
 
 # =============================================================================
-# 3. EXTRACT BOARD-LEVEL FEATURES FROM FEN
+# 3. EXTRACT FEATURES
 # =============================================================================
 
-logger.info("Extracting board-level features from FEN...")
+logger.info("Extracting 8 features (perceptual → relational)...")
 
-PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
-                chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
-
-# Central squares: c3-f6 (ranks 2-5, files 2-5 in 0-indexed)
 CENTER_SQUARES = [chess.square(f, r) for f in range(2, 6) for r in range(2, 6)]
 
-def extract_fen_features(fen):
-    """Extract objective board features from a FEN string."""
+
+def extract_board_features(fen, check_val):
+    """Extract 6 board-level features from FEN via python-chess."""
     board = chess.Board(fen)
     pm = board.piece_map()
 
-    white = [p for p in pm.values() if p.color == chess.WHITE]
-    black = [p for p in pm.values() if p.color == chess.BLACK]
-
     piece_count = len(pm)
-    density = piece_count / 64.0
-    w_mat = sum(PIECE_VALUES[p.piece_type] for p in white)
-    b_mat = sum(PIECE_VALUES[p.piece_type] for p in black)
-    mat_imbalance = abs(w_mat - b_mat)
-    total_material = w_mat + b_mat
-
-    center_occ = sum(1 for sq in CENTER_SQUARES if sq in pm)
-    center_density = center_occ / len(CENTER_SQUARES)
-
-    pawn_count = sum(1 for p in pm.values() if p.piece_type == chess.PAWN)
     officer_count = sum(1 for p in pm.values()
                         if p.piece_type not in (chess.PAWN, chess.KING))
+    center_occ = sum(1 for sq in CENTER_SQUARES if sq in pm)
 
-    # Spatial spread: SD of piece positions (file and rank)
-    if piece_count > 1:
-        files = [chess.square_file(sq) for sq in pm.keys()]
-        ranks = [chess.square_rank(sq) for sq in pm.keys()]
-        spread = np.std(files) + np.std(ranks)
-    else:
-        spread = 0.0
+    # King advantage: opponent (black) king exposure minus own (white) king exposure
+    # Positive = opponent's king is more threatened (good for the player)
+    # Participants always play as white in this task
+    king_exp = {}
+    for color in [chess.WHITE, chess.BLACK]:
+        king_sq = board.king(color)
+        if king_sq is None:
+            king_exp[color] = 0
+            continue
+        kf, kr = chess.square_file(king_sq), chess.square_rank(king_sq)
+        adj = [chess.square(kf + df, kr + dr)
+               for df in [-1, 0, 1] for dr in [-1, 0, 1]
+               if not (df == 0 and dr == 0)
+               and 0 <= kf + df <= 7 and 0 <= kr + dr <= 7]
+        opp = not color
+        attacked = sum(1 for sq in adj if board.is_attacked_by(opp, sq))
+        king_exp[color] = attacked / max(len(adj), 1)
+    king_advantage = king_exp[chess.BLACK] - king_exp[chess.WHITE]
+
+    # Attack advantage: white attack coverage minus black (positive = white dominates)
+    w_att = sum(1 for sq in chess.SQUARES if board.is_attacked_by(chess.WHITE, sq))
+    b_att = sum(1 for sq in chess.SQUARES if board.is_attacked_by(chess.BLACK, sq))
+    attack_advantage = w_att - b_att
 
     return {
         'piece_count': piece_count,
-        'density': density,
-        'white_material': w_mat,
-        'black_material': b_mat,
-        'total_material': total_material,
-        'material_imbalance': mat_imbalance,
-        'center_occupation': center_occ,
-        'center_density': center_density,
-        'pawn_count': pawn_count,
         'officer_count': officer_count,
-        'piece_spread': spread,
+        'center_occupation': center_occ,
+        'king_advantage': king_advantage,
+        'attack_advantage': attack_advantage,
+        'is_checkmate': int(check_val == 'checkmate'),
     }
 
-fen_features = []
-for _, row in stim_df.iterrows():
-    feats = extract_fen_features(row['fen'])
-    feats['stim_id'] = row['stim_id']
-    check_col = 'check' if 'check' in stim_df.columns else 'check_status'
-    feats['is_checkmate'] = int(row[check_col] == 'checkmate')
-    fen_features.append(feats)
-
-feat_df = pd.DataFrame(fen_features)
-logger.info(f"Extracted {len(feat_df.columns) - 1} board features for {len(feat_df)} boards")
-
-# =============================================================================
-# 4. EXTRACT IMAGE-LEVEL FEATURES
-# =============================================================================
-
-logger.info("Extracting image-level features from PNGs...")
-
-from scipy.ndimage import sobel
 
 def extract_image_features(img_path):
-    """Extract objective visual features from a board image."""
+    """Extract 2 image-level features from stimulus PNG."""
     img = plt.imread(str(img_path))
-
-    # Convert to grayscale if RGB
     if img.ndim == 3:
         gray = np.mean(img[:, :, :3], axis=2)
     else:
         gray = img.copy()
-
-    # Normalize to 0-255 range if float
     if gray.max() <= 1.0:
         gray = (gray * 255).astype(np.uint8)
 
@@ -184,190 +200,232 @@ def extract_image_features(img_path):
     probs = hist / hist.sum()
     entropy = -np.sum(probs * np.log2(probs))
 
-    # Edge density (Sobel)
+    # Edge density via Sobel filter
     edges_x = sobel(gray.astype(float), axis=0)
     edges_y = sobel(gray.astype(float), axis=1)
     edge_mag = np.sqrt(edges_x**2 + edges_y**2)
-    edge_threshold = np.percentile(edge_mag, 90)
-    edge_density = np.mean(edge_mag > edge_threshold)
+    edge_density = np.mean(edge_mag > np.percentile(edge_mag, 90))
 
-    # Luminance stats
-    luminance_mean = np.mean(gray)
-    luminance_std = np.std(gray)
+    return {'image_entropy': entropy, 'edge_density': edge_density}
 
-    return {
-        'image_entropy': entropy,
-        'edge_density': edge_density,
-        'luminance_mean': luminance_mean,
-        'luminance_std': luminance_std,
-    }
 
-img_features = []
-for _, row in stim_df.iterrows():
-    img_path = STIMULI_DIR / row['filename']
+rows = []
+for _, r in stim_df.iterrows():
+    feats = extract_board_features(r['fen'], r[ck])
+    img_path = STIMULI_DIR / r['filename']
     if img_path.exists():
-        feats = extract_image_features(img_path)
+        feats.update(extract_image_features(img_path))
     else:
-        logger.warning(f"Image not found: {img_path}")
-        feats = {k: np.nan for k in ['image_entropy', 'edge_density',
-                                       'luminance_mean', 'luminance_std']}
-    feats['stim_id'] = row['stim_id']
-    img_features.append(feats)
+        feats['image_entropy'] = np.nan
+        feats['edge_density'] = np.nan
+    feats['stim_id'] = r['stim_id']
+    rows.append(feats)
 
-img_df = pd.DataFrame(img_features)
-logger.info(f"Extracted {len(img_df.columns) - 1} image features")
+feat_df = pd.DataFrame(rows)
 
-# Merge all features
-all_feat = feat_df.merge(img_df, on='stim_id')
-
-# =============================================================================
-# 5. ADD PREFERENCE FREQUENCIES PER GROUP
-# =============================================================================
-
+# Add preference frequencies per group
 for group in ['expert', 'novice']:
     gdf = pref_df[pref_df['group'] == group]
-    board_freqs = {}
-    for _, row in gdf.iterrows():
-        board_freqs[int(row['c_stim_id'])] = row['c_freq']
-        board_freqs[int(row['nc_stim_id'])] = row['nc_freq']
-    all_feat[f'pref_{group}'] = all_feat['stim_id'].map(board_freqs)
+    freqs = {}
+    for _, r in gdf.iterrows():
+        freqs[int(r['c_stim_id'])] = r['c_freq']
+        freqs[int(r['nc_stim_id'])] = r['nc_freq']
+    feat_df[f'pref_{group}'] = feat_df['stim_id'].map(freqs)
 
-all_feat.to_csv(out_dir / "feature_matrix.csv", index=False)
-logger.info(f"Saved feature matrix: {out_dir / 'feature_matrix.csv'}")
+feat_df.to_csv(out_dir / "feature_matrix.csv", index=False)
+logger.info(f"Saved feature matrix: {len(feat_df)} boards x {len(FEATURE_KEYS)} features")
 
 # =============================================================================
-# 6. CORRELATIONS: FEATURES vs PREFERENCE
+# 4. PERMUTATION-BASED BIVARIATE CORRELATIONS WITH BOOTSTRAP CIs
 # =============================================================================
 
-logger.info("\nFeature-preference Spearman correlations:")
+N_PERM = 10000
+N_BOOT = 10000
+RNG = np.random.default_rng(config['RANDOM_SEED'])
 
-feature_cols = [c for c in all_feat.columns
-                if c not in ('stim_id', 'pref_expert', 'pref_novice')]
+logger.info(f"\nBivariate Spearman correlations (permutation p, n_perm={N_PERM}; "
+            f"bootstrap 95% CI, n_boot={N_BOOT}):")
+
+
+def permutation_spearman(x, y, n_perm, rng):
+    """Spearman r with permutation-based two-tailed p-value."""
+    r_obs = stats.spearmanr(x, y).statistic
+    count = 0
+    for _ in range(n_perm):
+        r_perm = stats.spearmanr(rng.permutation(x), y).statistic
+        if abs(r_perm) >= abs(r_obs):
+            count += 1
+    p_perm = (count + 1) / (n_perm + 1)  # +1 for the observed value
+    return r_obs, p_perm
+
+
+def bootstrap_ci_spearman(x, y, n_boot, rng, ci=0.95):
+    """Bootstrap 95% CI for Spearman r."""
+    n = len(x)
+    rs = np.empty(n_boot)
+    for i in range(n_boot):
+        idx = rng.integers(0, n, size=n)
+        rs[i] = stats.spearmanr(x[idx], y[idx]).statistic
+    alpha = (1 - ci) / 2
+    return float(np.nanpercentile(rs, 100 * alpha)), float(np.nanpercentile(rs, 100 * (1 - alpha)))
+
 
 corr_rows = []
 for group in ['expert', 'novice']:
     pref_col = f'pref_{group}'
-    rs = []
-    ps = []
-    names = []
+    rs, ps, names = [], [], []
+    ci_lows, ci_highs = [], []
 
-    for feat in feature_cols:
-        valid = all_feat.dropna(subset=[feat, pref_col])
-        if len(valid) < 5:
+    for fk, _ in FEATURE_ORDER:
+        valid = feat_df.dropna(subset=[fk, pref_col])
+        if len(valid) < 5 or valid[fk].nunique() < 2:
             continue
-        r, p = stats.spearmanr(valid[feat], valid[pref_col])
-        rs.append(r)
-        ps.append(p)
-        names.append(feat)
+        xv = valid[fk].values
+        yv = valid[pref_col].values
 
-    # FDR correction
+        r, p_perm = permutation_spearman(xv, yv, N_PERM, RNG)
+        ci_lo, ci_hi = bootstrap_ci_spearman(xv, yv, N_BOOT, RNG)
+
+        rs.append(r); ps.append(p_perm); names.append(fk)
+        ci_lows.append(ci_lo); ci_highs.append(ci_hi)
+
     reject, p_fdr, _, _ = multipletests(ps, alpha=0.05, method='fdr_bh')
-
-    for feat, r, p, pf, sig in zip(names, rs, ps, p_fdr, reject):
-        corr_rows.append({
-            'group': group, 'feature': feat,
-            'spearman_r': round(r, 4), 'p_value': round(p, 6),
-            'p_fdr': round(pf, 6), 'significant_fdr': bool(sig),
-        })
-        star = " ***" if sig else ""
-        logger.info(f"  {group:7s} | {feat:25s} | r={r:+.3f} | p={p:.4f} | pFDR={pf:.4f}{star}")
+    for fk, r, p, pf, sig, clo, chi in zip(names, rs, ps, p_fdr, reject, ci_lows, ci_highs):
+        corr_rows.append({'group': group, 'feature': fk,
+                          'spearman_r': round(r, 4),
+                          'p_perm': round(p, 6), 'p_fdr': round(pf, 6),
+                          'ci_low': round(clo, 4), 'ci_high': round(chi, 4),
+                          'significant_fdr': bool(sig)})
+        star = " *" if sig else ""
+        logger.info(f"  {group:7s} | {fk:20s} | r={r:+.3f} [{clo:+.3f}, {chi:+.3f}] | "
+                    f"p_perm={p:.4f} | pFDR={pf:.4f}{star}")
 
 corr_df = pd.DataFrame(corr_rows)
-corr_df.to_csv(out_dir / "feature_correlations_full.csv", index=False)
+corr_df.to_csv(out_dir / "feature_correlations.csv", index=False)
 
 # =============================================================================
-# 7. FIGURE: PREFERENCE DRIVERS PANEL
+# 5. PARTIAL CORRELATIONS (permutation p + bootstrap CI)
 # =============================================================================
 
-logger.info("\nGenerating figure panel...")
-apply_nature_rc()
+logger.info(f"\nPartial correlations (permutation p, n_perm={N_PERM}; "
+            f"bootstrap 95% CI, n_boot={N_BOOT}):")
 
-# Select features for plotting (most interpretable)
-plot_features = [
-    ('is_checkmate', 'Checkmate status'),
-    ('piece_count', 'Piece count'),
-    ('total_material', 'Total material'),
-    ('center_density', 'Center density'),
-    ('piece_spread', 'Piece spread'),
-    ('image_entropy', 'Image entropy'),
-    ('edge_density', 'Edge density'),
-    ('luminance_std', 'Contrast (lum. SD)'),
-]
-
-n_feat = len(plot_features)
-fig, axes = plt.subplots(2, n_feat, figsize=(n_feat * 2.2, 7),
-                          gridspec_kw={'hspace': 0.45, 'wspace': 0.35})
-
-expert_color = '#E74C3C'
-novice_color = '#3498DB'
-
-for g_idx, (group, group_color, group_label) in enumerate([
-    ('expert', expert_color, 'Experts'),
-    ('novice', novice_color, 'Novices'),
-]):
+partial_rows = []
+for group in ['expert', 'novice']:
     pref_col = f'pref_{group}'
+    valid = feat_df[FEATURE_KEYS + [pref_col]].dropna()
+    X = valid[FEATURE_KEYS].values
+    y = valid[pref_col].values
+    n = len(y)
 
-    for f_idx, (feat_name, feat_label) in enumerate(plot_features):
-        ax = axes[g_idx, f_idx]
-        valid = all_feat.dropna(subset=[feat_name, pref_col])
+    for i, (fk, fl) in enumerate(FEATURE_ORDER):
+        others = [j for j in range(len(FEATURE_KEYS)) if j != i]
+        X_others = X[:, others]
 
-        # Color by check status
-        cm_mask = valid['is_checkmate'] == 1
-        ax.scatter(valid.loc[cm_mask, feat_name], valid.loc[cm_mask, pref_col],
-                   c='#E74C3C', s=12, alpha=0.6, edgecolors='white', linewidths=0.2,
-                   zorder=3, label='C')
-        ax.scatter(valid.loc[~cm_mask, feat_name], valid.loc[~cm_mask, pref_col],
-                   c='#3498DB', s=12, alpha=0.6, edgecolors='white', linewidths=0.2,
-                   zorder=3, label='NC')
+        # Residualise feature and outcome on all other features
+        res_x = X[:, i] - LinearRegression().fit(X_others, X[:, i]).predict(X_others)
+        res_y = y - LinearRegression().fit(X_others, y).predict(X_others)
 
-        # Regression line
-        r, p = stats.spearmanr(valid[feat_name], valid[pref_col])
-        z = np.polyfit(valid[feat_name], valid[pref_col], 1)
-        x_line = np.linspace(valid[feat_name].min(), valid[feat_name].max(), 50)
-        ax.plot(x_line, np.polyval(z, x_line), '--', color='gray', linewidth=0.6)
+        # Observed partial r
+        r_obs = stats.spearmanr(res_x, res_y).statistic
 
-        # Get FDR p
-        fdr_row = corr_df[(corr_df['group'] == group) & (corr_df['feature'] == feat_name)]
-        p_fdr = fdr_row['p_fdr'].values[0] if len(fdr_row) > 0 else p
-        sig_marker = '*' if p_fdr < 0.05 else ''
+        # Permutation p-value: shuffle residualised feature, recompute
+        count = 0
+        for _ in range(N_PERM):
+            r_perm = stats.spearmanr(RNG.permutation(res_x), res_y).statistic
+            if abs(r_perm) >= abs(r_obs):
+                count += 1
+        p_perm = (count + 1) / (N_PERM + 1)
 
-        ax.set_xlabel(feat_label, fontsize=5.5)
-        if f_idx == 0:
-            ax.set_ylabel(f'{group_label}\nSelection freq.', fontsize=6)
-        ax.set_title(f'r={r:.2f}{sig_marker}', fontsize=6,
-                     color='red' if p_fdr < 0.05 else 'black')
-        ax.tick_params(labelsize=5)
-        ax.axhline(0.5, color='gray', linestyle=':', linewidth=0.3, alpha=0.4)
+        # Bootstrap CI on partial r
+        rs_boot = np.empty(N_BOOT)
+        for b in range(N_BOOT):
+            idx = RNG.integers(0, n, size=n)
+            X_b, y_b = X[idx], y[idx]
+            X_oth_b = X_b[:, others]
+            rx_b = X_b[:, i] - LinearRegression().fit(X_oth_b, X_b[:, i]).predict(X_oth_b)
+            ry_b = y_b - LinearRegression().fit(X_oth_b, y_b).predict(X_oth_b)
+            rs_boot[b] = stats.spearmanr(rx_b, ry_b).statistic
+        ci_lo = float(np.nanpercentile(rs_boot, 2.5))
+        ci_hi = float(np.nanpercentile(rs_boot, 97.5))
 
-        if g_idx == 0 and f_idx == n_feat - 1:
-            ax.legend(fontsize=4, loc='best', framealpha=0.4)
+        partial_rows.append({'group': group, 'feature': fk,
+                             'partial_r': round(r_obs, 4),
+                             'partial_p_perm': round(p_perm, 6),
+                             'ci_low': round(ci_lo, 4),
+                             'ci_high': round(ci_hi, 4)})
 
-# Suptitle
-fig.suptitle('Feature Drivers of Board Preference', fontsize=9, weight='bold', y=0.98)
+partial_df = pd.DataFrame(partial_rows)
 
-panel_path = FIGURES_DIR / 'panels' / 'preference_drivers_panel.pdf'
-fig.savefig(panel_path, dpi=300, bbox_inches='tight')
-fig.savefig(FIGURES_DIR / 'preference_drivers_panel.svg', dpi=300, bbox_inches='tight')
-plt.close(fig)
-logger.info(f"Saved: {panel_path}")
+# FDR within group on permutation p-values
+for group in ['expert', 'novice']:
+    mask = partial_df['group'] == group
+    _, p_fdr, _, _ = multipletests(partial_df.loc[mask, 'partial_p_perm'].values,
+                                    alpha=0.05, method='fdr_bh')
+    partial_df.loc[mask, 'partial_p_fdr'] = p_fdr
+    partial_df.loc[mask, 'significant_fdr'] = p_fdr < 0.05
+
+for _, row in partial_df.iterrows():
+    star = " *" if row.get('significant_fdr', False) else ""
+    ci_str = f"[{row['ci_low']:+.3f}, {row['ci_high']:+.3f}]"
+    logger.info(f"  {row['group']:7s} | {row['feature']:20s} | "
+                f"partial r={row['partial_r']:+.3f} {ci_str} | "
+                f"p_perm={row['partial_p_perm']:.4f} | pFDR={row.get('partial_p_fdr', row['partial_p_perm']):.4f}{star}")
+
+partial_df.to_csv(out_dir / "feature_partial_correlations.csv", index=False)
 
 # =============================================================================
-# 8. SUMMARY
+# 6. VARIANCE PARTITIONING
 # =============================================================================
 
-logger.info("\n" + "="*70)
-logger.info("SUMMARY OF SIGNIFICANT PREFERENCE DRIVERS (FDR < 0.05)")
-logger.info("="*70)
-sig = corr_df[corr_df['significant_fdr']]
-if len(sig) == 0:
-    logger.info("  No features survive FDR correction.")
+logger.info("\nVariance partitioning (hierarchical regression):")
+
+vp_rows = []
+for group in ['expert', 'novice']:
+    pref_col = f'pref_{group}'
+    valid = feat_df[FEATURE_KEYS + [pref_col]].dropna()
+    y = valid[pref_col].values
+
+    cumulative_feats = []
+    prev_r2 = 0.0
+    for block_name, block_feats in VP_BLOCKS.items():
+        cumulative_feats.extend(block_feats)
+        X_block = valid[cumulative_feats].values
+        r2 = LinearRegression().fit(X_block, y).score(X_block, y)
+        delta_r2 = r2 - prev_r2
+        vp_rows.append({'group': group, 'block': block_name,
+                        'cumulative_r2': round(r2, 4),
+                        'delta_r2': round(delta_r2, 4),
+                        'features': ', '.join(block_feats)})
+        logger.info(f"  {group:7s} | + {block_name:25s} | "
+                    f"cumR2={r2:.3f} | deltaR2={delta_r2:.3f}")
+        prev_r2 = r2
+
+vp_df = pd.DataFrame(vp_rows)
+vp_df.to_csv(out_dir / "feature_variance_partitioning.csv", index=False)
+
+# =============================================================================
+# 7. SUMMARY
+# =============================================================================
+
+logger.info("\n" + "=" * 70)
+logger.info("SUMMARY")
+logger.info("=" * 70)
+
+logger.info("\nFDR-significant bivariate:")
+for _, row in corr_df[corr_df['significant_fdr']].sort_values(['group', 'p_fdr']).iterrows():
+    logger.info(f"  {row['group']:7s} | {row['feature']:20s} | r={row['spearman_r']:+.3f}")
+
+logger.info("\nFDR-significant partial:")
+sig_p = partial_df[partial_df.get('significant_fdr', False) == True]
+if len(sig_p) == 0:
+    logger.info("  None survive FDR after partialling.")
 else:
-    for _, row in sig.iterrows():
-        logger.info(f"  {row['group']:7s} | {row['feature']:25s} | r={row['spearman_r']:+.3f} | pFDR={row['p_fdr']:.4f}")
+    for _, row in sig_p.sort_values(['group', 'partial_p_fdr']).iterrows():
+        logger.info(f"  {row['group']:7s} | {row['feature']:20s} | partial r={row['partial_r']:+.3f}")
 
-logger.info("\nTop uncorrected correlations (p < 0.05):")
-nom_sig = corr_df[corr_df['p_value'] < 0.05].sort_values('p_value')
-for _, row in nom_sig.iterrows():
-    logger.info(f"  {row['group']:7s} | {row['feature']:25s} | r={row['spearman_r']:+.3f} | p={row['p_value']:.4f}")
+logger.info("\nVariance partitioning (deltaR2):")
+for _, row in vp_df.iterrows():
+    logger.info(f"  {row['group']:7s} | {row['block']:25s} | deltaR2={row['delta_r2']:.3f}")
 
 log_script_end(logger)
