@@ -222,13 +222,13 @@ def compute_all_zmap_correlations(
 
     This function computes spatial correlations between group comparison maps
     (expert vs novice) and Neurosynth meta-analytic term association maps,
-    estimating confidence intervals via bootstrap resampling and applying FDR
-    correction for multiple comparisons.
+    estimating confidence intervals via bootstrap resampling while treating
+    voxels as independent observations and applying FDR correction for
+    multiple comparisons.
 
     By splitting the comparison map by sign, we can identify which cognitive
     terms are associated with expert-enhanced regions (Z+) versus expert-reduced
-    regions (Z-). Bootstrap resampling provides robust confidence intervals
-    that account for spatial dependencies in the data.
+    regions (Z-).
 
     For each term map, compute:
     - r_pos: correlation between term map and Z+ (expert-enhanced regions)
@@ -380,4 +380,3 @@ def compute_all_zmap_correlations(
         df['sig'] = rej
 
     return df_pos, df_neg, df_diff
-

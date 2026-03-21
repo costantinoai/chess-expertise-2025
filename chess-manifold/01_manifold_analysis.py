@@ -58,15 +58,15 @@ Classification Analysis
 -----------------------
 To assess whether PR profiles distinguish experts from novices, we trained a
 logistic regression classifier on the 22-dimensional PR feature space (one
-feature per ROI). Classification was performed using leave-one-out cross-
-validation (LOOCV) to maximize training data while providing unbiased accuracy
-estimates.
+feature per ROI). Classification was performed using stratified K-fold cross-
+validation with up to 5 folds, limited by the smallest class size, to estimate
+out-of-sample accuracy.
 
 **Permutation test for significance**: To test whether classification accuracy
 exceeded chance, we performed a permutation test with 10,000 iterations. In
-each iteration, group labels were randomly shuffled, and LOOCV accuracy was
-recomputed. The p-value was computed as the proportion of permuted accuracies
-exceeding the observed accuracy.
+each iteration, group labels were randomly shuffled, the same cross-validation
+procedure was recomputed, and the p-value was computed as the proportion of
+permuted accuracies exceeding the observed accuracy.
 
 Dimensionality Reduction and Visualization
 -------------------------------------------
@@ -289,10 +289,11 @@ xx, yy, Z = compute_2d_decision_boundary(
 # =============================================================================
 
 # Test whether classification accuracy exceeds chance using permutation tests.
-# We perform leave-one-out cross-validation (LOOCV) to estimate true accuracy,
-# then shuffle group labels 10,000 times to build a null distribution. P-value =
-# proportion of permuted accuracies ≥ observed accuracy. This tests whether
-# PR profiles genuinely distinguish expertise or if accuracy is spurious.
+# We estimate accuracy with the same stratified K-fold procedure used for the
+# main classifier, then shuffle group labels 10,000 times to build a null
+# distribution. P-value = proportion of permuted accuracies ≥ observed
+# accuracy. This tests whether PR profiles genuinely distinguish expertise or
+# if accuracy is spurious.
 #
 # Test in two spaces:
 # 1. Full 22-dimensional ROI space (all PR features)

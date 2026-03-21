@@ -68,8 +68,8 @@ strongly associated with regions where experts show higher activations.
 
 Bootstrap Statistical Inference
 --------------------------------
-To provide robust confidence intervals and p-values accounting for spatial
-dependencies in brain imaging data, we employed bootstrap resampling:
+To quantify uncertainty, we employed bootstrap resampling while treating
+voxels as independent observations:
 
 1. **Individual correlations** (r_pos, r_neg):
    - Method: Percentile bootstrap using Pingouin implementation
@@ -100,11 +100,6 @@ dependencies in brain imaging data, we employed bootstrap resampling:
    - Applied separately to positive, negative, and difference correlations
    - Significance level: α = 0.05 (5% FDR)
    - Implementation: common.stats_utils.apply_fdr_correction()
-
-The bootstrap approach addresses spatial autocorrelation by resampling voxels
-as units, providing empirical confidence intervals that reflect sampling
-variability without assuming independence. The percentile method is
-distribution-free and robust to non-normality.
 
 Statistical Assumptions and Limitations
 ----------------------------------------

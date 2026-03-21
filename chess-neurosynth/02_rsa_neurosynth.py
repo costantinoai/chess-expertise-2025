@@ -97,10 +97,9 @@ dependencies in brain imaging data, we employed bootstrap resampling:
    - Significance level: α = 0.05 (5% FDR)
    - Implementation: common.stats_utils.apply_fdr_correction()
 
-The bootstrap approach addresses spatial autocorrelation by resampling voxels
-as units, providing empirical confidence intervals that reflect sampling
-variability without assuming independence. The percentile method is
-distribution-free and robust to non-normality.
+Bootstrap resampling was performed on voxel values while treating voxels as
+independent observations. The percentile method is distribution-free and robust
+to non-normality.
 
 Statistical Assumptions and Limitations
 ----------------------------------------
