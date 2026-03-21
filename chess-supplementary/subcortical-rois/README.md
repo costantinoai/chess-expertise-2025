@@ -6,7 +6,9 @@ This supplementary analysis extends the main cortical multivariate pattern analy
 
 This analysis is **exploratory and supplementary**. All existing cortical analyses remain untouched. The analysis replicates the **exact same MVPA pipeline** (both SVM decoding and RSA correlations) used for cortical ROIs, substituting only the atlas. The goal is to test whether the expertise-related effects observed in cortex extend to subcortical structures associated with memory, navigation, and procedural learning.
 
-## Motivation
+## Methods
+
+### Rationale
 
 The Neurosynth meta-analytic correlations (Fig 7) revealed that expert representations correlate with memory retrieval and navigation networks, which prominently include subcortical structures (hippocampus, caudate, thalamus). Recent work has also highlighted subcortical involvement in task learning and practice:
 
@@ -15,7 +17,14 @@ The Neurosynth meta-analytic correlations (Fig 7) revealed that expert represent
 
 These findings motivate testing whether chess expertise modulates neural representations in subcortical regions that support memory encoding, habit formation, and cortico-subcortical integration.
 
-## Atlas: Cole-Anticevic Brain-wide Network Partition (CAB-NP)
+### Data Sources
+
+**Participants**: N=40 (20 experts, 20 novices)
+**Task**: 1-back preference task during fMRI scanning
+**Neural data**: Beta estimates from unsmoothed GLM (SPM.mat), identical to cortical pipeline
+**Atlas**: Cole-Anticevic Brain-wide Network Partition (CAB-NP), subcortical parcels only
+
+### Atlas: Cole-Anticevic Brain-wide Network Partition (CAB-NP)
 
 **Reference**: Ji, J. L., Spronk, M., Kulkarni, K., Repovs, G., Anticevic, A., & Cole, M. W. (2019). Mapping the human brain's cortical-subcortical functional network organization. NeuroImage, 185, 35-57.
 
@@ -78,11 +87,11 @@ rois/cab-np/
   region_info.tsv
 ```
 
-## Pipeline: Exact Replication of Cortical MVPA
+### Pipeline: Exact Replication of Cortical MVPA
 
 The analysis replicates the **exact same MVPA pipeline** used for cortical ROIs (both SVM decoding and RSA correlations), with the CAB-NP subcortical atlas in place of the Glasser-22 atlas. Every statistical procedure, parameter, and threshold is identical.
 
-### Step 1: Subject-Level SVM Decoding and RSA (MATLAB / CoSMoMVPA)
+### Subject-Level SVM Decoding and RSA (MATLAB / CoSMoMVPA)
 
 **Script**: subcortical_rsa.m (mirrors chess-mvpa/01_roi_mvpa_main.m)
 
@@ -114,7 +123,7 @@ BIDS/derivatives/mvpa-rsa-subcortical/sub-XX/
 
 Each TSV has columns: target, then one column per subcortical ROI name. Rows: checkmate, strategy, visual_similarity. Values: SVM accuracy (0-1) or Spearman correlation (r).
 
-### Step 2: Group-Level RSA Statistics (Python)
+### Group-Level RSA Statistics (Python)
 
 **Script**: 02_subcortical_group_rsa.py (mirrors chess-mvpa/02_mvpa_group_rsa.py)
 
@@ -136,13 +145,13 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 
 5. **Descriptive statistics**: Group means and 95% CIs for experts and novices per ROI.
 
-### Step 3: Group-Level Decoding Statistics (Python)
+### Group-Level Decoding Statistics (Python)
 
 **Script**: 03_subcortical_group_decoding.py (mirrors chess-mvpa/03_mvpa_group_decoding.py)
 
 **Procedure** (identical to cortical):
 
-1. Same data loading and group assignment as Step 2, but reading from mvpa-decoding-subcortical/.
+1. Same data loading and group assignment as the RSA step, but reading from mvpa-decoding-subcortical/.
 
 2. **Chance-level determination**: Target-specific chance levels derived from stimulus design via derive_target_chance_from_stimuli():
    - checkmate: chance = 0.5 (binary: check vs non-check)
@@ -153,77 +162,7 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 
 4. **Output**: Same CSV format as cortical. Results saved into the unified subcortical_group_stats.pkl under the "svm" key.
 
-### Step 4: Figures (Python)
-
-**Script 91**: 91_plot_subcortical_rsa.py (mirrors chess-mvpa/92_plot_mvpa_rsa.py)
-- Three-panel bar plot (Visual Similarity, Strategy, Checkmate RSA)
-- Uses centralized PLOT_YLIMITS['rsa_subcortical'] = (-0.03, 0.06) for y-axis
-- Uses PLOT_PARAMS['ylabel_correlation_r'] for y-label
-- Bars colored by ROI anatomical group; labels grayed for non-significant ROIs
-- Expert vs Novice grouped bars with 95% CI error bars
-- FDR-corrected significance stars from between-group Welch t-tests
-- Figure size: 11.43 x 16.00 cm (matches cortical RSA panel)
-- No pial surface maps (not applicable to subcortical structures)
-
-**Script 93**: 93_plot_subcortical_decoding.py (mirrors chess-mvpa/93_plot_mvpa_decoding.py)
-- Six-panel figure: SVM decoding (left column) + RSA correlations (right column)
-- SVM panels: chance-subtracted accuracy, PLOT_YLIMITS['decoding_subcortical'] = (-0.03, 0.06)
-- RSA panels: raw Spearman correlation, PLOT_YLIMITS['rsa_subcortical'] = (-0.03, 0.06)
-- Figure size: 18.29 x 13.50 cm (matches cortical decoding panel)
-- No RDM visualization panels (model RDMs are identical to cortical)
-
-**Script 92**: 92_plot_atlas_on_mni.py (supplementary atlas visualization)
-- Axial slice montages of CAB-NP subcortical atlas overlaid on MNI152 template
-- Glasser cortical atlas visualization for comparison
-- Combined cortical+subcortical overlay
-- Glass brain views via nilearn
-
-## Existing Cortical Pipeline Reference
-
-The cortical pipeline that this analysis replicates:
-
-```
-chess-mvpa/
-  01_roi_mvpa_main.m           # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
-  02_mvpa_group_rsa.py         # Group-level RSA statistics (Python)
-  03_mvpa_group_decoding.py    # Group-level decoding statistics (Python)
-  92_plot_mvpa_rsa.py          # RSA bar plots + pial surfaces
-  93_plot_mvpa_decoding.py     # SVM + RSA + RDM combined panel
-```
-
-## Output Structure
-
-```
-chess-supplementary/subcortical-rois/
-  README.md                                # This file
-  00_prepare_atlas.py                      # Atlas download, extraction, bilateral merge, resample
-  subcortical_rsa.m                        # Subject-level SVM + RSA (MATLAB)
-  02_subcortical_group_rsa.py              # Group-level RSA statistics
-  03_subcortical_group_decoding.py         # Group-level decoding statistics
-  91_plot_subcortical_rsa.py               # RSA bar plots
-  92_plot_atlas_on_mni.py                  # Atlas visualization on MNI anatomy
-  93_plot_subcortical_decoding.py          # SVM + RSA combined panel
-  results/
-    subcortical_atlas_prep/                # Atlas preparation logs
-    subcortical_rois/
-      analysis.log
-      subcortical_group_stats.pkl          # Unified results (rsa_corr + svm blocks)
-      ttest_rsa_corr_*.csv                 # RSA group statistics (9 files)
-      ttest_svm_*.csv                      # SVM group statistics (9 files)
-      figures/
-        subcortical_rsa__RSA_*.svg         # Individual RSA bar axes
-        subcortical_svm__SVM_*.svg         # Individual SVM bar axes
-        subcortical_svm__RSA_*.svg         # Individual RSA bar axes (decoding panel)
-        atlas_subcortical_axial.pdf        # CAB-NP atlas on MNI
-        atlas_cortical_axial.pdf           # Glasser atlas on MNI
-        atlas_combined_axial.pdf           # Both atlases combined
-        atlas_glass_brain.pdf              # Glass brain views
-        panels/
-          subcortical_rsa_panel.pdf
-          subcortical_svm_panel.pdf
-```
-
-## Statistical Assumptions and Limitations
+### Statistical Assumptions and Limitations
 
 - **Normality**: t-tests assume normally distributed correlation coefficients / accuracies within each group and ROI. With n=20 per group, the central limit theorem provides robustness to moderate deviations.
 - **Independence**: Subject-level values are assumed independent across participants.
@@ -233,7 +172,93 @@ chess-supplementary/subcortical-rois/
 - **Exploratory framing**: This analysis tests 9 ROIs (fewer than the 22 cortical ROIs), providing slightly more statistical power per ROI but addressing a broader anatomical scope with fewer targeted hypotheses.
 - **ROI size variability**: Subcortical ROIs vary substantially in size (216 voxels for NAcc to 17,846 for Cerebellum), which may affect signal-to-noise ratio. ROIs with fewer than 6 usable voxels after preprocessing are excluded.
 
-## Results
+## Dependencies
+
+- Python 3.9+ with packages: numpy, pandas, scipy, matplotlib, nibabel, nilearn, statsmodels
+- MATLAB with CoSMoMVPA and LIBSVM (for subject-level SVM decoding and RSA)
+- Common utilities from `common/` (bids_utils, neuro_utils, report_utils, plotting, logging_utils, script_utils)
+- Shared modules from `chess-mvpa/modules/` (mvpa_io, mvpa_group, mvpa_plot_utils)
+
+## Data Requirements
+
+### Input Files
+
+- **GLM beta estimates**: `BIDS_ROOT/derivatives/spm-glm/sub-XX/SPM.mat` and associated NIfTI beta images
+- **Cortical atlas** (for overlap removal): `rois/glasser/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser_dseg.nii.gz`
+- **CAB-NP atlas source**: https://github.com/ColeLab/ColeAnticevicNetPartition (cloned by 00_prepare_atlas.py)
+- **Participant metadata**: `BIDS_ROOT/participants.tsv`
+- **Stimulus metadata**: `BIDS_ROOT/stimuli.tsv`
+
+### Data Location
+
+Configure the external data root in `common/constants.py`:
+
+```python
+# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
+_EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
+```
+
+## Running the Analysis
+
+### Step 0: Prepare the subcortical atlas
+
+```bash
+cd chess-supplementary/subcortical-rois
+python 00_prepare_atlas.py
+```
+
+Downloads the CAB-NP atlas, extracts subcortical parcels, merges into 9 bilateral ROIs, resamples to functional space, removes cortical overlap, and saves the NIfTI atlas with region metadata.
+
+### Step 1: Run subject-level SVM decoding and RSA (MATLAB)
+
+```matlab
+% In MATLAB with CoSMoMVPA on path
+subcortical_rsa
+```
+
+Runs the identical MVPA pipeline (SVM decoding + RSA correlations) for each subject using the CAB-NP subcortical atlas. Outputs per-subject TSV files in BIDS derivatives format.
+
+### Step 2: Run group-level RSA statistics
+
+```bash
+python 02_subcortical_group_rsa.py
+```
+
+Computes group-level t-tests (experts vs chance, novices vs chance, experts vs novices) with FDR correction across 9 subcortical ROIs for all three RSA model targets.
+
+### Step 3: Run group-level decoding statistics
+
+```bash
+python 03_subcortical_group_decoding.py
+```
+
+Computes group-level decoding statistics with the same three-test battery and FDR correction as the RSA step.
+
+### Step 4: Generate RSA bar plot figures
+
+```bash
+python 91_plot_subcortical_rsa.py
+```
+
+Produces three-panel RSA bar plot (Visual Similarity, Strategy, Checkmate) with expert/novice grouped bars, 95% CI error bars, and FDR-corrected significance stars.
+
+### Step 5: Generate atlas visualization
+
+```bash
+python 92_plot_atlas_on_mni.py
+```
+
+Produces axial slice montages of the CAB-NP subcortical atlas overlaid on MNI152 template, plus glass brain views.
+
+### Step 6: Generate combined SVM + RSA panel
+
+```bash
+python 93_plot_subcortical_decoding.py
+```
+
+Produces six-panel figure: SVM decoding (left column) and RSA correlations (right column), with chance-subtracted accuracy and raw Spearman correlation respectively.
+
+## Key Results
 
 ### RSA Correlations
 
@@ -251,7 +276,7 @@ No subcortical ROI showed significant above-chance decoding or between-group dec
 
 The null results are informative and constrain the interpretation of the main cortical findings. The expertise-related representational shift from visual to strategic encoding appears to be **predominantly cortical** in this task paradigm. Several factors may contribute to the subcortical null:
 
-1. **Effect size**: Subcortical correlations were an order of magnitude smaller than cortical ones, suggesting that subcortical contributions to chess position encoding — if present — are below the sensitivity of ROI-based RSA with n=20 per group.
+1. **Effect size**: Subcortical correlations were an order of magnitude smaller than cortical ones, suggesting that subcortical contributions to chess position encoding -- if present -- are below the sensitivity of ROI-based RSA with n=20 per group.
 2. **Signal quality**: Subcortical fMRI signal is inherently noisier due to physiological noise, partial volume effects, and susceptibility artefacts, particularly in MTL and brainstem structures.
 3. **Task design**: The 1-back preference task may not optimally engage subcortical memory and learning systems, which might contribute more during active problem-solving or training.
 4. **ROI granularity**: Merging 29 hippocampal parcels into a single bilateral ROI may average over functionally distinct subregions (e.g., anterior vs posterior hippocampus) that show opposing effects.
@@ -262,13 +287,57 @@ These results do not rule out subcortical involvement in chess expertise more br
 
 Subcortical effect sizes are substantially smaller than cortical ones. To make the data readable, subcortical panels use a tighter y-axis range ((-0.03, 0.06)) compared to cortical panels ((-0.06, 0.25)). This range is consistent across both the RSA and SVM subcortical panels.
 
-## Manuscript Integration
+### Existing Cortical Pipeline Reference
+
+The cortical pipeline that this analysis replicates:
+
+```
+chess-mvpa/
+  01_roi_mvpa_main.m           # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
+  02_mvpa_group_rsa.py         # Group-level RSA statistics (Python)
+  03_mvpa_group_decoding.py    # Group-level decoding statistics (Python)
+  92_plot_mvpa_rsa.py          # RSA bar plots + pial surfaces
+  93_plot_mvpa_decoding.py     # SVM + RSA + RDM combined panel
+```
+
+### Manuscript Integration
 
 Results are reported in a supplementary section ("Subcortical Representational and Decoding Analysis") with:
 - Bar plot panels for RSA (91_plot) and SVM+RSA combined (93_plot), matching the style of the main cortical MVPA figures
 - Atlas visualization showing the subcortical ROI locations on MNI anatomy
 - A brief mention in the main text Discussion noting that expertise effects are predominantly cortical
 - A note in the rebuttal letter for Reviewer #2, Major Comment 4, explaining that the CAB-NP subcortical atlas was used to test subcortical involvement, with null results constraining interpretation
+
+## File Structure
+
+```
+chess-supplementary/subcortical-rois/
+├── 00_prepare_atlas.py                # Atlas download, extraction, bilateral merge, resample
+├── subcortical_rsa.m                  # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
+├── 02_subcortical_group_rsa.py        # Group-level RSA statistics
+├── 03_subcortical_group_decoding.py   # Group-level decoding statistics
+├── 91_plot_subcortical_rsa.py         # RSA bar plots
+├── 92_plot_atlas_on_mni.py            # Atlas visualization on MNI anatomy
+├── 93_plot_subcortical_decoding.py    # SVM + RSA combined panel
+├── README.md
+└── results/
+    ├── subcortical_atlas_prep/        # Atlas preparation logs
+    └── subcortical_rois/
+        ├── subcortical_group_stats.pkl
+        ├── ttest_rsa_corr_*.csv       # RSA group statistics (9 files)
+        ├── ttest_svm_*.csv            # SVM group statistics (9 files)
+        └── figures/
+            ├── subcortical_rsa__RSA_*.svg
+            ├── subcortical_svm__SVM_*.svg
+            ├── subcortical_svm__RSA_*.svg
+            ├── atlas_subcortical_axial.pdf
+            ├── atlas_cortical_axial.pdf
+            ├── atlas_combined_axial.pdf
+            ├── atlas_glass_brain.pdf
+            └── panels/
+                ├── subcortical_rsa_panel.pdf
+                └── subcortical_svm_panel.pdf
+```
 
 ## References
 

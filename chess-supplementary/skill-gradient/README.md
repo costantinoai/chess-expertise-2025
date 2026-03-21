@@ -13,14 +13,28 @@ are used:
    on the 20 checkmate boards used in fMRI, correlated with neural metrics
    across all participants (n=38) and within experts only.
 
-## Motivation
+## Methods
+
+### Rationale
 
 A reviewer requested evidence that neural differences reflect a continuous
 skill gradient, not just an artefact of the binary group partition. If neural
 representations truly track chess expertise, they should correlate with
 continuous skill measures within and across groups.
 
-## Methods
+### Data Sources
+
+**Participants**: N=40 (20 experts, 20 novices)
+**Skill proxies**:
+- Elo rating from BIDS `participants.tsv` (experts only, n=20)
+- Familiarisation accuracy from pre-scan checkmate detection task (all participants, n=38)
+
+**Neural measures**:
+- RSA model fit (checkmate, strategy) from BIDS `derivatives/mvpa-rsa/`
+- SVM decoding accuracy (checkmate, strategy) from BIDS `derivatives/mvpa-decoding/`
+- Participation ratio (PR) from `chess-manifold/results/manifold/pr_results.pkl`
+
+### Correlation Procedure
 
 For each skill proxy, Pearson and Spearman correlations are computed between
 per-subject skill scores and per-subject neural measures (mean across 22
@@ -33,22 +47,65 @@ correlations include between-group variance, so strong effects may partly
 reflect the group split. Expert-only correlations isolate the within-group
 skill gradient.
 
-### Elo correlations (experts only)
+### Elo Correlations (Experts Only)
 
 - Elo x Participation Ratio (PR): 22 ROIs + mean
 - Elo x RSA model fit (checkmate, strategy): 22 ROIs + mean per model
 - Elo x Decoding accuracy (checkmate, strategy): 22 ROIs + mean per target
 
-### Familiarisation correlations (all participants + experts only)
+### Familiarisation Correlations (All Participants + Experts Only)
 
 - Move accuracy x PR, RSA (checkmate, strategy, visual similarity),
   Decoding (checkmate, strategy)
 - Tested in both the full sample (n=38) and within experts (n=19)
 - FDR correction applied across neural metrics within each sample
 
+## Dependencies
+
+- Python 3.9+ with packages: numpy, pandas, scipy, matplotlib
+- Common utilities from `common/` (stats_utils, logging_utils, script_utils, plotting)
+
+## Data Requirements
+
+### Input Files
+
+- **Participant metadata**: `BIDS_ROOT/participants.tsv` (Elo in `rating` column)
+- **Participation ratio**: `chess-manifold/results/manifold/pr_results.pkl`
+- **RSA per-subject results**: `BIDS_ROOT/derivatives/mvpa-rsa/sub-XX/*.tsv`
+- **Decoding per-subject results**: `BIDS_ROOT/derivatives/mvpa-decoding/sub-XX/*.tsv`
+- **Familiarisation accuracy**: `chess-supplementary/task-engagement/results/familiarisation_accuracy/familiarisation_subject_accuracy.csv`
+
+### Data Location
+
+Configure the external data root in `common/constants.py`:
+
+```python
+# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
+_EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
+```
+
+## Running the Analysis
+
+### Step 1: Run skill gradient correlations
+
+```bash
+cd chess-supplementary/skill-gradient
+python 01_skill_gradient.py
+```
+
+Computes Elo and familiarisation correlations with all neural metrics (RSA, decoding, PR) at the mean and per-ROI level, with FDR correction.
+
+### Step 2: Generate skill gradient figures
+
+```bash
+python 91_plot_skill_gradient.py
+```
+
+Produces the combined 3x3 panel: Elo correlations (row 1, experts only) and familiarisation correlations (rows 2--3, all participants and experts only).
+
 ## Key Results
 
-### Elo correlations
+### Elo Correlations
 
 No ROI-level correlations survive FDR correction for any measure. The
 strongest uncorrected effects:
@@ -59,7 +116,7 @@ strongest uncorrected effects:
 
 PR and decoding show no reliable Elo gradient (all p>0.25 at the mean level).
 
-### Familiarisation correlations
+### Familiarisation Correlations
 
 **All participants (n=38)**: Several strong correlations with move accuracy,
 reflecting both within- and between-group variance:
@@ -73,39 +130,24 @@ reflecting both within- and between-group variance:
 **Experts only (n=19)**: No correlation reaches significance, consistent with
 range restriction within the expert group.
 
-## Data
+## File Structure
 
-- **Participants**: BIDS `participants.tsv` (Elo in `rating` column)
-- **PR**: `chess-manifold/results/manifold/pr_results.pkl`
-- **RSA**: BIDS `derivatives/mvpa-rsa/` per-subject TSVs
-- **Decoding**: BIDS `derivatives/mvpa-decoding/` per-subject TSVs
-- **Familiarisation**: `chess-supplementary/task-engagement/results/familiarisation_accuracy/familiarisation_subject_accuracy.csv`
-
-## Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `01_skill_gradient.py` | Main analysis: Elo and familiarisation correlations with neural metrics |
-| `91_plot_skill_gradient.py` | Combined 3x3 figure: Elo (row 1) + familiarisation (rows 2-3) |
-
-## Output Files
-
-### Results (in `results/skill_gradient/`)
-
-| File | Contents |
-|------|----------|
-| `elo_pr_correlations.csv` | Elo x PR per ROI + mean |
-| `elo_rsa_correlations.csv` | Elo x RSA (checkmate, strategy) per ROI + mean |
-| `elo_decoding_correlations.csv` | Elo x decoding per ROI + mean |
-| `elo_correlations_all.csv` | Combined Elo results (all measures) |
-| `familiarisation_subject_enriched.csv` | Per-subject familiarisation accuracy enriched with neural metrics |
-| `familiarisation_neural_correlations.csv` | Familiarisation accuracy x neural metric correlations |
-
-### Figures (in `results/skill_gradient/figures/`)
-
-| File | Contents |
-|------|----------|
-| `skill_gradient_panel.pdf` | Combined 3x3 panel: Elo correlations (row 1, experts) + familiarisation correlations (rows 2-3, all participants) |
-| `elo_correlations_panel.pdf` | Elo-only correlation panel |
-| `familiarisation_correlations_panel.pdf` | Familiarisation correlations (all participants) |
-| `familiarisation_correlations_experts_panel.pdf` | Familiarisation correlations (experts only) |
+```
+chess-supplementary/skill-gradient/
+├── 01_skill_gradient.py               # Main analysis: Elo and familiarisation correlations with neural metrics
+├── 91_plot_skill_gradient.py          # Combined 3x3 figure: Elo (row 1) + familiarisation (rows 2-3)
+├── README.md
+└── results/
+    └── skill_gradient/
+        ├── elo_pr_correlations.csv
+        ├── elo_rsa_correlations.csv
+        ├── elo_decoding_correlations.csv
+        ├── elo_correlations_all.csv
+        ├── familiarisation_subject_enriched.csv
+        ├── familiarisation_neural_correlations.csv
+        └── figures/
+            ├── skill_gradient_panel.pdf
+            ├── elo_correlations_panel.pdf
+            ├── familiarisation_correlations_panel.pdf
+            └── familiarisation_correlations_experts_panel.pdf
+```
