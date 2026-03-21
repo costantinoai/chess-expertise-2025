@@ -4,8 +4,8 @@ Generate Eyetracking Decoding Supplementary Figure
 
 Creates a publication-ready two-panel figure showing expert vs novice decoding
 performance from eyetracking data. Compares two feature representations:
-2D gaze coordinates (x, y) and displacement from center. Uses stratified
-cross-validation fold accuracies to visualize decoding reliability.
+2D gaze coordinates (x, y) and displacement from center. Uses subject-level
+out-of-fold accuracies to visualize participant-wise decoding performance.
 
 Figure Produced
 ---------------
@@ -15,7 +15,7 @@ Eyetracking Decoding Panel (2 panels side-by-side)
 - Individual axes saved to figures/: eyetracking_decoding_*.svg/pdf
 
 Panel A: 2D Gaze (x, y) Features
-- Shows cross-validation fold accuracies as jittered dots
+- Shows subject-level out-of-fold accuracies as jittered dots
 - Mean accuracy displayed as horizontal orange line
 - 95% CI shown as shaded band
 - Chance level (0.5) shown as gray dashed line
@@ -25,8 +25,8 @@ Panel B: Displacement Features
 - Displacement = Euclidean distance from board center
 
 Visual Elements (both panels):
-- Blue dots: Individual fold accuracies (with horizontal jitter for visibility)
-- Orange line: Mean accuracy across folds
+- Blue dots: Individual subject accuracies (with horizontal jitter for visibility)
+- Orange line: Mean subject-level accuracy
 - Orange band: 95% confidence interval
 - Gray dashed line: Chance level (0.5 for binary classification)
 - Y-axis: Accuracy (0 to 1.0)
@@ -35,9 +35,9 @@ Visual Elements (both panels):
 Inputs
 ------
 - results_xy.json (from eyetracking decoding analysis)
-  Contains: fold_accuracies, mean_accuracy, ci_low, ci_high, n_folds
+  Contains: subject_accuracies, mean_accuracy, ci_low, ci_high, n_subjects
 - results_displacement.json (from eyetracking decoding analysis)
-  Contains: fold_accuracies, mean_accuracy, ci_low, ci_high, n_folds
+  Contains: subject_accuracies, mean_accuracy, ci_low, ci_high, n_subjects
 
 Dependencies
 ------------
@@ -87,7 +87,7 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 # Configuration and Results Loading
 # =============================================================================
 # Find latest eyetracking decoding results directory and load JSON outputs
-# containing cross-validation fold accuracies for both feature sets
+# containing subject-level out-of-fold accuracies for both feature sets
 
 apply_nature_rc()  # Apply Nature journal style to all figures
 
@@ -102,25 +102,28 @@ RESULTS_DIR = results_dir
 FIGURES_DIR = dirs['figures']
 
 # Load decoding results for both feature representations
-# Each JSON contains: fold_accuracies (list), mean_accuracy, ci_low, ci_high, n_folds
+# Each JSON contains: subject_accuracies (list), mean_accuracy, ci_low, ci_high, n_subjects
 with open(RESULTS_DIR / 'results_xy.json', 'r') as f:
     results_xy = json.load(f)       # 2D gaze coordinates (x, y)
 with open(RESULTS_DIR / 'results_displacement.json', 'r') as f:
     results_disp = json.load(f)     # Displacement from center
 
-logger.info(f"Loaded results: xy (n_folds={results_xy['n_folds']}), displacement (n_folds={results_disp['n_folds']})")
+logger.info(
+    f"Loaded results: xy (n_subjects={results_xy['n_subjects']}), "
+    f"displacement (n_subjects={results_disp['n_subjects']})"
+)
 
 # Extract xy features data
-# - fold_accuracies: accuracy for each cross-validation fold
-# - mean_accuracy: average accuracy across folds
+# - subject_accuracies: out-of-fold accuracy for each participant
+# - mean_accuracy: average subject-level accuracy
 # - ci_low, ci_high: 95% confidence interval bounds
-xy_acc = np.array(results_xy['fold_accuracies'])
+xy_acc = np.array(results_xy['subject_accuracies'])
 xy_mean = results_xy['mean_accuracy']
 xy_ci_low = results_xy['ci_low']
 xy_ci_high = results_xy['ci_high']
 
 # Extract displacement features data (same structure as xy)
-disp_acc = np.array(results_disp['fold_accuracies'])
+disp_acc = np.array(results_disp['subject_accuracies'])
 disp_mean = results_disp['mean_accuracy']
 disp_ci_low = results_disp['ci_low']
 disp_ci_high = results_disp['ci_high']
@@ -130,7 +133,7 @@ disp_ci_high = results_disp['ci_high']
 # =============================================================================
 # Panel A: 2D gaze (x, y) features
 # Panel B: Displacement from center features
-# Both panels show fold accuracies, mean, 95% CI, and chance level
+# Both panels show subject accuracies, mean, 95% CI, and chance level
 
 fig, axes = plt.subplots(1, 2, figsize=figure_size(columns=2, height_mm=100), sharey=True)
 
@@ -141,7 +144,7 @@ fig, axes = plt.subplots(1, 2, figsize=figure_size(columns=2, height_mm=100), sh
 # Jittered strip plot allows visualization of all fold accuracies
 ax = axes[0]
 
-# Plot individual fold accuracies as jittered dots
+# Plot individual subject accuracies as jittered dots
 # Jitter is horizontal only (vertical position = actual accuracy)
 x_jitter = np.random.default_rng(seed=42).normal(0, 0.02, size=len(xy_acc))
 ax.scatter(
@@ -150,16 +153,16 @@ ax.scatter(
     s=PLOT_PARAMS['marker_size'],       # Point size from central settings
     color=COLORS_WONG['blue'],     # Blue color from central palette
     zorder=3,                      # Draw on top of lines/bands
-    label='Fold accuracies'
+    label='Subject accuracies'
 )
 
-# Plot mean accuracy as horizontal line
+# Plot mean subject accuracy as horizontal line
 ax.axhline(
     xy_mean,
     color=COLORS_WONG['orange'],   # Orange color from central palette
     linestyle='-',                 # Solid line
     linewidth=PLOT_PARAMS['plot_linewidth'],
-    label='Mean accuracy',
+    label='Mean subject accuracy',
     zorder=2                       # Behind dots, in front of CI band
 )
 
@@ -196,7 +199,7 @@ ax.legend(loc='lower right', frameon=False, fontsize=PLOT_PARAMS['font_size_lege
 # Same visualization format as Panel A for easy comparison
 ax = axes[1]
 
-# Plot individual fold accuracies as jittered dots
+# Plot individual subject accuracies as jittered dots
 x_jitter = np.random.default_rng(seed=42).normal(0, 0.02, size=len(disp_acc))
 ax.scatter(
     x_jitter, disp_acc,
@@ -204,16 +207,16 @@ ax.scatter(
     s=PLOT_PARAMS['marker_size'],       # Point size from central settings
     color=COLORS_WONG['blue'],     # Blue (same as Panel A)
     zorder=3,
-    label='Fold accuracies'
+    label='Subject accuracies'
 )
 
-# Plot mean accuracy as horizontal line
+# Plot mean subject accuracy as horizontal line
 ax.axhline(
     disp_mean,
     color=COLORS_WONG['orange'],   # Orange (same as Panel A)
     linestyle='-',
     linewidth=PLOT_PARAMS['plot_linewidth'],
-    label='Mean accuracy',
+    label='Mean subject accuracy',
     zorder=2
 )
 

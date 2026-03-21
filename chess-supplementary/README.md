@@ -45,9 +45,9 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 **Key Question**: Do experts and novices have different visual strategies when viewing chess boards?
 
 **Method**:
-- Features: Gaze coordinates (x, y), displacement, velocity
-- Classifier: Linear SVM with stratified group k-fold cross-validation (k=20)
-- Permutation testing for significance (10,000 iterations)
+- Features: Gaze coordinates (x, y) and displacement from screen center
+- Classifier: Linear SVM with stratified group k-fold cross-validation (k=20, grouped by subject)
+- Inference: One-sample t-test on subject-level out-of-fold accuracies vs 0.5; pooled run accuracy reported descriptively
 
 **Key Finding**: Gaze patterns do not discriminate experts from novices.
 
@@ -193,4 +193,3 @@ To run all supplementary analyses together, use the top-level pipeline (suppleme
 # From repository root
 ./run_all_analyses.sh --levels analysis,tables,figures --sequential
 ```
-

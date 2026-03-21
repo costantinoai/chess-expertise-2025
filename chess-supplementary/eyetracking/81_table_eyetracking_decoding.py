@@ -12,32 +12,32 @@ Summary tables were generated from eyetracking-based expertise classification
 results. Using a support vector machine (SVM) classifier with linear kernel and
 L2 regularization, we trained binary classifiers to discriminate expert from
 novice chess players based on eye-tracking features extracted during the chess
-evaluation task. Classification was performed using leave-one-subject-out
-cross-validation (LOSO-CV) to ensure independence between training and test sets.
+evaluation task. Classification was performed using stratified group k-fold
+cross-validation (k=20, grouped by subject) so that all runs from a held-out
+participant remained out of sample.
 
 Two feature sets were evaluated:
-1. **Displacement features**: Temporal dynamics of eye movements (velocity,
-   acceleration, displacement magnitude)
+1. **Displacement features**: Distance from screen center at each timepoint
 2. **XY position features**: Spatial patterns of gaze locations on the board
 
 For each feature set, we report:
 
-1. **Accuracy (CV mean, t-test)**: Mean classification accuracy across LOSO-CV
-   folds with 95% CI (t distribution). Statistical significance assessed via a
-   one-sample t-test vs chance level (0.5).
+1. **Accuracy (subject mean, t-test)**: Mean subject-level out-of-fold accuracy
+   with 95% CI (t distribution). Statistical significance assessed via a
+   one-sample t-test vs chance level (0.5) across subjects.
 
-2. **Accuracy (pooled, binomial)**: Accuracy computed by pooling all out-of-fold
-   predictions; statistical significance assessed via exact binomial test vs p0=0.5.
-   95% CI reported using Wilson method.
+2. **Accuracy (pooled runs, descriptive)**: Accuracy computed by pooling all
+   out-of-fold run predictions. Because runs are nested within subjects, this
+   quantity is reported descriptively only. A Wilson 95% CI is provided.
 
-2. **Balanced accuracy**: Arithmetic mean of sensitivity (true positive rate)
+3. **Balanced accuracy**: Arithmetic mean of sensitivity (true positive rate)
    and specificity (true negative rate), providing a metric robust to class
    imbalance.
 
-3. **F1 score**: Harmonic mean of precision and recall, quantifying the balance
+4. **F1 score**: Harmonic mean of precision and recall, quantifying the balance
    between false positives and false negatives.
 
-4. **ROC AUC**: Area under the receiver operating characteristic curve,
+5. **ROC AUC**: Area under the receiver operating characteristic curve,
    measuring the classifier's ability to discriminate between classes across
    all decision thresholds (0.5 = chance, 1.0 = perfect discrimination).
 
@@ -50,16 +50,14 @@ Inputs
 - results_displacement.json: JSON file with displacement feature results
 - results_xy.json: JSON file with XY position feature results
   Each containing at minimum:
-  - 'mean_accuracy': Mean accuracy across CV folds
-  - 'ci_low', 'ci_high': 95% CI bounds for CV-mean accuracy (t CI)
+  - 'mean_accuracy': Mean subject-level out-of-fold accuracy
+  - 'ci_low', 'ci_high': 95% CI bounds for subject-mean accuracy (t CI)
   - 'p_value' or 'p_value_ttest': One-sample t-test p-value (H₀: accuracy = 0.5)
   - 'balanced_accuracy': Mean balanced accuracy
   - 'f1_score': Mean F1 score
   - 'roc_auc': Mean ROC AUC
-  Optionally (recommended; computed by 01_eye_decoding.py):
-  - 'pooled_accuracy': Accuracy pooled across all out-of-fold predictions
-  - 'pooled_ci_low', 'pooled_ci_high': 95% CI (Wilson) for pooled accuracy
-  - 'p_value_binomial': Exact binomial p-value vs p0=0.5
+  - 'pooled_accuracy': Accuracy pooled across all out-of-fold run predictions
+  - 'pooled_ci_low', 'pooled_ci_high': 95% CI (Wilson) for pooled run accuracy
 
 Outputs
 -------
@@ -95,7 +93,6 @@ for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
 from common import setup_script, log_script_end
 from common.tables import generate_styled_table
 from common.formatters import format_p_cell, format_ci
-from common.stats_utils import binomial_test_from_predictions
 
 # ============================================================================
 # Configuration & Setup
@@ -135,46 +132,27 @@ def build_metric_rows(res: dict, feature_label: str) -> list:
         List of row dictionaries for DataFrame
     """
     rows = []
-    # Accuracy (CV mean, t-test)
+    # Accuracy (subject mean, t-test)
     p_t = res.get('p_value_ttest', res.get('p_value', float('nan')))
     rows.append(dict(
         Feature=feature_label,
-        Metric='Accuracy (CV mean, t-test)',
+        Metric='Accuracy (subject mean, t-test)',
         Estimate=float(res['mean_accuracy']),
         CI=format_ci(float(res['ci_low']), float(res['ci_high']), precision=3, latex=False, use_numrange=True),
         p_value=format_p_cell(p_t),
     ))
 
-    # Accuracy (pooled, binomial)
-    if all(k in res for k in ('pooled_accuracy', 'pooled_ci_low', 'pooled_ci_high', 'p_value_binomial')):
-        pooled_acc = res['pooled_accuracy']
-        pooled_lo = res['pooled_ci_low']
-        pooled_hi = res['pooled_ci_high']
-        p_bin = res['p_value_binomial']
-    else:
-        # Fallback: compute from y_true/y_pred if present
-        if 'y_true' in res and 'y_pred' in res:
-            # Not silent: log that we are computing binomial test from raw predictions
-            # (requires external logger in calling scope, else no-op)
-            try:
-                import logging
-                logging.getLogger(__name__).info(
-                    "Binomial fields missing; computing from y_true/y_pred (Wilson CI)."
-                )
-            except Exception:
-                pass
-            pooled_acc, pooled_lo, pooled_hi, p_bin, _, _ = binomial_test_from_predictions(
-                res['y_true'], res['y_pred'], p_null=0.5, alternative='two-sided', confidence_level=0.95, ci_method='wilson'
-            )
-        else:
-            pooled_acc = float('nan'); pooled_lo = float('nan'); pooled_hi = float('nan'); p_bin = float('nan')
+    # Accuracy (pooled runs, descriptive only)
+    pooled_acc = res.get('pooled_accuracy', float('nan'))
+    pooled_lo = res.get('pooled_ci_low', float('nan'))
+    pooled_hi = res.get('pooled_ci_high', float('nan'))
     rows.append(dict(
         Feature=feature_label,
-        Metric='Accuracy (pooled, binomial)',
+        Metric='Accuracy (pooled runs, descriptive)',
         Estimate=float(pooled_acc) if pooled_acc == pooled_acc else float('nan'),
         CI=(format_ci(float(pooled_lo), float(pooled_hi), precision=3, latex=False, use_numrange=True)
             if pooled_lo == pooled_lo and pooled_hi == pooled_hi else ''),
-        p_value=(format_p_cell(p_bin) if p_bin == p_bin else ''),
+        p_value='',
     ))
 
     return [

@@ -28,15 +28,15 @@ Procedure
 3. For each feature set:
    - Truncate runs to common length (minimum across runs) and flatten per-run vectors.
    - Train linear SVM in StratifiedGroupKFold CV (k=20 folds, group=subject).
-   - Compute fold accuracies and aggregate out-of-fold predictions.
+   - Aggregate out-of-fold predictions to subject-level accuracies so inference
+     is performed at the participant level.
 
 Statistical Tests
 -----------------
-- Fold-wise test: One-sample t-test of mean fold accuracy vs chance (0.5), with
-  95% CI from t distribution across folds.
-- Pooled prediction test: Exact binomial test on pooled out-of-fold predictions
-  (successes = correct predictions; n = total predictions) vs p0=0.5. Binomial
-  95% CI reported using the Wilson method.
+- Primary inferential test: One-sample t-test of mean subject-level out-of-fold
+  accuracy vs chance (0.5), with 95% CI from the t distribution across subjects.
+- Descriptive run-level summaries: Fold accuracies and pooled out-of-fold run
+  accuracy, with Wilson 95% CI for the pooled run proportion.
 
 Outputs
 -------
@@ -45,11 +45,15 @@ Saved under results/<ts>_eyetracking_decoding/:
 - results_displacement.json: metrics and predictions for displacement features
 - fold_accuracies_xy.csv: per-fold accuracies for XY
 - fold_accuracies_displacement.csv: per-fold accuracies for displacement
+- subject_accuracies_xy.csv: per-subject out-of-fold accuracies for XY
+- subject_accuracies_displacement.csv: per-subject out-of-fold accuracies for displacement
 - copies of this script and logs
 
 JSON keys (per feature set):
 - mean_accuracy, ci_low, ci_high, p_value, p_value_ttest
-- pooled_accuracy, pooled_ci_low, pooled_ci_high, p_value_binomial, n_correct, n_total
+- subject_accuracies, subject_accuracy_records, n_subjects
+- fold_accuracies, fold_mean_accuracy, fold_ci_low, fold_ci_high
+- pooled_accuracy, pooled_ci_low, pooled_ci_high, n_correct, n_total
 """
 
 import os
@@ -78,6 +82,52 @@ from common.logging_utils import setup_analysis, log_script_end
 from modules import load_eyetracking_dataframe, prepare_run_level_features
 
 
+def summarize_subject_accuracies(y_true, y_pred, subject_ids):
+    """
+    Aggregate out-of-fold predictions to subject-level accuracies.
+
+    Parameters
+    ----------
+    y_true : ndarray
+        True binary labels for each held-out run.
+    y_pred : ndarray
+        Predicted binary labels for each held-out run.
+    subject_ids : ndarray
+        Subject identifier for each held-out run.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per subject with columns:
+        - subject
+        - true_label
+        - n_runs
+        - n_correct
+        - subject_accuracy
+    """
+    prediction_df = pd.DataFrame(
+        {
+            'subject': np.asarray(subject_ids),
+            'y_true': np.asarray(y_true, dtype=int),
+            'y_pred': np.asarray(y_pred, dtype=int),
+        }
+    )
+    prediction_df['correct'] = (prediction_df['y_true'] == prediction_df['y_pred']).astype(int)
+
+    subject_df = (
+        prediction_df
+        .groupby('subject', sort=True)
+        .agg(
+            true_label=('y_true', 'first'),
+            n_runs=('correct', 'size'),
+            n_correct=('correct', 'sum'),
+        )
+        .reset_index()
+    )
+    subject_df['subject_accuracy'] = subject_df['n_correct'] / subject_df['n_runs']
+    return subject_df
+
+
 def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
     """
     Run stratified group k-fold CV with linear SVM.
@@ -104,7 +154,7 @@ def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
     """
     cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=CONFIG.get('RANDOM_SEED', 42))
 
-    y_true, y_pred, y_prob, fold_acc = [], [], [], []
+    y_true, y_pred, y_prob, fold_acc, subject_ids = [], [], [], [], []
 
     for fold_idx, (train_idx, test_idx) in enumerate(cv.split(X, y, groups), start=1):
         X_train, X_test = X[train_idx], X[test_idx]
@@ -128,15 +178,25 @@ def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
         y_true.extend(y_test)
         y_pred.extend(fold_pred)
         y_prob.extend(fold_pred_proba)
+        subject_ids.extend(groups_test)
 
     # Convert to arrays
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
     y_prob = np.array(y_prob)
     fold_acc = np.array(fold_acc)
+    subject_ids = np.array(subject_ids)
 
-    # Compute overall metrics (fold-wise mean and pooled prediction tests)
+    subject_df = summarize_subject_accuracies(y_true, y_pred, subject_ids)
+    subject_acc = subject_df['subject_accuracy'].to_numpy(dtype=float)
+
+    # Primary inference uses subject-level out-of-fold accuracy.
     mean_acc, ci_low, ci_high, t_stat, p_val = compute_mean_ci_and_ttest_vs_value(
+        subject_acc, popmean=0.5, alternative='two-sided', confidence_level=0.95
+    )
+
+    # Retain fold-level summaries as descriptive diagnostics only.
+    fold_mean, fold_ci_low, fold_ci_high, _, _ = compute_mean_ci_and_ttest_vs_value(
         fold_acc, popmean=0.5, alternative='two-sided', confidence_level=0.95
     )
     balanced_acc = balanced_accuracy_score(y_true, y_pred)
@@ -144,41 +204,54 @@ def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
     fpr, tpr, _ = roc_curve(y_true, y_prob)
     roc_auc = auc(fpr, tpr)
 
-    # Exact binomial test on pooled out-of-fold predictions
-    pooled_acc, pooled_lo, pooled_hi, p_binom, n_correct, n_total = binomial_test_from_predictions(
+    # Pooled run-level accuracy is descriptive only because runs are nested within subjects.
+    pooled_acc, pooled_lo, pooled_hi, _, n_correct, n_total = binomial_test_from_predictions(
         y_true, y_pred, p_null=0.5, alternative='two-sided', confidence_level=0.95, ci_method='wilson'
     )
 
-    logger.info(f"[{feature_label}] Mean accuracy: {mean_acc:.3f}, 95% CI: [{ci_low:.3f}, {ci_high:.3f}]")
-    logger.info(f"[{feature_label}] t-test vs chance=0.5: t={t_stat:.3f}, p={p_val:.4f}")
+    logger.info(
+        f"[{feature_label}] Subject-level mean accuracy: {mean_acc:.3f}, "
+        f"95% CI: [{ci_low:.3f}, {ci_high:.3f}], t={t_stat:.3f}, p={p_val:.4f}"
+    )
+    logger.info(
+        f"[{feature_label}] Fold-level accuracy (descriptive): mean={fold_mean:.3f}, "
+        f"95% CI: [{fold_ci_low:.3f}, {fold_ci_high:.3f}]"
+    )
     logger.info(f"[{feature_label}] Balanced accuracy: {balanced_acc:.3f}, F1: {f1:.3f}, ROC AUC: {roc_auc:.3f}")
     logger.info(
-        f"[{feature_label}] Binomial test vs p0=0.5: n_correct={n_correct}/{n_total} "
-        f"(acc={pooled_acc:.3f}), p={p_binom:.4g}, CI=[{pooled_lo:.3f}, {pooled_hi:.3f}] (Wilson)"
+        f"[{feature_label}] Pooled run accuracy (descriptive): n_correct={n_correct}/{n_total} "
+        f"(acc={pooled_acc:.3f}), CI=[{pooled_lo:.3f}, {pooled_hi:.3f}] (Wilson)"
     )
 
     return {
         'feature_type': feature_label,
         'n_folds': n_splits,
+        'n_subjects': int(subject_df.shape[0]),
+        'inference_unit': 'subject',
         'mean_accuracy': float(mean_acc),
         'ci_low': float(ci_low),
         'ci_high': float(ci_high),
         't_statistic': float(t_stat),
         'p_value': float(p_val),            # Backward-compatible key (t-test p)
         'p_value_ttest': float(p_val),      # Explicit t-test p-value
+        'fold_mean_accuracy': float(fold_mean),
+        'fold_ci_low': float(fold_ci_low),
+        'fold_ci_high': float(fold_ci_high),
         'pooled_accuracy': float(pooled_acc),
         'pooled_ci_low': float(pooled_lo),
         'pooled_ci_high': float(pooled_hi),
-        'p_value_binomial': float(p_binom),
         'n_correct': int(n_correct),
         'n_total': int(n_total),
         'balanced_accuracy': float(balanced_acc),
         'f1_score': float(f1),
         'roc_auc': float(roc_auc),
         'fold_accuracies': fold_acc.tolist(),
+        'subject_accuracies': subject_acc.tolist(),
+        'subject_accuracy_records': subject_df.to_dict(orient='records'),
         'y_true': y_true.tolist(),
         'y_pred': y_pred.tolist(),
         'y_prob': y_prob.tolist(),
+        'subject_ids': subject_ids.tolist(),
     }
 
 
@@ -211,6 +284,7 @@ results_xy = run_svm_cv(X_xy, y_xy, groups_xy, feature_label='xy', logger=logger
 
 # Save xy results
 pd.DataFrame({'fold_accuracy': results_xy['fold_accuracies']}).to_csv(out_dir / 'fold_accuracies_xy.csv', index=False)
+pd.DataFrame(results_xy['subject_accuracy_records']).to_csv(out_dir / 'subject_accuracies_xy.csv', index=False)
 with open(out_dir / 'results_xy.json', 'w') as f:
     json.dump(results_xy, f, indent=2)
 
@@ -228,6 +302,7 @@ results_disp = run_svm_cv(X_disp, y_disp, groups_disp, feature_label='displaceme
 
 # Save displacement results
 pd.DataFrame({'fold_accuracy': results_disp['fold_accuracies']}).to_csv(out_dir / 'fold_accuracies_displacement.csv', index=False)
+pd.DataFrame(results_disp['subject_accuracy_records']).to_csv(out_dir / 'subject_accuracies_displacement.csv', index=False)
 with open(out_dir / 'results_displacement.json', 'w') as f:
     json.dump(results_disp, f, indent=2)
 

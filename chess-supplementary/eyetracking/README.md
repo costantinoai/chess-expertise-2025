@@ -34,11 +34,12 @@ Eye movements reflect cognitive processes during chess perception and problem-so
 - Grouping ensures all runs from the same subject stay together (prevents data leakage)
 
 **Metrics**:
-- Fold accuracies, mean accuracy, balanced accuracy, F1 score
+- Subject-level out-of-fold accuracies, mean accuracy, balanced accuracy, F1 score
 - ROC curve and AUC
-- 95% Confidence interval via Student's t-distribution
+- 95% confidence interval via Student's t-distribution across subjects
+- Fold accuracies and pooled run accuracy reported descriptively
 
-**Statistical test**: One-sample t-test testing whether mean fold accuracy differs from chance (0.5)
+**Statistical test**: One-sample t-test testing whether mean subject-level out-of-fold accuracy differs from chance (0.5)
 
 ## Dependencies
 
@@ -81,13 +82,15 @@ python chess-supplementary/eyetracking/01_eye_decoding.py
 - `results_displacement.json`: Metrics and predictions for displacement features
 - `fold_accuracies_xy.csv`: Per-fold accuracies for xy
 - `fold_accuracies_displacement.csv`: Per-fold accuracies for displacement
+- `subject_accuracies_xy.csv`: Per-subject out-of-fold accuracies for xy
+- `subject_accuracies_displacement.csv`: Per-subject out-of-fold accuracies for displacement
 - `01_eye_decoding.py`: Copy of the analysis script
 
 **Expected runtime**: ~2-5 minutes
 
 ## Key Results
 
-Classification accuracies indicate whether gaze features systematically differ between experts and novices. Significant above-chance accuracy would suggest different visual strategies.
+Subject-level decoding accuracies indicate whether gaze features systematically differ between experts and novices. Significant above-chance subject-level accuracy would suggest different visual strategies.
 
 ## File Structure
 
