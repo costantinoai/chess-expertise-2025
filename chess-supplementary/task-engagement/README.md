@@ -281,26 +281,24 @@ Produces a combined panel with bivariate vs partial correlation bars and stacked
 
 ### Response Rate
 
-Expert M = 0.856 (SD = 0.195), Novice M = 0.949 (SD = 0.108). Both groups
+Expert M = 0.856 (SD = 0.195), Novice M = 0.939 (SD = 0.108). Both groups
 show high task compliance. The slightly lower expert rate reflects a few
 subjects with intermittent button-box issues (sub-03: 36%, sub-06: 50%).
 Group difference not significant after accounting for these outliers.
 
 ### Checkmate Preference
 
-Expert M = 0.756 (SD = 0.317), significantly above 50%: t(18) = 3.52,
-p = 0.002. Novice M = 0.511 (SD = 0.131), not above 50%: t(19) = 0.37,
-p = 0.71. Group difference: t(23.7) = 3.12, p = 0.005, d = 1.01.
+Expert M = 0.864 (SD = 0.170), significantly above 50%: t(18) = 9.33,
+p < 0.001. Novice M = 0.511 (SD = 0.131), not above 50%: t(19) = 0.37,
+p = 0.714. Group difference: t(33.8) = 7.24, p < 0.001, d = 2.34.
 
 Experts reliably prefer the checkmate member within visual pairs; novices
-show no preference. Three experts show reversed preferences (sub-07, sub-08,
-sub-16) -- these were identified as button-swap errors and corrected in the
-v3 events conversion (see chess-bh-debugging/tasks.md).
+show no preference.
 
 ### Transitivity
 
-Expert M = 0.373 (SD = 0.113), Novice M = 0.336 (SD = 0.052). Group
-difference not significant.
+Expert M = 0.408 (SD = 0.129), Novice M = 0.378 (SD = 0.078). Group
+difference not significant: t(29.3) = 0.87, p = 0.389, d = 0.28.
 
 Low transitivity in both groups reflects the sparse pairwise coverage of the
 1-back design rather than genuinely intransitive preferences. With most pairs
@@ -310,13 +308,14 @@ dominated by noise, producing many apparent intransitivities.
 ### Board Preference Profile
 
 **Group-level C-NC correlations**:
-- Expert: r = −0.41 (p = 0.073, trend), ρ = −0.48 (p = 0.032, significant)
-- Novice: r = 0.87 (p < 0.001), ρ = 0.84 (p < 0.001)
+- Expert: r = −0.54 (p = 0.013), ρ = −0.58 (p = 0.007)
+- Novice: r = 0.86 (p < 0.001), ρ = 0.84 (p < 0.001)
 
 **Per-subject C-NC correlations**:
-- Expert: M = −0.059 (SD = 0.273), not different from 0 (p = 0.358)
-- Novice: M = 0.675 (SD = 0.203), significantly above 0 (p < 0.001)
-- Group difference: t(33.2) = −9.50, p < 0.001, d = −3.05
+- Expert: M = −0.08 (SD = 0.27), not different from 0: t(18) = −1.25, p = 0.227
+- Novice: M = 0.67 (SD = 0.20), significantly above 0: t(19) = 14.87, p < 0.001
+- Group difference: t(33.2) = −9.75, p < 0.001, d = −3.15
+- Fisher z-test (group-level): z = −5.51, p < 0.001
 
 Experts' preferences are not driven by visual similarity (C-NC r near zero):
 they discriminate between checkmate and non-checkmate members of visual
