@@ -32,19 +32,24 @@
 clear; clc;
 
 %% --------------------------- Configuration -------------------------------
-% BIDS derivatives root (override with env CHESS_BIDS_DERIVATIVES)
-defaultDeriv = '/data/projects/chess/data/BIDS/derivatives';
-derivativesDir = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
+% External data root (override with env CHESS_DATA_ROOT)
+% Default: manuscript-data/ -- the shared data folder.
+% NOTE: .nii.gz files must be decompressed to .nii before running this
+% script, as MATLAB's SPM cannot read gzipped NIfTI natively.
+defaultDataRoot = '/media/costantino_ai/eik-T9/manuscript-data';
+dataRoot = getenv_default('CHESS_DATA_ROOT', defaultDataRoot);
+derivativesDir = fullfile(dataRoot, 'BIDS', 'derivatives');
 
 % GLM root for unsmoothed SPM outputs (subject folders live here)
-% Matches old-implementation logic (unsmoothed GLM for MVPA)
-glmRoot = fullfile(derivativesDir, 'fmriprep-SPM_smoothed-NO_GS-FD-HMP_brainmasked', 'MNI', 'fmriprep-SPM-MNI', 'GLM');
+glmRoot = fullfile(derivativesDir, 'SPM', 'GLM-unsmoothed');
 
 % ROI atlas and metadata (override with CHESS_ROI_ATLAS_22 and CHESS_ROI_TSV_22)
+% The atlas .nii must be decompressed for SPM's spm_vol.
 roiAtlas = getenv_default('CHESS_ROI_ATLAS_22', ...
-    fullfile(derivativesDir, 'rois', 'glasser22', 'tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii'));
+    fullfile(dataRoot, 'rois', 'glasser22', ...
+    'tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii'));
 roiTSV = getenv_default('CHESS_ROI_TSV_22', ...
-    fullfile(derivativesDir, 'rois', 'glasser22', 'region_info.tsv'));
+    fullfile(dataRoot, 'rois', 'glasser22', 'region_info.tsv'));
 
 % Output root
 outRootSVM = fullfile(derivativesDir, 'mvpa-decoding');
@@ -58,14 +63,18 @@ subDirs = find_subjects(glmRoot, 'sub-*');
 fprintf('[INFO] Found %d subject(s) under: %s\n\n', numel(subDirs), glmRoot);
 
 %% --------------------------- Load ROIs -----------------------------------
-[Vroi, roi_data] = spm_read_vols(spm_vol(roiAtlas)); %#ok<ASGLU>
+roi_data = spm_read_vols(spm_vol(roiAtlas));
 roiInfo = readtable(roiTSV, 'FileType','text', 'Delimiter','\t');
-if ~ismember('index', roiInfo.Properties.VariableNames)
-    error('ROI TSV must contain an "index" column with integer labels.');
+% Support both column naming conventions (index/name or ROI_idx/roi_name)
+if ismember('index', roiInfo.Properties.VariableNames)
+    region_ids = roiInfo.index(:)';
+    region_names = roiInfo.name(:)';
+elseif ismember('ROI_idx', roiInfo.Properties.VariableNames)
+    region_ids = roiInfo.ROI_idx(:)';
+    region_names = roiInfo.roi_name(:)';
+else
+    error('ROI TSV must contain an "index" or "ROI_idx" column with integer labels.');
 end
-
-region_ids = roiInfo.index(:)';
-region_names = roiInfo.name(:)';
 fprintf('[INFO] Loaded ROI atlas with %d labeled regions\n', numel(region_ids));
 
 %% ========================= Main subject loop =============================
@@ -128,15 +137,25 @@ for s = 1:numel(subDirs)
     rsa_measure = @cosmo_target_dsm_corr_measure;
     rsa_args = struct('center_data', true);
 
+    % Precompute feature-space ROI membership from 3D atlas.
+    % ds.fa.i/j/k are 1-indexed voxel coordinates for each feature in ds.
+    % We look up each feature's ROI label from the 3D atlas volume.
+    ijk = [ds.fa.i; ds.fa.j; ds.fa.k];  % 3 x n_features
+    n_feat = size(ijk, 2);
+    feat_roi = zeros(1, n_feat);
+    for fi = 1:n_feat
+        feat_roi(fi) = roi_data(ijk(1,fi), ijk(2,fi), ijk(3,fi));
+    end
+
     % ---------------------- ROI loop ----------------------
     for r = 1:nROI
         rid = region_ids(r);
-        mask = (roi_data == rid);
-        if ~any(mask(:))
+        feat_mask = (feat_roi == rid);
+        if sum(feat_mask) == 0
             continue; % empty ROI
         end
 
-        ds_slice = cosmo_slice(ds, mask, 2);
+        ds_slice = cosmo_slice(ds, feat_mask, 2);
         ds_slice = cosmo_remove_useless_data(ds_slice);
         if isempty(ds_slice.samples) || size(ds_slice.samples,2) < 6
             continue;
