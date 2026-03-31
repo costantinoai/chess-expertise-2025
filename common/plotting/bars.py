@@ -680,6 +680,211 @@ def _apply_color_legend_from_bars(
 
     return True
 
+def compute_whisker_ylim(*data_arrays, padding_pct: float = 0.12) -> Tuple[float, float]:
+    """
+    Compute shared y-axis limits from boxplot whisker extents across multiple data arrays.
+
+    Parameters
+    ----------
+    *data_arrays : np.ndarray
+        Each array has shape (n_subjects, n_items). Whisker extents are computed
+        per column using the 1.5*IQR rule.
+    padding_pct : float
+        Fraction of range to add as padding (default 12%).
+
+    Returns
+    -------
+    Tuple[float, float]
+        (ymin, ymax) limits suitable for set_ylim.
+    """
+    wlo, whi = [], []
+    for arr in data_arrays:
+        for col in range(arr.shape[1]):
+            q1, q3 = np.percentile(arr[:, col], [25, 75])
+            iqr = q3 - q1
+            wlo.append(max(arr[:, col].min(), q1 - 1.5 * iqr))
+            whi.append(min(arr[:, col].max(), q3 + 1.5 * iqr))
+    if not wlo:
+        return (-0.1, 0.1)
+    lo, hi = min(wlo), max(whi)
+    pad = (hi - lo) * padding_pct
+    return (lo - pad, hi + pad)
+
+
+def plot_grouped_boxplots_on_ax(
+    ax, x_positions: np.ndarray,
+    group1_data: np.ndarray,
+    group2_data: Optional[np.ndarray] = None,
+    group1_color: Union[str, List[str]] = '#999999',
+    group2_color: Optional[Union[str, List[str]]] = None,
+    group1_label: str = "Group 1",
+    group2_label: str = "Group 2",
+    comparison_pvals: Optional[List[float]] = None,
+    ylim: Optional[Tuple[float, float]] = None,
+    box_width_multiplier: float = 1.0,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    subtitle: Optional[str] = None,
+    xtick_labels: Optional[List[str]] = None,
+    x_label_colors: Optional[List[str]] = None,
+    x_tick_rotation: int = 30,
+    x_tick_align: str = 'right',
+    hide_xticklabels: bool = False,
+    show_legend: Optional[bool] = None,
+    legend_loc: str = 'upper right',
+    visible_spines: Optional[List[str]] = None,
+    params: dict = None
+):
+    """
+    Plot grouped box-and-whisker charts on an existing Axes.
+
+    Drop-in alternative to plot_grouped_bars_on_ax for NatComms compliance.
+    Shows data distribution via boxplots instead of bars with error bars.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axis to draw on.
+    x_positions : np.ndarray
+        X positions for box groups.
+    group1_data : np.ndarray
+        Per-subject data for group 1, shape (n_subjects, n_items).
+    group2_data : np.ndarray, optional
+        Per-subject data for group 2, shape (n_subjects, n_items).
+    group1_color, group2_color : str or list of str
+        Box face colours.
+    comparison_pvals : list of float, optional
+        FDR-corrected p-values for between-group comparisons.
+    ylim : tuple, optional
+        Fixed y-axis limits. If None, auto-computed from whisker extents.
+    """
+    from .style import PLOT_PARAMS
+    if params is None:
+        params = PLOT_PARAMS
+
+    import matplotlib.ticker as mticker
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.2f'))
+
+    n_items = len(x_positions)
+    is_grouped = group2_data is not None
+    bw = 0.30 * box_width_multiplier
+
+    # Normalise colors to per-item lists
+    if isinstance(group1_color, str):
+        g1_colors = [group1_color] * n_items
+    else:
+        g1_colors = group1_color
+
+    if is_grouped:
+        if group2_color is None:
+            g2_colors = g1_colors
+        elif isinstance(group2_color, str):
+            g2_colors = [group2_color] * n_items
+        else:
+            g2_colors = group2_color
+
+        use_hatch = _should_use_hatching(group1_color, group2_color)
+    else:
+        use_hatch = False
+
+    # Alpha for group distinction: experts full, novices light
+    g1_alpha = params.get('bar_alpha', 0.85)
+    g2_alpha = 0.35  # Lighter for novices — visually distinct without hatching
+
+    box_props_base = dict(linewidth=0.3)
+    whisker_props = dict(linewidth=0.2, color='black')
+    cap_props = dict(linewidth=0.2, color='black')
+    median_props = dict(linewidth=0.4, color='black')
+
+    all_whisker_tops = []
+    all_whisker_bots = []
+
+    for i in range(n_items):
+        # Group 1 (experts)
+        pos1 = x_positions[i] - bw/2 if is_grouped else x_positions[i]
+        bp1 = ax.boxplot(
+            [group1_data[:, i]], positions=[pos1], widths=bw * 0.7,
+            patch_artist=True, showfliers=False, zorder=2,
+            boxprops=box_props_base, whiskerprops=whisker_props,
+            capprops=cap_props, medianprops=median_props
+        )
+        bp1['boxes'][0].set_facecolor(g1_colors[i])
+        bp1['boxes'][0].set_alpha(g1_alpha)
+        bp1['boxes'][0].set_edgecolor(params.get('bar_edgecolor', 'white'))
+        all_whisker_tops.append(bp1['whiskers'][1].get_ydata()[1])
+        all_whisker_bots.append(bp1['whiskers'][0].get_ydata()[1])
+
+        if is_grouped:
+            # Group 2 (novices) — lighter alpha, no hatching
+            pos2 = x_positions[i] + bw/2
+            bp2 = ax.boxplot(
+                [group2_data[:, i]], positions=[pos2], widths=bw * 0.7,
+                patch_artist=True, showfliers=False, zorder=2,
+                boxprops=box_props_base, whiskerprops=whisker_props,
+                capprops=cap_props, medianprops=median_props
+            )
+            bp2['boxes'][0].set_facecolor(g2_colors[i])
+            bp2['boxes'][0].set_alpha(g2_alpha)
+            bp2['boxes'][0].set_edgecolor(params.get('bar_edgecolor', 'white'))
+            all_whisker_tops.append(bp2['whiskers'][1].get_ydata()[1])
+            all_whisker_bots.append(bp2['whiskers'][0].get_ydata()[1])
+
+            # Comparison significance stars with connecting line
+            if comparison_pvals is not None:
+                whisker_top = max(bp1['whiskers'][1].get_ydata()[1],
+                                 bp2['whiskers'][1].get_ydata()[1])
+                stars = significance_stars(comparison_pvals[i])
+                if stars:
+                    offset = (max(all_whisker_tops) - min(all_whisker_bots)) * 0.03 \
+                             if all_whisker_tops else 0.01
+                    line_y = whisker_top + offset
+                    ax.plot([pos1, pos2], [line_y, line_y],
+                            color='black', linewidth=params.get('comparison_linewidth', 0.6),
+                            zorder=3)
+                    ax.text((pos1 + pos2) / 2, line_y + offset * 0.5, stars,
+                            ha='center', va='bottom',
+                            fontsize=params.get('font_size_annotation', 6),
+                            fontweight='bold')
+
+    # Y-axis limits from whisker extents
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    elif all_whisker_tops and all_whisker_bots:
+        data_range = max(all_whisker_tops) - min(all_whisker_bots)
+        pad = data_range * 0.12
+        ax.set_ylim(min(all_whisker_bots) - pad, max(all_whisker_tops) + pad)
+
+    # Baseline zero line
+    ax.axhline(0, color='gray', linestyle=':',
+               linewidth=params.get('reference_line_width', 0.75),
+               alpha=params.get('reference_line_alpha', 0.6), zorder=1, clip_on=True)
+
+    # Manual legend for grouped boxplots (experts solid, novices light)
+    if is_grouped and show_legend:
+        from matplotlib.patches import Patch
+        ref_color = g1_colors[0] if isinstance(g1_colors, list) else g1_colors
+        legend_elements = [
+            Patch(facecolor=ref_color, alpha=g1_alpha, edgecolor='black',
+                  linewidth=0.5, label=group1_label),
+            Patch(facecolor=ref_color, alpha=g2_alpha, edgecolor='black',
+                  linewidth=0.5, label=group2_label),
+        ]
+        ax.legend(handles=legend_elements, loc=legend_loc, ncol=2, frameon=False,
+                  fontsize=params.get('font_size_legend', 6))
+        show_legend = False  # Prevent _apply_dry_formatting from adding another
+
+    # DRY formatting (spines, titles, ticks)
+    _apply_dry_formatting(
+        ax, x_positions,
+        y_label=y_label, title=title, subtitle=subtitle,
+        xtick_labels=xtick_labels, x_label_colors=x_label_colors,
+        x_tick_rotation=x_tick_rotation, x_tick_align=x_tick_align,
+        hide_xticklabels=hide_xticklabels,
+        show_legend=show_legend, legend_loc=legend_loc,
+        visible_spines=visible_spines, params=params,
+    )
+
+
 def _apply_dry_formatting(
     ax,
     x_positions,

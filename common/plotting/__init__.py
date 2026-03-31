@@ -62,6 +62,8 @@ from .legends import create_roi_group_legend
 from .bars import (
     plot_grouped_bars_with_ci,
     plot_grouped_bars_on_ax,
+    plot_grouped_boxplots_on_ax,
+    compute_whisker_ylim,
     plot_counts_on_ax,
 )
 
@@ -129,6 +131,8 @@ __all__ = [
     # Bars
     'plot_grouped_bars_with_ci',
     'plot_grouped_bars_on_ax',
+    'plot_grouped_boxplots_on_ax',
+    'compute_whisker_ylim',
     'plot_counts_on_ax',
 
     # Heatmaps

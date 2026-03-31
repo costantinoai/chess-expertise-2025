@@ -742,7 +742,8 @@ def set_axis_title(
         return
 
     if subtitle and not title:
-        ax.set_title(subtitle, fontsize=subtitle_size, fontweight='normal', pad=pad_pts)
+        subtitle_pad = params.get('subtitle_pad', 4.0)
+        ax.set_title(subtitle, fontsize=subtitle_size, fontweight='normal', pad=subtitle_pad)
         return
 
     ax.set_title("")
