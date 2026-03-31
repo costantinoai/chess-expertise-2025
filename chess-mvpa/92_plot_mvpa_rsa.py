@@ -69,7 +69,8 @@ from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
 from common.plotting import (
     apply_nature_rc,
-    plot_grouped_bars_on_ax,
+    plot_grouped_boxplots_on_ax,
+    compute_whisker_ylim,
     compute_ylim_range,
     PLOT_PARAMS,
     PLOT_YLIMITS,
@@ -146,71 +147,79 @@ roi_info = load_roi_metadata(CONFIG["ROI_GLASSER_22"])
 apply_nature_rc()
 
 # =============================================================================
-# Figure: MVPA RSA Multi-Panel Figure - RSA Correlation Barplots
+# Figure: MVPA RSA Multi-Panel Figure - RSA Correlation Barplots/Boxplots
 # =============================================================================
-# This section creates grouped barplots showing RSA correlations for Expert vs Novice
-# groups across 22 ROIs, for each of the 3 target model RDMs
 
-# Extract RSA correlation data for all targets
-# Returns dict with target_name -> {exp_means, nov_means, exp_cis, nov_cis, pvals, roi_names, roi_colors, label_colors}
+# Extract RSA correlation data for all targets (for p-values, label colors, etc.)
 rsa_data = extract_mvpa_bar_data(
-    group_stats,          # Group statistics dict
-    roi_info,             # ROI metadata
-    MAIN_TARGETS,         # List of targets to plot
-    method='rsa_corr',    # Extract RSA correlation data
-    subtract_chance=False # Use raw correlation values (not chance-corrected)
+    group_stats, roi_info, MAIN_TARGETS,
+    method='rsa_corr', subtract_chance=False
 )
 
-# Compute global y-axis limits for consistent scale across all panels
-# Collects all expert and novice mean values across all targets
-all_vals = []
-for d in rsa_data.values():
-    all_vals.extend(d['exp_means'])  # Expert mean correlations
-    all_vals.extend(d['nov_means'])  # Novice mean correlations
+# Load per-subject RSA data for boxplots
+from common.io_utils import find_subject_tsvs
+from common.bids_utils import get_participants_with_expertise
+from modules.mvpa_io import build_group_dataframe
+
+rsa_subject_dir = Path(CONFIG['BIDS_MVPA_RSA'])
+roi_col_names = roi_info['roi_name'].tolist()
+participants, (n_exp, n_nov) = get_participants_with_expertise(
+    participants_file=CONFIG["BIDS_PARTICIPANTS"], bids_root=CONFIG["BIDS_ROOT"]
+)
+tsv_files = find_subject_tsvs(rsa_subject_dir)
+df_all = build_group_dataframe(tsv_files, participants, roi_col_names)
+
+subject_data = {t: {'experts': [], 'novices': []} for t in MAIN_TARGETS}
+for target in MAIN_TARGETS:
+    tgt_df = df_all[df_all['target'] == target]
+    for _, row in tgt_df.iterrows():
+        group = 'experts' if row['expert'] else 'novices'
+        vals = row[roi_col_names].values.astype(float)
+        subject_data[target][group].append(vals)
+for t in MAIN_TARGETS:
+    for g in ('experts', 'novices'):
+        subject_data[t][g] = np.array(subject_data[t][g])
+logger.info(f"Loaded per-subject RSA data: {subject_data['checkmate']['experts'].shape[0]} experts, "
+            f"{subject_data['checkmate']['novices'].shape[0]} novices")
+
+# Compute shared whisker-based ylim across all targets
+shared_boxplot_ylim = compute_whisker_ylim(
+    *[subject_data[t][g] for t in MAIN_TARGETS for g in ('experts', 'novices')]
+)
 
 fig1 = plt.figure(1)
 
-# Create one panel for each RSA target (Visual Similarity, Strategy, Checkmate)
 for idx, tgt in enumerate(MAIN_TARGETS):
     if tgt not in rsa_data:
-        continue  # Skip if data is missing for this target
+        continue
 
-    # Extract data for this target
     data = rsa_data[tgt]
-    roi_names = data['roi_names']        # ROI pretty names (for x-axis labels)
-    roi_colors = data['roi_colors']      # ROI group colors (for bars)
-    label_colors = data['label_colors']  # Label colors (gray if not significant)
-    x = np.arange(len(roi_names))        # X-positions for bars
+    roi_names = data['roi_names']
+    roi_colors = data['roi_colors']
+    label_colors = data['label_colors']
+    x = np.arange(len(roi_names))
 
-    # -------------------------------------------------------------------------
-    # Panel RSA_{idx+1}: RSA Correlations for {target}
-    # -------------------------------------------------------------------------
-    # Grouped barplot showing Expert vs Novice RSA correlations per ROI
-    # Shows Spearman correlation (r) between model RDM and neural RDM
-    # Bars colored by ROI group; labels grayed for non-significant ROIs
     ax = plt.axes()
     ax.set_label(f'RSA_{idx+1}_{tgt}')
 
-    plot_grouped_bars_on_ax(
+    plot_grouped_boxplots_on_ax(
         ax=ax,
         x_positions=x,
-        group1_values=data['exp_means'],      # Expert mean correlations
-        group1_cis=data['exp_cis'],           # Expert 95% CIs
-        group1_color=roi_colors,              # ROI group colors (solid bars)
-        group2_values=data['nov_means'],      # Novice mean correlations
-        group2_cis=data['nov_cis'],           # Novice 95% CIs
-        group2_color=roi_colors,              # Same colors (hatched bars)
-        group1_label='Experts',               # Legend label
-        group2_label='Novices',               # Legend label
-        comparison_pvals=data['pvals'],       # FDR p-values for significance stars
-        ylim=PLOT_YLIMITS['rsa_neural'],      # Centralized RSA neural limits (was -.06, .25)
-        y_label=PLOT_PARAMS['ylabel_correlation_r'],  # Y-axis label (Spearman r)
-        subtitle=RSA_TITLES[tgt],                # Panel title
-        xtick_labels=roi_names,               # ROI names on x-axis
-        x_label_colors=label_colors,          # Color by significance (gray if p ≥ 0.05)
+        group1_data=subject_data[tgt]['experts'],
+        group2_data=subject_data[tgt]['novices'],
+        group1_color=roi_colors,
+        group2_color=roi_colors,
+        group1_label='Experts',
+        group2_label='Novices',
+        comparison_pvals=data['pvals'],
+        ylim=shared_boxplot_ylim,
+        y_label=PLOT_PARAMS['ylabel_correlation_r'],
+        subtitle=RSA_TITLES[tgt],
+        xtick_labels=roi_names,
+        x_label_colors=label_colors,
         x_tick_rotation=30,
         x_tick_align='right',
-        show_legend=(idx == 0),               # Only show legend on first panel
+        show_legend=(idx == 0),
         legend_loc='upper right',
         visible_spines=['left','bottom'],
         params=PLOT_PARAMS

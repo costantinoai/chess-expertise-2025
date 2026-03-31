@@ -84,6 +84,7 @@ from common.plotting import (
     set_axis_title,
     plot_matrix_on_ax,
     plot_grouped_bars_on_ax,
+    plot_grouped_boxplots_on_ax,
     plot_2d_embedding_on_ax,
     style_spines,
     COLORS_EXPERT_NOVICE,
@@ -201,85 +202,76 @@ novice_data = (
 # Build figure and axes
 fig1 = plt.figure(1)
 
-# -----------------------------------------------------------------------------
-# Panel 1A: Top bars - Mean PR per ROI (Experts vs Novices)
-# -----------------------------------------------------------------------------
-# Shows grouped bars comparing Expert (solid) vs Novice (hatched) mean PR
-# Bars use ROI group colors; significance stars show FDR p < 0.05
+# Extract per-subject PR data for boxplots
+pr_matrix = pr_matrix_pack['matrix']       # (40, 22)
+n_exp = pr_matrix_pack['n_experts']        # 20
+experts_pr = pr_matrix[:n_exp, :]          # (20, 22)
+novices_pr = pr_matrix[n_exp:, :]          # (20, 22)
+
+# Reorder columns to match order_rois
+roi_id_to_col = {rid: i for i, rid in enumerate(roi_labels)}
+col_order = [roi_id_to_col[rid] for rid in order_rois]
+experts_pr = experts_pr[:, col_order]
+novices_pr = novices_pr[:, col_order]
+
+# Top panel: boxplots showing Expert vs Novice PR distributions
 ax_bars_top = plt.axes(); ax_bars_top.set_label('Bars_Top_Mean_PR')
 
-# Extract mean PR values and 95% CIs for each group
-exp_vals = expert_data['mean_PR'].tolist()
-exp_cis = list(zip(expert_data['ci_low'].values, expert_data['ci_high'].values))
-nov_vals = novice_data['mean_PR'].tolist()
-nov_cis = list(zip(novice_data['ci_low'].values, novice_data['ci_high'].values))
-
-# Plot grouped bars with significance annotation
-plot_grouped_bars_on_ax(
+plot_grouped_boxplots_on_ax(
     ax=ax_bars_top,
     x_positions=x,
-    group1_values=exp_vals,              # Expert mean PR
-    group1_cis=exp_cis,                  # Expert 95% CIs
-    group1_color=roi_colors,             # ROI group colors (solid bars)
-    group2_values=nov_vals,              # Novice mean PR
-    group2_cis=nov_cis,                  # Novice 95% CIs
-    group2_color=roi_colors,             # Same colors (hatched bars)
-    group1_label='Expert',               # Legend label
-    group2_label='Novice',               # Legend label
-    comparison_pvals=pvals,              # FDR p-values for significance stars
-    y_label='Mean PR (95% CI)',
+    group1_data=experts_pr,
+    group2_data=novices_pr,
+    group1_color=roi_colors,
+    group2_color=roi_colors,
+    group1_label='Expert',
+    group2_label='Novice',
+    comparison_pvals=pvals,
+    y_label='Participation Ratio',
     title='Participation Ratio',
     subtitle='FDR p < .05',
-    hide_xticklabels=True,               # No x-labels on top panel
-    show_legend=True,                    # Show Expert/Novice legend (solid/hatched)
+    hide_xticklabels=True,
+    show_legend=True,
     visible_spines=['left', 'bottom'],
     params=PLOT_PARAMS,
 )
 
-# -----------------------------------------------------------------------------
-# Panel 1B: Bottom bars - ΔPR (Expert − Novice) per ROI
-# -----------------------------------------------------------------------------
-# Shows single bars for the difference in PR between Experts and Novices
-# X-axis labels show ROI names, colored by group (gray if not significant)
+# Bottom panel: difference bars (ΔPR = Expert − Novice)
 ax_bars_bottom = plt.axes(); ax_bars_bottom.set_label('Bars_Bottom_Diff_PR')
-
-# Align stats_results to order_rois and extract difference values and CIs
 stats_ordered = stats_results.set_index('ROI_Label').reindex(order_rois)
-diff_vals = stats_ordered['mean_diff'].tolist()      # Expert − Novice difference
+diff_vals = stats_ordered['mean_diff'].tolist()
 diff_cis = list(zip(stats_ordered['ci95_low'].values,
-                    stats_ordered['ci95_high'].values))  # 95% CIs for difference
-
-# Plot single-group bars with ROI labels on x-axis
+                    stats_ordered['ci95_high'].values))
 plot_grouped_bars_on_ax(
     ax=ax_bars_bottom,
     x_positions=x,
-    group1_values=diff_vals,             # ΔPR values
-    group1_cis=diff_cis,                 # 95% CIs
-    group1_color=roi_colors,             # ROI group colors
-    group1_pvals=pvals,                  # FDR p-values for significance stars
-    bar_width_multiplier=2.0,            # Wider bars (single group)
+    group1_values=diff_vals,
+    group1_cis=diff_cis,
+    group1_color=roi_colors,
+    group1_pvals=pvals,
+    bar_width_multiplier=2.0,
     y_label='ΔPR (Expert − Novice) (95% CI)',
     title='Participation Ratio Difference',
     subtitle='FDR p < .05',
-    xtick_labels=roi_names,              # Show ROI names
-    x_label_colors=label_colors,         # Color by significance (gray if p ≥ 0.05)
+    xtick_labels=roi_names,
+    x_label_colors=label_colors,
     x_tick_rotation=30,
     x_tick_align='right',
-    visible_spines=['left'],             # No bottom spine (labels below)
+    visible_spines=['left'],
     params=PLOT_PARAMS,
-)
+    )
 
 # -----------------------------------------------------------------------------
 # Panel 1C: ROI groups legend
 # -----------------------------------------------------------------------------
 # Shows all ROI group families with their colors (horizontal layout)
-# Positioned with zorder=-1 so it appears behind other plot elements
+# ROI group legend
 ax_roi_legend = plt.axes(); ax_roi_legend.set_label('ROI_Groups_Legend')
 roi_legend_fig = create_roi_group_legend(
     single_row=True,                     # Horizontal layout
     params=PLOT_PARAMS
 )
-embed_figure_on_ax(ax_roi_legend, roi_legend_fig, title='')  # Zorder set centrally in legend
+embed_figure_on_ax(ax_roi_legend, roi_legend_fig, title='')
 
 # Setup ax_dict for pylustrator
 fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
@@ -287,16 +279,20 @@ fig1.ax_dict = {ax.get_label(): ax for ax in fig1.axes}
 # Pylustrator layout code for this panel
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
+import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
-plt.figure(1).set_size_inches(cm_to_inches(8.90), cm_to_inches(8.74), forward=True)
+plt.figure(1).set_size_inches(9.000000/2.54, 8.740000/2.54, forward=True)
 plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].set(position=[0.1116, 0.2957, 0.867, 0.2766])
+plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].set_position([0.125534, 0.295351, 0.853402, 0.276273])
 plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].texts[14].set(position=(0.5, 1.151))
 plt.figure(1).ax_dict["Bars_Bottom_Diff_PR"].texts[15].set(position=(0.5, 1.065))
 plt.figure(1).ax_dict["Bars_Top_Mean_PR"].legend(loc=(0.6604, 0.9411), frameon=False, ncols=2)
 plt.figure(1).ax_dict["Bars_Top_Mean_PR"].set(position=[0.1116, 0.6717, 0.867, 0.2766])
+plt.figure(1).ax_dict["Bars_Top_Mean_PR"].set_position([0.125534, 0.670907, 0.853402, 0.276273])
 plt.figure(1).ax_dict["Bars_Top_Mean_PR"].texts[14].set(position=(0.5, 1.073))
 plt.figure(1).ax_dict["Bars_Top_Mean_PR"].texts[15].set(position=(0.5, 0.9845))
 plt.figure(1).ax_dict["ROI_Groups_Legend"].set(position=[-0.02044, -0.03719, 1.123, 0.1567])
+plt.figure(1).ax_dict["ROI_Groups_Legend"].set_position([0.002005, -0.037134, 1.092505, 0.156490])
 #% end: automatic generated code from pylustrator
 
 # Save this panel
@@ -452,6 +448,7 @@ fig2.ax_dict = {ax.get_label(): ax for ax in fig2.axes}
 # Pylustrator layout code for this panel
 #% start: automatic generated code from pylustrator
 plt.figure(2).ax_dict = {ax.get_label(): ax for ax in plt.figure(2).axes}
+import matplotlib as mpl
 getattr(plt.figure(2), '_pylustrator_init', lambda: ...)()
 plt.figure(2).set_size_inches(cm_to_inches(18.29), cm_to_inches(13.31), forward=True)
 plt.figure(2).ax_dict["A_PR_Matrix"].set(position=[0.1148, 0.3461, 0.3517, 0.6051])
@@ -463,7 +460,7 @@ plt.figure(2).ax_dict["C_Feature_Importance"].spines[['right', 'top']].set_visib
 plt.figure(2).ax_dict["C_Feature_Importance"].texts[0].set(position=(0.1742, 1.027), fontsize=6.)
 plt.figure(2).ax_dict["C_Feature_Importance"].texts[1].set(position=(0.8235, 1.027), fontsize=6.)
 plt.figure(2).ax_dict["C_Feature_Importance"].text(-0.0477, 1.1218, 'c', transform=plt.figure(2).ax_dict["C_Feature_Importance"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(2).ax_dict["C_Feature_Importance"].texts[2].new
-plt.figure(2).ax_dict["D_PCA_Loadings"].set(position=[0.1148, 0.2468, 0.3517, 0.03663])
+plt.figure(2).ax_dict["D_PCA_Loadings"].set(position=[0.1148, 0.2595, 0.3517, 0.03663])
 #% end: automatic generated code from pylustrator
 
 # Save this panel
@@ -605,15 +602,19 @@ fig3.ax_dict = {ax.get_label(): ax for ax in fig3.axes}
 # Pylustrator layout code for this panel
 #% start: automatic generated code from pylustrator
 plt.figure(3).ax_dict = {ax.get_label(): ax for ax in plt.figure(3).axes}
+import matplotlib as mpl
 getattr(plt.figure(3), '_pylustrator_init', lambda: ...)()
 plt.figure(3).set_size_inches(cm_to_inches(18.30), cm_to_inches(5.15), forward=True)
 plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].set(position=[0.06032, 0.1735, 0.244, 0.7121])
 plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].texts[0].set(position=(0.5, 1.084))
 plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].texts[1].set(position=(0.5, 1.018))
+plt.figure(3).ax_dict["E_PR_vs_Voxels_Experts"].texts[2].set(position=(0.8844, 0.02))
 plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].set(position=[0.391, 0.1735, 0.244, 0.7121])
 plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].texts[0].set(position=(0.5, 1.084))
 plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].texts[1].set(position=(0.5, 1.018))
+plt.figure(3).ax_dict["F_PR_vs_Voxels_Novices"].texts[2].set(position=(0.8857, 0.02))
 plt.figure(3).ax_dict["G_PRdiff_vs_VoxelsAvg"].set(position=[0.7217, 0.1735, 0.244, 0.7121])
+plt.figure(3).ax_dict["G_PRdiff_vs_VoxelsAvg"].texts[0].set(position=(0.8977, 0.02))
 #% end: automatic generated code from pylustrator
 
 # Save this panel

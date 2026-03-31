@@ -88,7 +88,8 @@ from common.bids_utils import load_roi_metadata, load_stimulus_metadata
 from common.rsa_utils import create_model_rdm
 from common.plotting import (
     apply_nature_rc,
-    plot_grouped_bars_on_ax,
+    plot_grouped_boxplots_on_ax,
+    compute_whisker_ylim,
     plot_rdm_on_ax,
     compute_stimulus_palette,
     PLOT_PARAMS,
@@ -102,6 +103,7 @@ from modules.mvpa_plot_utils import extract_mvpa_bar_data
 
 # =============================================================================
 # Configuration and Constants
+
 # =============================================================================
 # Define fine-grained dimensions to analyze (all on checkmate boards only)
 
@@ -282,9 +284,55 @@ stim_colors, stim_alphas = compute_stimulus_palette(checkmate_stimuli)
 # Creates 3 panels per fine-grained dimension (RSA, SVM, model RDM)
 # Total: 6 dimensions × 3 panels = 18 panels arranged by pylustrator
 
+# Load per-subject data for boxplots
+from common.io_utils import find_subject_tsvs
+from common.bids_utils import get_participants_with_expertise
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa'))
+from modules.mvpa_io import build_group_dataframe
+
+roi_col_names = roi_info['roi_name'].tolist()
+participants, _ = get_participants_with_expertise(
+    participants_file=CONFIG["BIDS_PARTICIPANTS"], bids_root=CONFIG["BIDS_ROOT"]
+)
+
+rsa_files = find_subject_tsvs(Path(CONFIG['BIDS_MVPA_RSA']))
+rsa_df_all = build_group_dataframe(rsa_files, participants, roi_col_names)
+svm_files = find_subject_tsvs(Path(CONFIG['BIDS_MVPA_DECODING']))
+svm_df_all = build_group_dataframe(svm_files, participants, roi_col_names)
+
+def _load_subject_arrays(df, targets, chance_dict=None):
+    result = {}
+    for t in targets:
+        result[t] = {'experts': [], 'novices': []}
+        tgt_df = df[df['target'] == t]
+        chance = 0.0
+        if chance_dict and t in chance_dict:
+            c = chance_dict[t]
+            chance = c.get('chance', 0.5) if isinstance(c, dict) else 0.5
+        for _, row in tgt_df.iterrows():
+            g = 'experts' if row['expert'] else 'novices'
+            vals = row[roi_col_names].values.astype(float) - chance
+            result[t][g].append(vals)
+        for g in ('experts', 'novices'):
+            result[t][g] = np.array(result[t][g]) if result[t][g] else np.empty((0, len(roi_col_names)))
+    return result
+
+finer_rsa_subject = _load_subject_arrays(rsa_df_all, FINE_TARGETS)
+finer_svm_subject = _load_subject_arrays(svm_df_all, FINE_TARGETS, chance_dict=svm_stats.get('svm', {}))
+
+finer_rsa_ylim = compute_whisker_ylim(
+    *[finer_rsa_subject[t][g] for t in FINE_TARGETS for g in ('experts', 'novices')
+      if finer_rsa_subject[t][g].size > 0]
+)
+finer_svm_ylim = compute_whisker_ylim(
+    *[finer_svm_subject[t][g] for t in FINE_TARGETS for g in ('experts', 'novices')
+      if finer_svm_subject[t][g].size > 0]
+)
+logger.info("Loaded finer per-subject data for boxplots")
+
 fig = plt.figure(figsize=(12, len(FINE_TARGETS) * 3))
 
-panel_idx = 0  # Track row index for layout
+panel_idx = 0
 for target in FINE_TARGETS:
     # -----------------------------------------------------------------------------
     # Data Extraction and Preparation
@@ -340,60 +388,37 @@ for target in FINE_TARGETS:
     # Grouped bars: Experts (solid) vs Novices (hatched)
     ax_rsa = plt.axes()
     ax_rsa.set_label(f'RSA_{panel_idx}_{target}')
+    _xtick = roi_names if target == "total_pieces_half" else ["" for _ in roi_names]
+    _lcol = ["gray" for _ in label_colors_svm]
 
-    plot_grouped_bars_on_ax(
-        ax=ax_rsa,
-        x_positions=x,
-        group1_values=rsa['exp_means'],      # Expert mean correlations
-        group1_cis=rsa['exp_cis'],           # Expert 95% CIs
-        group1_color=roi_colors,             # ROI group colors (solid bars)
-        group2_values=rsa['nov_means'],      # Novice mean correlations
-        group2_cis=rsa['nov_cis'],           # Novice 95% CIs
-        group2_color=roi_colors,             # Same colors (hatched bars)
-        group1_label='Experts',
-        group2_label='Novices',
-        comparison_pvals=rsa['pvals'],       # FDR-corrected p-values for stars
-        ylim=ylim_rsa,                       # Shared y-axis range
-        y_label=PLOT_PARAMS['ylabel_correlation_r'],  # 'Correlation (r)'
-        # subtitle=f'{TARGET_DISPLAY_NAMES[target]}',
-        xtick_labels=roi_names if target == "total_pieces_half" else ["" for _ in roi_names],              # ROI names on x-axis
-        x_label_colors=["gray" for _ in label_colors_svm],         # Color by significance
-        x_tick_rotation=30,
-        x_tick_align='right',
-        visible_spines=['left','bottom'],
-        params=PLOT_PARAMS
+    plot_grouped_boxplots_on_ax(
+        ax=ax_rsa, x_positions=x,
+        group1_data=finer_rsa_subject[target]['experts'],
+        group2_data=finer_rsa_subject[target]['novices'],
+        group1_color=roi_colors, group2_color=roi_colors,
+        group1_label='Experts', group2_label='Novices',
+        comparison_pvals=rsa['pvals'], ylim=finer_rsa_ylim,
+        y_label=PLOT_PARAMS['ylabel_correlation_r'],
+        xtick_labels=_xtick, x_label_colors=_lcol,
+        x_tick_rotation=30, x_tick_align='right',
+        visible_spines=['left','bottom'], params=PLOT_PARAMS
     )
 
-    # -----------------------------------------------------------------------------
-    # Panel B: SVM Decoding Barplot (Experts vs Novices)
-    # -----------------------------------------------------------------------------
-    # Shows per-ROI classification accuracy (minus chance level)
-    # Grouped bars: Experts (solid) vs Novices (hatched)
     ax_svm = plt.axes()
     ax_svm.set_label(f'SVM_{panel_idx}_{target}')
 
-    plot_grouped_bars_on_ax(
-        ax=ax_svm,
-        x_positions=x,
-        group1_values=svm['exp_means'],      # Expert mean accuracies (minus chance)
-        group1_cis=svm['exp_cis'],           # Expert 95% CIs
-        group1_color=roi_colors,             # ROI group colors (solid bars)
-        group2_values=svm['nov_means'],      # Novice mean accuracies (minus chance)
-        group2_cis=svm['nov_cis'],           # Novice 95% CIs
-        group2_color=roi_colors,             # Same colors (hatched bars)
-        group1_label='Experts',
-        group2_label='Novices',
-        comparison_pvals=svm['pvals'],       # FDR-corrected p-values for stars
-        ylim=ylim_svm,                       # Shared y-axis range
-        y_label='Accuracy - chance',         # Chance-subtracted accuracy
-        # subtitle=f'{TARGET_DISPLAY_NAMES[target]}',
-        xtick_labels=roi_names if target == "total_pieces_half" else ["" for _ in roi_names],              # ROI names on x-axis
-        x_label_colors=["gray" for _ in label_colors_svm],         # Color by significance
-        x_tick_rotation=30,
-        x_tick_align='right',
-        visible_spines=['left','bottom'],
-        params=PLOT_PARAMS
-    )
+    plot_grouped_boxplots_on_ax(
+        ax=ax_svm, x_positions=x,
+        group1_data=finer_svm_subject[target]['experts'],
+        group2_data=finer_svm_subject[target]['novices'],
+        group1_color=roi_colors, group2_color=roi_colors,
+        group1_label='Experts', group2_label='Novices',
+        comparison_pvals=svm['pvals'], ylim=finer_svm_ylim,
+        y_label='Accuracy - chance',
+        xtick_labels=_xtick, x_label_colors=_lcol,
+        x_tick_rotation=30, x_tick_align='right',
+        visible_spines=['left','bottom'], params=PLOT_PARAMS
+        )
 
     # -----------------------------------------------------------------------------
     # Panel C: Model RDM (Checkmate Stimuli Only)
