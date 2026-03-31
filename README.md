@@ -96,145 +96,105 @@ If running subject-level GLM and/or MVPA analyses:
 2. Install [CoSMoMVPA](http://www.cosmomvpa.org/)
 3. Add both to your MATLAB path
 
+**Important**: MATLAB does not allow running scripts whose filenames start with a number. The MATLAB scripts in this repository are named with numeric prefixes (e.g., `01_roi_mvpa_main.m`) for ordering consistency with the Python scripts. To run them, either:
+
+- Rename the file by removing the numeric prefix (e.g., `01_roi_mvpa_main.m` → `roi_mvpa_main.m`), or
+- Call them via `run('01_roi_mvpa_main.m')` from the MATLAB command window
+
 ## Data Download and Setup
 
 ### Download Data
 
-**Download link**: [PLACEHOLDER - Data will be available on OpenNeuro/OSF upon publication/request]
+**Download link**: [PLACEHOLDER - Data will be available on KU Leuven RDR upon publication]
 
-The (minimal) dataset is organized according to the Brain Imaging Data Structure (BIDS) specification.
+The dataset is organized according to the Brain Imaging Data Structure (BIDS) specification (v1.10.0).
 
 ### Data Organization
 
-After downloading, extract the data and organize as follows (see also Folder Setup below):
-
-```
-/path/to/your/data/
-└── BIDS/
-    ├── participants.tsv                    # Participant metadata
-    ├── participants.json                   # Column descriptions
-    ├── stimuli.tsv                         # Stimulus metadata
-    ├── dataset_description.json            # Dataset info
-    ├── sub-01/
-    │   ├── anat/                           # Anatomical scans
-    │   │   └── sub-01_T1w.nii.gz
-    │   └── func/                           # Functional scans
-    │       ├── sub-01_task-exp_run-1_bold.nii.gz
-    │       ├── sub-01_task-exp_run-1_events.tsv
-    │       └── ...
-    ├── sub-02/
-    │   └── ...
-    └── derivatives/                        # Preprocessed/analyzed data
-        ├── fmriprep/                       # fMRIPrep outputs (preprocessed data)
-        ├── spm-glm/                        # SPM first-level GLMs
-        │   ├── unsmoothed/                 # Unsmoothed beta images (for MVPA)
-        │   └── smooth4/                    # Smoothed (4mm) beta images (for univariate)
-        ├── mvpa-rsa/                       # Subject-level RSA results
-        ├── mvpa-searchlight/               # Searchlight maps
-        └── eyetracking/                    # Eye-tracking data
-```
+After downloading, extract the data. The dataset follows the BIDS specification. All data -- including stimuli, atlases, and analysis derivatives -- lives under `BIDS/`. See [Folder Setup](#folder-setup) and [Expected Inputs](#expected-inputs) for the full directory tree.
 
 ## Folder Setup
 
 All analyses read their inputs from a **single external data root**. Configure this once and all paths are derived from it.
 
-1) Choose a folder on your system to hold all inputs:
+1) Choose a folder on your system to hold the BIDS dataset:
 
 ```
 /path/to/manuscript-data/
-├── BIDS/                  # BIDS dataset (raw + derivatives)
-│   ├── participants.tsv
-│   └── derivatives/
-├── rois/                  # Atlases and ROI metadata
-├── neurosynth/            # Term maps for meta-analytic correlations
-└── stimuli/               # Stimulus metadata (e.g., stimuli.tsv)
+└── BIDS/                         # BIDS dataset (raw + derivatives)
+    ├── participants.tsv
+    ├── stimuli/                  # Stimulus images and metadata
+    └── derivatives/
+        ├── fmriprep/             # fMRIPrep outputs
+        ├── SPM/                  # GLM beta images
+        ├── mvpa-rsa/             # Subject-level RSA matrices
+        ├── mvpa-decoding/        # Subject-level SVM accuracies
+        ├── rsa_searchlight/      # Searchlight maps
+        ├── eye-tracking/         # Eye-tracking data
+        └── atlases/              # ROI atlases and reference data
+            ├── glasser22/        # 22 bilateral cortical ROIs
+            ├── glasser180/       # 180 bilateral cortical ROIs
+            ├── cab-np/           # Subcortical ROIs (CAB-NP)
+            └── neurosynth/       # Meta-analytic term maps
 ```
 
-2) Point the repository to this folder by editing `common/constants.py`:
+2) Point the repository to this folder:
+
+**Python** -- edit `common/constants.py`:
 
 ```python
-# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
 _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
-# Do not edit BIDS_ROOT directly — it is derived from the external root
 ```
+
+**MATLAB** -- edit `common/chess_config.m`:
+
+```matlab
+cfg.dataRoot = getenv_or('/path/to/manuscript-data', 'CHESS_DATA_ROOT');
+```
+
+Both files derive all other paths from this single root. Alternatively, set the `CHESS_DATA_ROOT` environment variable to avoid editing files.
 
 ## Expected Inputs
 
-The repository expects the following files and layout under `_EXTERNAL_DATA_ROOT`. Adjust the root path in `common/constants.py` if your data lives elsewhere.
+The repository expects the following layout under `_EXTERNAL_DATA_ROOT`. Everything lives inside `BIDS/` (including stimuli, atlases, and neurosynth term maps under `derivatives/atlases/`).
 
-Top level
 ```
 <EXTERNAL_DATA_ROOT>/
-├── BIDS/
-├── rois/
-├── neurosynth/
-└── stimuli/
-```
-
-BIDS (raw + derivatives)
-```
-BIDS/
-├── dataset_description.json
-├── participants.json
-├── participants.tsv                     # participant_id, group
-├── sub-01/func/
-│   ├── sub-01_task-exp_run-1_bold.nii.gz
-│   ├── sub-01_task-exp_run-1_events.tsv
-│   └── ... (runs 1–6 per subject)
-└── derivatives/
-    ├── SPM/
-    │   ├── GLM-unsmoothed/sub-*/exp/    # beta_*.nii.gz, SPM.mat, mask.nii.gz
-    │   └── GLM-smooth4/
-    │       └── group/
-    │           ├── spmT_exp_gt_nonexp_all_gt_rest.nii.gz
-    │           └── spmT_exp_gt_nonexp_check_gt_nocheck.nii.gz
-    ├── mvpa-rsa/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv
-    ├── mvpa-decoding/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv
-    ├── mvpa-rsa-subcortical/sub-*/sub-*_..._roi-cabnp_rdm.tsv
-    ├── mvpa-decoding-subcortical/sub-*/sub-*_..._roi-cabnp_accuracy.tsv
-    ├── rsa_searchlight/sub-*/
-    │   ├── sub-*_desc-searchlight_checkmate_stat-r_map.nii.gz
-    │   ├── sub-*_desc-searchlight_strategy_stat-r_map.nii.gz
-    │   └── sub-*_desc-searchlight_visual_similarity_stat-r_map.nii.gz
-    └── eye-tracking/sub-*/func/
-        ├── sub-*_task-exp_run-1_space-MNI152NLin2009cAsym_desc-1to6_eyetrack.tsv
-        └── sub-*_task-exp_run-1_space-MNI152NLin2009cAsym_desc-1to6_eyetrack.json
-```
-
-ROIs and parcellations
-```
-rois/
-├── glasser22/
-│   ├── tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz
-│   └── region_info.tsv
-├── glasser180/
-│   ├── tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-180_bilateral_resampled.nii.gz
-│   └── region_info.tsv
-├── glasser180-surface/
-│   ├── lh.HCPMMP1.annot
-│   └── rh.HCPMMP1.annot
-└── cab-np/
-    ├── tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii.gz
-    └── region_info.tsv
-```
-
-Neurosynth term maps
-```
-neurosynth/terms/
-├── 1_working memory.nii.gz
-├── 2_navigation.nii.gz
-├── 3_memory retrieval.nii.gz
-├── 4_language network.nii.gz
-├── 5_object recognition.nii.gz
-├── 6_face recognition.nii.gz
-└── 7_early visual.nii.gz
-```
-
-Stimuli metadata and images
-```
-stimuli/
-├── stimuli.tsv                           # stim_id, check, strategy, visual, ...
-└── images/*.png                          # 40 chess board images (C* and NC* files)
+└── BIDS/
+    ├── dataset_description.json
+    ├── participants.tsv                     # participant_id, age, sex, group, rating
+    ├── participants.json
+    ├── README
+    ├── task-exp_bold.json                   # TaskName via BIDS inheritance
+    ├── task-familiarisation_beh.json        # Beh sidecar via BIDS inheritance
+    ├── stimuli/
+    │   ├── stimuli.tsv                      # Stimulus metadata (stim_id, check, strategy, ...)
+    │   └── *.png                            # 40 chess board images
+    ├── sub-01/
+    │   ├── anat/sub-01_T1w.nii.gz
+    │   ├── func/sub-01_task-exp_run-{1..6}_bold.nii.gz
+    │   ├── func/sub-01_task-exp_run-{1..6}_events.tsv
+    │   └── beh/sub-01_task-familiarisation_beh.tsv
+    ├── sub-02/ ... sub-44/
+    └── derivatives/
+        ├── fmriprep/                        # fMRIPrep preprocessed data
+        ├── SPM/
+        │   ├── GLM-unsmoothed/sub-*/exp/    # Unsmoothed beta images (for MVPA)
+        │   └── GLM-smooth4/group/           # Group-level smoothed contrasts
+        ├── mvpa-rsa/sub-*/                  # Subject-level RSA correlation matrices
+        ├── mvpa-decoding/sub-*/             # Subject-level SVM accuracy scores
+        ├── mvpa-rsa-subcortical/sub-*/
+        ├── mvpa-decoding-subcortical/sub-*/
+        ├── rsa_searchlight/sub-*/           # Subject-level searchlight maps
+        ├── eye-tracking/sub-*/              # Eye-tracking derivatives
+        └── atlases/                         # ROI atlases and reference data
+            ├── glasser22/                   # 22 bilateral cortical ROIs
+            ├── glasser180/                  # 180 bilateral cortical ROIs
+            ├── glasser180-surface/          # Surface parcellation (.annot)
+            ├── cab-np/                      # Subcortical ROIs (CAB-NP)
+            ├── neurosynth/terms/            # Meta-analytic term maps
+            ├── HCP-MMP1_UniqueRegionList.csv
+            └── dataset_description.json
 ```
 
 ## Running Analyses

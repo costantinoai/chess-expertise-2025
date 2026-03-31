@@ -80,7 +80,7 @@ skill gradient.
 Configure the external data root in `common/constants.py`:
 
 ```python
-# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
+# Base folder containing BIDS/ (all data lives inside BIDS/)
 _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 ```
 

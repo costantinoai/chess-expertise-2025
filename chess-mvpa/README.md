@@ -114,8 +114,8 @@ Subject-level RSA correlations and decoding accuracies were aggregated and teste
 - **SPM GLM outputs**: `BIDS/derivatives/SPM/GLM-unsmoothed/sub-*/exp/SPM.mat`
   - Trial-wise beta estimates (unsmoothed)
   - One beta image per condition per run
-- **Atlas**: `rois/glasser22/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz`
-- **ROI metadata**: `rois/glasser22/region_info.tsv`
+- **Atlas**: `BIDS/derivatives/atlases/glasser22/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz`
+- **ROI metadata**: `BIDS/derivatives/atlases/glasser22/region_info.tsv`
   - Columns: `index`, `name`, `hemisphere`
 
 **For group-level analysis (Python)**:
@@ -123,7 +123,7 @@ Subject-level RSA correlations and decoding accuracies were aggregated and teste
 - **Decoding accuracies**: `BIDS/derivatives/mvpa-decoding/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv`
 - **Participant data**: `BIDS/participants.tsv`
   - Columns: `participant_id`, `group` (expert/novice)
-- **Stimulus metadata**: `stimuli/stimuli.tsv`
+- **Stimulus metadata**: `BIDS/stimuli/stimuli.tsv`
   - Required for deriving chance levels for decoding targets
 
 ### Data Location
@@ -131,9 +131,9 @@ Subject-level RSA correlations and decoding accuracies were aggregated and teste
 Set the external data root once in `common/constants.py` (all analysis paths are derived from it):
 
 ```python
-# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
+# Base folder containing BIDS/ (all data lives inside BIDS/)
 _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
-# BIDS_ROOT and derivative paths (e.g., mvpa-rsa, mvpa-decoding) are built from this
+# All paths (BIDS_ROOT, ROIs, stimuli, derivatives) are derived from this
 ```
 
 Key derived paths used here (from `CONFIG`):

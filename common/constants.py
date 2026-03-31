@@ -90,19 +90,19 @@ _MANUSCRIPT_TABLES_DIR = _FINAL_RESULTS_DIR / "tables"
 # Intermediate Path Construction (private - build CONFIG paths from these)
 # ============================================================================
 
-# ROI base directories
-_ROI_ROOT = _EXTERNAL_DATA_ROOT / "rois"
+# BIDS base directories
+_BIDS_ROOT = _EXTERNAL_DATA_ROOT / "BIDS"
+_BIDS_DERIVATIVES = _BIDS_ROOT / "derivatives"
+
+# ROI base directories (under BIDS/derivatives/atlases/)
+_ROI_ROOT = _BIDS_DERIVATIVES / "atlases"
 _ROI_GLASSER_22_DIR = _ROI_ROOT / "glasser22"
 _ROI_GLASSER_180_DIR = _ROI_ROOT / "glasser180"
 _ROI_GLASSER_180_SURFACE_DIR = _ROI_ROOT / "glasser180-surface"
 _ROI_CABNP_DIR = _ROI_ROOT / "cab-np"
 
-# BIDS base directories
-_BIDS_ROOT = _EXTERNAL_DATA_ROOT / "BIDS"
-_BIDS_DERIVATIVES = _BIDS_ROOT / "derivatives"
-
-# Neurosynth base directory
-_NEUROSYNTH_ROOT = _EXTERNAL_DATA_ROOT / "neurosynth"
+# Neurosynth base directory (under BIDS/derivatives/atlases/)
+_NEUROSYNTH_ROOT = _ROI_ROOT / "neurosynth"
 
 # ============================================================================
 # CONFIG Dictionary - All Constants in One Place
@@ -158,7 +158,7 @@ CONFIG = {
     'BIDS_ROOT': _BIDS_ROOT,                                    # Main BIDS dataset root
     'BIDS_DERIVATIVES': _BIDS_DERIVATIVES,                      # Preprocessed/derived data
     'BIDS_PARTICIPANTS': _BIDS_ROOT / "participants.tsv",       # Subject metadata TSV
-    'STIMULI_FILE': _EXTERNAL_DATA_ROOT / "stimuli" / "stimuli.tsv",  # Chess board stimulus metadata
+    'STIMULI_FILE': _BIDS_ROOT / "stimuli" / "stimuli.tsv",  # Chess board stimulus metadata
 
     # --- Preprocessing Outputs ---
     'BIDS_FMRIPREP': _BIDS_DERIVATIVES / "fmriprep",            # fMRIPrep outputs

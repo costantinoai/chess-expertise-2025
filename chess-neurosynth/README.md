@@ -29,13 +29,13 @@ Seven cognitive terms were selected *a priori* for their relevance to chess expe
 - Gray matter mask includes both cortical and subcortical regions
 
 File locations (under external data root):
-- `neurosynth/terms/1_working memory.nii.gz`
-- `neurosynth/terms/2_navigation.nii.gz`
-- `neurosynth/terms/3_memory retrieval.nii.gz`
-- `neurosynth/terms/4_language network.nii.gz`
-- `neurosynth/terms/5_object recognition.nii.gz`
-- `neurosynth/terms/6_face recognition.nii.gz`
-- `neurosynth/terms/7_early visual.nii.gz`
+- `BIDS/derivatives/atlases/neurosynth/terms/1_working memory.nii.gz`
+- `BIDS/derivatives/atlases/neurosynth/terms/2_navigation.nii.gz`
+- `BIDS/derivatives/atlases/neurosynth/terms/3_memory retrieval.nii.gz`
+- `BIDS/derivatives/atlases/neurosynth/terms/4_language network.nii.gz`
+- `BIDS/derivatives/atlases/neurosynth/terms/5_object recognition.nii.gz`
+- `BIDS/derivatives/atlases/neurosynth/terms/6_face recognition.nii.gz`
+- `BIDS/derivatives/atlases/neurosynth/terms/7_early visual.nii.gz`
 
 ### Univariate Analysis: T-Map Correlations
 
@@ -108,7 +108,7 @@ Paths (under external data root):
 - **Group t-maps**: `BIDS/derivatives/SPM/GLM-smooth4/group/spmT_exp-gt-nonexp_*.nii.gz`
   - SPM12 second-level GLM outputs
   - Contrasts: Experts > Novices for various first-level contrasts
-- **Neurosynth term maps**: `neurosynth/terms/*.nii.gz`
+- **Neurosynth term maps**: `BIDS/derivatives/atlases/neurosynth/terms/*.nii.gz`
   - Z-scored association test maps for cognitive terms
   - Downloaded from https://neurosynth.org/
 

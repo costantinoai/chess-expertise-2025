@@ -76,7 +76,7 @@ See `requirements.txt` in the repository root for complete dependencies.
 Set the external data root once in `common/constants.py` (all analysis paths are derived from it):
 
 ```python
-# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
+# Base folder containing BIDS/ (all data lives inside BIDS/)
 _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 # BIDS_ROOT, ROI, and other paths are built from this automatically
 ```
@@ -85,13 +85,11 @@ Expected structure under this folder:
 
 ```
 /path/to/manuscript-data/
-├── BIDS/                      # Main dataset (BIDS-compliant)
-│   ├── participants.tsv
-│   ├── sub-*/
-│   └── derivatives/
-├── rois/                      # Atlases and ROI metadata
-├── neurosynth/                # Term maps for meta-analysis (if used)
-└── stimuli/                   # Stimulus metadata (e.g., stimuli.tsv)
+└── BIDS/                      # Main dataset (BIDS-compliant)
+    ├── participants.tsv
+    ├── stimuli/               # Stimulus metadata
+    ├── sub-*/
+    └── derivatives/           # Per-subject derivatives + atlases
 ```
 
 ## Running the Analysis

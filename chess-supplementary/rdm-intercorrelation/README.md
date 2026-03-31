@@ -74,7 +74,7 @@ See `requirements.txt` in the repository root for complete dependencies.
 Set the external data root once in `common/constants.py` (all analysis paths are derived from it):
 
 ```python
-# Base folder containing BIDS/, rois/, neurosynth/, stimuli/
+# Base folder containing BIDS/ (all data lives inside BIDS/)
 _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 ```
 

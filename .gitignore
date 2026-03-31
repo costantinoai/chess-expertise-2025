@@ -138,3 +138,4 @@ docs/
 /chess-supplementary/dataset-viz
 Makefile
 /chess-dnn
+results-bundle/
