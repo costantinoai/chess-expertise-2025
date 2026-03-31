@@ -49,19 +49,20 @@
 clear; clc;
 
 %% --------------------------- Configuration -------------------------------
-% Derivatives and BIDS roots (overridable via env)
-defaultDeriv = '/data/projects/chess/data/BIDS/derivatives';
-defaultBids  = '/data/projects/chess/data/BIDS';
-DERIVATIVES  = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
-BIDS_ROOT    = getenv_default('CHESS_BIDS_ROOT',        defaultBids);
+% Central config (edit common/chess_config.m to change paths)
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'common'));
+cfg = chess_config();
+
+DERIVATIVES  = cfg.derivatives;
+BIDS_ROOT    = cfg.bidsRoot;
 
 % Space and smoothing (default 4 mm per manuscript)
 SPACE        = getenv_default('CHESS_GLM_SPACE', 'MNI');          % 'MNI' or 'T1w'
 SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '4'));
 
 % fMRIPrep root and output roots (BIDS-like derivatives)
-fmriprepRoot = fullfile(DERIVATIVES, 'fmriprep');
-glmBase      = fullfile(DERIVATIVES, 'SPM');
+fmriprepRoot = cfg.fmriprep;
+glmBase      = cfg.spmDir;
 % Separate output roots for unsmoothed and smoothed (4 mm) first-level GLMs
 outRootUns   = fullfile(glmBase, 'unsmoothed');
 outRootSm4   = fullfile(glmBase, sprintf('smooth%d', SMOOTH_MM));

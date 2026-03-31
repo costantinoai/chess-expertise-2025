@@ -39,15 +39,17 @@
 clear; clc;
 
 %% --------------------------- Configuration -------------------------------
-defaultDeriv = '/data/projects/chess/data/BIDS/derivatives';
-defaultBids  = '/data/projects/chess/data/BIDS';
-DERIVATIVES  = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
-BIDS_ROOT    = getenv_default('CHESS_BIDS_ROOT',        defaultBids);
+% Central config (edit common/chess_config.m to change paths)
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'common'));
+cfg = chess_config();
+
+DERIVATIVES  = cfg.derivatives;
+BIDS_ROOT    = cfg.bidsRoot;
 SPACE        = getenv_default('CHESS_GLM_SPACE', 'MNI');
 SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '4'));
 
 % First-level GLM root (BIDS-like): derivatives/SPM/smooth<MM>
-glmRoot = fullfile(DERIVATIVES, 'SPM', sprintf('smooth%d', SMOOTH_MM));
+glmRoot = fullfile(cfg.spmDir, sprintf('smooth%d', SMOOTH_MM));
 
 % No second-level smoothing; group analyses run on first-level smoothed (4mm) contrasts
 

@@ -33,27 +33,16 @@
 clear; clc;
 
 %% --------------------------- Configuration -------------------------------
-% External data root (override with env CHESS_DATA_ROOT)
-% Default: manuscript-data/ -- the shared data folder.
-% NOTE: .nii.gz files must be decompressed to .nii before running this
-% script, as MATLAB's SPM cannot read gzipped NIfTI natively.
-defaultDataRoot = '/media/costantino_ai/eik-T9/manuscript-data';
-dataRoot = getenv_default('CHESS_DATA_ROOT', defaultDataRoot);
-derivativesDir = fullfile(dataRoot, 'BIDS', 'derivatives');
+% Central config (edit common/chess_config.m to change paths)
+addpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'common'));
+cfg = chess_config();
 
-% GLM root for unsmoothed SPM outputs (subject folders live here)
-glmRoot = fullfile(derivativesDir, 'SPM', 'GLM-unsmoothed');
-
-% ROI atlas and metadata (override with CHESS_ROI_ATLAS_22 and CHESS_ROI_TSV_22)
-% The atlas .nii must be decompressed for SPM's spm_vol.
-roiAtlas = getenv_default('CHESS_ROI_ATLAS_22', ...
-    fullfile(dataRoot, 'rois', 'glasser22', ...
-    'tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii'));
-roiTSV = getenv_default('CHESS_ROI_TSV_22', ...
-    fullfile(dataRoot, 'rois', 'glasser22', 'region_info.tsv'));
+derivativesDir = cfg.derivatives;
+glmRoot        = cfg.glmUnsmoothed;
+roiAtlas       = cfg.roiGlasser22Atlas;
+roiTSV         = cfg.roiGlasser22TSV;
 
 % Output root: save results in the repo, not in BIDS derivatives.
-% Results are saved alongside this script under results/mvpa-rsa-run-matched/.
 scriptDir = fileparts(mfilename('fullpath'));
 outRootRSACorr = fullfile(scriptDir, 'results', 'mvpa-rsa-run-matched');
 mkdir_p(outRootRSACorr);

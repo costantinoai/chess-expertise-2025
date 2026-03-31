@@ -28,22 +28,19 @@
 clear; clc;
 
 %% --------------------------- Configuration -------------------------------
-defaultDeriv = '/data/projects/chess/data/BIDS/derivatives';
-derivativesDir = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
+% Central config (edit common/chess_config.m to change paths)
+addpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'common'));
+cfg = chess_config();
 
-glmRoot = fullfile(derivativesDir, 'fmriprep-SPM_smoothed-NO_GS-FD-HMP_brainmasked', 'MNI', 'fmriprep-SPM-MNI', 'GLM');
-
-roiAtlas = getenv_default('CHESS_ROI_ATLAS_22', ...
-    fullfile(derivativesDir, 'rois', 'glasser22', 'tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii'));
-roiTSV = getenv_default('CHESS_ROI_TSV_22', ...
-    fullfile(derivativesDir, 'rois', 'glasser22', 'region_info.tsv'));
-
-stimuliTSV = getenv_default('CHESS_STIMULI_TSV', '/media/costantino_ai/eik-T9/manuscript-data/stimuli/stimuli.tsv');
+derivativesDir = cfg.derivatives;
+glmRoot        = cfg.glmUnsmoothed;
+roiAtlas       = cfg.roiGlasser22Atlas;
+roiTSV         = cfg.roiGlasser22TSV;
+stimuliTSV     = cfg.stimuliFile;
 
 % Output root - use same directories and filenames as main MVPA
-% Fine-grained targets will appear as additional rows in the same files
-outRootSVM = fullfile(derivativesDir, 'mvpa-decoding');
-outRootRSACorr = fullfile(derivativesDir, 'mvpa-rsa');
+outRootSVM     = cfg.mvpaDecoding;
+outRootRSACorr = cfg.mvpaRsa;
 mkdir_p(outRootSVM); mkdir_p(outRootRSACorr);
 
 fprintf('[INFO] Fine-grained outputs will be written to same files as main MVPA: %s and %s\n', outRootSVM, outRootRSACorr);

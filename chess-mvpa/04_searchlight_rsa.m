@@ -95,14 +95,15 @@
 clear; clc;
 
 %% --------------------------- Configuration -------------------------------
+% Central config (edit common/chess_config.m to change paths)
+addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'common'));
+cfg = chess_config();
 
-% BIDS derivatives root (override with env CHESS_BIDS_DERIVATIVES)
-defaultDeriv = '/data/projects/chess/data/BIDS/derivatives';
-derivativesDir = getenv_default('CHESS_BIDS_DERIVATIVES', defaultDeriv);
+derivativesDir = cfg.derivatives;
 
 % GLM root for unsmoothed SPM outputs (subject folders live here)
 % Searchlight RSA uses unsmoothed data to preserve spatial specificity
-glmRoot = fullfile(derivativesDir, 'fmriprep-SPM_smoothed-NO_GS-FD-HMP_brainmasked', 'MNI', 'fmriprep-SPM-MNI', 'GLM');
+glmRoot = cfg.glmUnsmoothed;
 
 % Output root with timestamp for reproducibility
 ts = datestr(now, 'yyyymmdd-HHMMSS');

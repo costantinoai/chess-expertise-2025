@@ -28,22 +28,17 @@
 clear; clc;
 
 %% --------------------------- Configuration -------------------------------
-% BIDS derivatives root (must be set via environment variable)
-derivativesDir = getenv('CHESS_BIDS_DERIVATIVES');
-if isempty(derivativesDir)
-    error('Environment variable CHESS_BIDS_DERIVATIVES is not set. Set it to the BIDS derivatives root (e.g., /path/to/BIDS/derivatives).');
-end
+% Central config (edit common/chess_config.m to change paths)
+addpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'common'));
+cfg = chess_config();
 
-% GLM root for unsmoothed SPM outputs (subject folders live here)
-glmRoot = fullfile(derivativesDir, 'SPM', 'GLM-unsmoothed');
+derivativesDir = cfg.derivatives;
+glmRoot        = cfg.glmUnsmoothed;
 
 % ROI atlas: CAB-NP subcortical bilateral atlas (resampled to functional space)
 % Use .nii (uncompressed) since SPM's spm_vol does not support .nii.gz
-roiRoot = fullfile(fileparts(fileparts(derivativesDir)), 'rois');
-roiAtlas = getenv_default('CHESS_ROI_ATLAS_CABNP', ...
-    fullfile(roiRoot, 'cab-np', 'tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii'));
-roiTSV = getenv_default('CHESS_ROI_TSV_CABNP', ...
-    fullfile(roiRoot, 'cab-np', 'region_info.tsv'));
+roiAtlas = cfg.roiCabnpAtlas;
+roiTSV   = cfg.roiCabnpTSV;
 
 % Output roots: subcortical SVM and RSA results
 outRootSVM = fullfile(derivativesDir, 'mvpa-decoding-subcortical');
