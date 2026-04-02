@@ -60,15 +60,9 @@ Usage
 python chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
 """
 
-import sys
-import os
 import pickle
 from pathlib import Path
 
-# Add repo root and chess-mvpa to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
 script_dir = Path(__file__).parent
 
 # Import CONFIG first to check pylustrator flag
@@ -98,6 +92,10 @@ from common.plotting import (
     save_axes_svgs,
     save_panel_pdf,
 )
+# chess-mvpa modules (cross-analysis dependency)
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-mvpa"))
+
 from modules.mvpa_plot_utils import extract_mvpa_bar_data
 
 
@@ -287,7 +285,6 @@ stim_colors, stim_alphas = compute_stimulus_palette(checkmate_stimuli)
 # Load per-subject data for boxplots
 from common.io_utils import find_subject_tsvs
 from common.bids_utils import get_participants_with_expertise
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa'))
 from modules.mvpa_io import build_group_dataframe
 
 roi_col_names = roi_info['roi_name'].tolist()

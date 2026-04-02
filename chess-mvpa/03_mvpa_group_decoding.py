@@ -92,14 +92,10 @@ All results are saved to results/mvpa_group/:
 - 03_mvpa_group_decoding.py: Copy of this script
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 import numpy as np
 
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
 from common import CONFIG, setup_or_reuse_analysis_dir, log_script_end

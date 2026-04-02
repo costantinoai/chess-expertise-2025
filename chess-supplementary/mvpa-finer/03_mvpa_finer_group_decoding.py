@@ -6,16 +6,9 @@ Performs group-level tests on subject-level ROI SVM decoding accuracies for
 fine dimensions computed on checkmate boards only.
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Add repo root for 'common' module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-# Add chess-mvpa to import path to reuse its modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
 script_dir = Path(__file__).parent
 
 import numpy as np
@@ -30,6 +23,10 @@ from common.bids_utils import (
 )
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
+
+# chess-mvpa modules (cross-analysis dependency)
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-mvpa"))
 
 from modules.mvpa_io import (
     find_subject_tsvs,

@@ -99,11 +99,8 @@ All results are saved to results/<timestamp>_manifold/:
 - 01_manifold_analysis.py: Copy of this script
 """
 
-import os
-import sys
 from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 script_dir = Path(__file__).parent
 
 import pickle

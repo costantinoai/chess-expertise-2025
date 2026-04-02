@@ -108,14 +108,10 @@ All results are saved to results/<timestamp>_manifold/:
 - 01_manifold_analysis.py: Copy of this script
 """
 
-import os
 import re
-import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-# Path to repo root (two levels up from chess-supplementary/run-matching/)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 script_dir = Path(__file__).parent
 
 import pickle  # noqa: S301 — used for internal analysis artifacts only
@@ -130,8 +126,9 @@ from common.bids_utils import get_subject_list, get_group_summary
 from common.neuro_utils import load_atlas
 from common.spm_utils import _normalize_subject_id, _get_spm_dir, _get_beta_filename
 
-# Chess-manifold modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chess-manifold")))
+# Chess-manifold modules (not an installable package; add parent to path)
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "chess-manifold"))
 
 from modules.data import (
     load_atlas_and_metadata,

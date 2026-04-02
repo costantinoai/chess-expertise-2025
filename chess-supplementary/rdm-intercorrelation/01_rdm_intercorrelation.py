@@ -121,14 +121,9 @@ All results are saved to results/<timestamp>_rdm_intercorrelation/:
 - 01_rdm_intercorrelation.py: Copy of this script
 """
 
-import sys
 from pathlib import Path
 
 # Enable imports from repo root
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 import numpy as np
 import pandas as pd
 from common import CONFIG

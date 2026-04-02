@@ -54,18 +54,8 @@ Usage
 python chess-behavioral/91_plot_behavioral_panels.py
 """
 
-import os
-import sys
 import pickle
 from pathlib import Path
-
-# Ensure repo root is on sys.path for 'common' imports
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
-        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG

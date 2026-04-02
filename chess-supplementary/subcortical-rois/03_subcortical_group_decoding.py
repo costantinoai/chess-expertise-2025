@@ -27,13 +27,10 @@ Outputs
 - subcortical_group_stats.pkl (svm block)
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 import numpy as np
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from common import CONFIG, setup_or_reuse_analysis_dir, log_script_end
 from common.bids_utils import (
@@ -45,7 +42,10 @@ from common.bids_utils import (
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
+# chess-mvpa modules (cross-analysis dependency)
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-mvpa"))
+
 from modules.mvpa_io import find_subject_tsvs, build_group_dataframe
 from modules.mvpa_group import (
     compute_per_roi_group_comparison,

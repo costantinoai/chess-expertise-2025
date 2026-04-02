@@ -56,12 +56,9 @@ JSON keys (per feature set):
 - pooled_accuracy, pooled_ci_low, pooled_ci_high, n_correct, n_total
 """
 
-import os
-import sys
 from pathlib import Path
 import json
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 script_dir = Path(__file__).parent
 
 import numpy as np

@@ -43,14 +43,10 @@ Usage
 python chess-supplementary/univariate-rois/91_plot_univariate_rois.py
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 import numpy as np
 
-# Add parent (repo root) to sys.path for 'common' and 'modules'
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -73,13 +69,6 @@ from common.plotting import (
     save_axes_svgs,
     save_panel_pdf,
 )
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
-        break
-
 from modules import UNIV_CONTRASTS
 
 

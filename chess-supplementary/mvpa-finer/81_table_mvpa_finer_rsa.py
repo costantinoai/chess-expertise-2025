@@ -70,11 +70,9 @@ python chess-supplementary/mvpa-finer/81_table_mvpa_finer_rsa.py
 Supplementary Analysis: MVPA RSA with finer-grained parcellation (180 ROIs)
 """
 
-import sys
 from pathlib import Path
 import pickle
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata

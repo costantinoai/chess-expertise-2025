@@ -16,17 +16,13 @@ Usage:
     python compare_run_matched_vs_original.py
 """
 
-import os
-import sys
 from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import pandas as pd
 from common import CONFIG
 
 script_dir = Path(__file__).parent
-repo_root = script_dir.parents[1]
 
 # =============================================================================
 # 1. PR comparison

@@ -15,15 +15,7 @@ Colors: checkmate = gold (#fdb338), non-checkmate = blue (#025196),
 Reads results from 02_marginal_split_half.py.
 """
 
-import os
-import sys
 from pathlib import Path
-
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..', '..'),):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
 
 from common import CONFIG
 
