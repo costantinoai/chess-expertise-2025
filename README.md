@@ -341,7 +341,9 @@ The pipeline was validated on Ubuntu 24.04 with Python 3.11.6 (numpy 1.26.4, sci
 
 If you use this code or data in your research, please cite:
 
-[PLACEHOLDER]
+> Costantino, A.I. et al. (2025). Chess expertise shapes neural representations of strategic board positions. *Under review*.
+
+Code: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392283.svg)](https://doi.org/10.5281/zenodo.19392283)
 
 ## Acknowledgments
 
