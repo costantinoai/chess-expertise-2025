@@ -122,12 +122,8 @@ All results are saved to results/<timestamp>_neurosynth_rsa/:
 - 02_rsa_neurosynth.py: Copy of this script
 """
 
-import os
-import sys
 from pathlib import Path
 
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
 from nilearn.glm.second_level import SecondLevelModel
@@ -243,7 +239,8 @@ for pattern, pretty in PATTERNS.items():
     # cognitive functions are most strongly associated with regions showing
     # expertise-related differences in RSA correlations.
     df_pos, df_neg, df_diff = compute_all_zmap_correlations(
-        z_pos, z_neg, term_maps, ref_img=con_img
+        z_pos, z_neg, term_maps, ref_img=con_img,
+        random_state=config['RANDOM_SEED'],
     )
 
     # Reorder rows by canonical term order for consistency across analyses

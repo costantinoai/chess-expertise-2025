@@ -42,9 +42,8 @@ glmRoot        = cfg.glmUnsmoothed;
 roiAtlas       = cfg.roiGlasser22Atlas;
 roiTSV         = cfg.roiGlasser22TSV;
 
-% Output root: save results in the repo, not in BIDS derivatives.
-scriptDir = fileparts(mfilename('fullpath'));
-outRootRSACorr = fullfile(scriptDir, 'results', 'mvpa-rsa-run-matched');
+% Output root: save results in BIDS derivatives alongside other MVPA outputs.
+outRootRSACorr = fullfile(derivativesDir, 'mvpa-rsa-run-matched');
 mkdir_p(outRootRSACorr);
 
 fprintf('[INFO] RSA outputs will be written under: %s\n', outRootRSACorr);

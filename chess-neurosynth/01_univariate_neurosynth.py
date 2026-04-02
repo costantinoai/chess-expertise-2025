@@ -123,12 +123,8 @@ All results are saved to results/<timestamp>_neurosynth_univariate/:
 - 01_univariate_neurosynth.py: Copy of this script
 """
 
-import os
-import sys
 from pathlib import Path
 
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
 from nilearn import image
@@ -221,7 +217,8 @@ for t_path in t_files:
     # This identifies which cognitive functions are most strongly associated
     # with regions showing expertise-related activation differences.
     df_pos, df_neg, df_diff = compute_all_zmap_correlations(
-        z_pos, z_neg, term_maps, ref_img=z_img
+        z_pos, z_neg, term_maps, ref_img=z_img,
+        random_state=config['RANDOM_SEED'],
     )
 
     # Reorder rows by canonical term order for consistency

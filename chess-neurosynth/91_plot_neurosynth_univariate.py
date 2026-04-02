@@ -42,18 +42,8 @@ Usage
 python chess-neurosynth/91_plot_neurosynth_univariate.py
 """
 
-import os
-import sys
 from pathlib import Path
 script_dir = Path(__file__).parent
-
-# Ensure repo root is on sys.path for 'common' imports
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
-        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -107,7 +97,6 @@ FIGURES_DIR = dirs['figures']
 # =============================================================================
 # Setup logging
 # =============================================================================
-
 
 
 # =============================================================================
@@ -289,20 +278,7 @@ surface_fig_check = plot_flat_pair(
 )
 embed_figure_on_ax(ax_D, surface_fig_check, title='Surface Projection', subtitle='Checkmate > Non-Checkmate')
 
-# -----------------------------------------------------------------------------
-# Panel E: Glass Brain Terms Visualization
-# -----------------------------------------------------------------------------
-# Display pre-made glass brain image showing term locations from manuscript data
-ax_E = plt.axes(); ax_E.set_label('E_Terms_Glass')
-
-# Load image from ROI directory (centralized path from CONFIG)
-import matplotlib.image as mpimg
-terms_glass_path = CONFIG['NEUROSYNTH_ROOT'] / 'terms_glass.png'
-
-img = mpimg.imread(str(terms_glass_path))
-ax_E.imshow(img)
-ax_E.set_axis_off()
-logger.info(f"Loaded glass brain image from {terms_glass_path}")
+# Panel E (glass brain terms visualization) removed — asset no longer available
 
 
 # =============================================================================
@@ -359,16 +335,7 @@ plt.figure(1).ax_dict["C_Flat_All_gt_Rest"].text(0.0217, 0.9793, 'c', transform=
 plt.figure(1).ax_dict["D_Flat_Check_gt_NoCheck"].set(position=[0.5367, -0.02473, 0.436, 0.2985])
 plt.figure(1).ax_dict["D_Flat_Check_gt_NoCheck"].texts[0].set(position=(0.4951, 1.009))
 plt.figure(1).ax_dict["D_Flat_Check_gt_NoCheck"].texts[1].set(position=(0.4951, 0.9548))
-plt.figure(1).ax_dict["E_Terms_Glass"].set(position=[0.0143, 0.7285, 0.9547, 0.2598], xticks=[], xticklabels=[], yticks=[], yticklabels=[])
-plt.figure(1).ax_dict["E_Terms_Glass"].set_position([0.020344, 0.680068, 0.944324, 0.307795])
-plt.figure(1).ax_dict["E_Terms_Glass"].spines[['left', 'right', 'bottom', 'top']].set_visible(False)
-plt.figure(1).ax_dict["E_Terms_Glass"].text(0.2833, 0.9750, 'All Boards > Baseline', transform=plt.figure(1).ax_dict["E_Terms_Glass"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["E_Terms_Glass"].texts[0].new
-plt.figure(1).ax_dict["E_Terms_Glass"].text(0.5563, 0.9750, 'Checkmate > Non-Checkmate', transform=plt.figure(1).ax_dict["E_Terms_Glass"].transAxes, fontsize=7., weight='bold')  # id=plt.figure(1).ax_dict["E_Terms_Glass"].texts[1].new
-plt.figure(1).ax_dict["E_Terms_Glass"].text(0.3062, 0.9215, 'Experts > Novices', transform=plt.figure(1).ax_dict["E_Terms_Glass"].transAxes, )  # id=plt.figure(1).ax_dict["E_Terms_Glass"].texts[2].new
-plt.figure(1).ax_dict["E_Terms_Glass"].text(0.3062, 0.4753, 'Novices > Experts', transform=plt.figure(1).ax_dict["E_Terms_Glass"].transAxes, )  # id=plt.figure(1).ax_dict["E_Terms_Glass"].texts[3].new
-plt.figure(1).ax_dict["E_Terms_Glass"].text(0.6099, 0.9215, 'Experts > Novices', transform=plt.figure(1).ax_dict["E_Terms_Glass"].transAxes, )  # id=plt.figure(1).ax_dict["E_Terms_Glass"].texts[4].new
-plt.figure(1).ax_dict["E_Terms_Glass"].text(0.6099, 0.4753, 'Novices > Experts', transform=plt.figure(1).ax_dict["E_Terms_Glass"].transAxes, )  # id=plt.figure(1).ax_dict["E_Terms_Glass"].texts[5].new
-plt.figure(1).ax_dict["E_Terms_Glass"].text(0.0096, 0.9750, 'a', transform=plt.figure(1).ax_dict["E_Terms_Glass"].transAxes, fontsize=8., weight='bold')  # id=plt.figure(1).ax_dict["E_Terms_Glass"].texts[6].new
+# Panel E (glass brain terms) pylustrator layout removed — panel no longer used
 #% end: automatic generated code from pylustrator
 
 # Display figures in pylustrator GUI for interactive layout adjustment

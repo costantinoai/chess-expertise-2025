@@ -94,13 +94,9 @@ All results are saved to results/mvpa_group/:
 - 02_mvpa_group_rsa.py: Copy of this script
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 
-# Add repo root to sys.path for 'common' and chess-mvpa for 'modules'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 script_dir = Path(__file__).parent
 
 from common import CONFIG, setup_or_reuse_analysis_dir, log_script_end
@@ -111,8 +107,9 @@ from common.bids_utils import (
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
 
-# chess-mvpa modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
+# chess-mvpa modules (not an installable package; add parent to path)
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "chess-mvpa"))
 
 from modules.mvpa_io import (
     find_subject_tsvs,
@@ -141,8 +138,8 @@ results_dir, logger, _ = setup_or_reuse_analysis_dir(
 )
 
 # Read run-matched RSA results produced by roi_mvpa_run_matched.m
-# (saved in this folder under results/mvpa-rsa-run-matched/)
-rsa_dir = script_dir / "results" / "mvpa-rsa-run-matched"
+# (stored in BIDS derivatives alongside other MVPA outputs)
+rsa_dir = CONFIG["BIDS_MVPA_RSA_RUN_MATCHED"]
 if not rsa_dir.exists():
     raise FileNotFoundError(f"Missing run-matched RSA directory: {rsa_dir}. "
                             "Run roi_mvpa_run_matched.m first.")
