@@ -138,21 +138,16 @@ All analyses read their inputs from a **single external data root**. Configure t
             └── neurosynth/       # Meta-analytic term maps
 ```
 
-2) Point the repository to this folder:
+2) Point the repository to your local data folder by setting the `CHESS_DATA_ROOT`
+environment variable:
 
-**Python** -- edit `common/constants.py`:
-
-```python
-_EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
+```bash
+export CHESS_DATA_ROOT=/path/to/manuscript-data
 ```
 
-**MATLAB** -- edit `common/chess_config.m`:
-
-```matlab
-cfg.dataRoot = getenv_or('/path/to/manuscript-data', 'CHESS_DATA_ROOT');
-```
-
-Both files derive all other paths from this single root. Alternatively, set the `CHESS_DATA_ROOT` environment variable to avoid editing files.
+Both Python (`common/constants.py`) and MATLAB (`common/chess_config.m`) read this
+variable automatically. All other paths (BIDS root, derivatives, atlases, etc.) are
+derived from this single root. No source files need to be edited.
 
 ## Expected Inputs
 
@@ -199,7 +194,7 @@ The repository expects the following layout under `_EXTERNAL_DATA_ROOT`. Everyth
 
 ## Running Analyses
 
-You have two options to run the code. Either you run the single python scripts one by one (in which case, make sure to cd into the analysis folder first, e.g., `cd chess-manifold` --> `conda activate ml` --> `python 01_....py`) or you can run all the scripts at once (this can be run directly from the repo root, see below).
+You have two options to run the code. Either you run the single python scripts one by one (in which case, make sure to cd into the analysis folder first, e.g., `cd chess-manifold` --> `conda activate chess-expertise` --> `python 01_....py`) or you can run all the scripts at once (this can be run directly from the repo root, see below).
 
 ### Option A: Automated Pipeline (bash)
 

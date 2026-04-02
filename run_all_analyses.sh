@@ -47,7 +47,7 @@ set -euo pipefail  # Exit on error, undefined vars, pipe failures
 # Configuration
 # ==============================================================================
 
-CONDA_ENV="ml"  # Choose your conda environment here
+CONDA_ENV="chess-expertise"  # Must match environment.yml name
 PYTHON_BIN=""
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="./backup"
@@ -186,6 +186,10 @@ ANALYSIS_FOLDERS=(
   "chess-supplementary/univariate-rois"
   "chess-supplementary/task-engagement"
   "chess-supplementary/skill-gradient"
+  # Note: chess-supplementary/run-matching requires MATLAB for subject-level
+  # analysis (01_roi_rsa_run_matched.m). The Python group stats and table scripts
+  # (02_*–06_*) can run after MATLAB outputs are available.
+  "chess-supplementary/run-matching"
   # Note: chess-supplementary/subcortical-rois requires MATLAB for subject-level
   # analysis (subcortical_rsa.m). The Python group stats and plotting scripts
   # (02_*, 03_*, 91_*, 92_*, 93_*) can run after MATLAB outputs are available.
@@ -678,6 +682,8 @@ export LOG_DIR
 export RUN_ANALYSIS
 export RUN_TABLES
 export RUN_FIGURES
+export SEQUENTIAL
+export DEBUG_MODE
 
 # Launch all analyses in parallel
 if $SEQUENTIAL; then
@@ -836,7 +842,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Review logs:     ls -lh ${LOG_DIR}/"
 echo "  2. Check results:   ls -lh chess-*/results/"
-echo "  3. View manuscript: ls -lh /home/eik-tb/OneDrive_andreaivan.costantino@kuleuven.be/GitHub/chess-manuscript/write/figures/"
+echo "  3. View outputs:    ls -lh ${REPO_ROOT}/results-bundle/figures/"
 echo ""
 
 # Exit with failure code if any jobs failed

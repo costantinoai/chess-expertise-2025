@@ -61,10 +61,10 @@ dependencies:
   - plotly>=5.14.0,<6.0.0       # Interactive 3D brain surface plots
 
   # =============================================================================
-  # Optional Dependencies (Uncomment to enable)
+  # Figure Layout and Export
   # =============================================================================
-  # - pylustrator>=1.2.0        # Publication figure layout (interactive)
-  # - kaleido>=0.2.1            # Static plotly exports (PNG, PDF, SVG)
+  - pylustrator>=1.2.0          # Publication figure layout (interactive)
+  - kaleido>=0.2.1              # Static plotly exports (PNG, PDF, SVG)
 
   # =============================================================================
   # PyPI-only packages (installed via pip within conda environment)

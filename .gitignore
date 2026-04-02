@@ -28,6 +28,8 @@ venv/
 ENV/
 env/
 .venv
+.env
+*.local.env
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -74,7 +76,7 @@ logs/
 backup/
 
 # Final results (auto-generated PDFs and tables, regenerable)
-final_results/
+# final_results/ was renamed to results-bundle/ (kept for historical clones)
 
 # Local folders (private scripts, notes, etc.)
 local/

@@ -307,6 +307,13 @@ def setup_analysis(
     # Import CONFIG dictionary from constants
     from .constants import CONFIG
 
+    # 0. Ensure the script's parent directory is on sys.path so that
+    #    analysis-local ``modules/`` packages are importable without
+    #    manual sys.path manipulation in every script.
+    script_parent = str(Path(script_file).resolve().parent)
+    if script_parent not in sys.path:
+        sys.path.insert(0, script_parent)
+
     # 1. Create timestamped output directory
     results_base = Path(results_base)
     results_base.mkdir(parents=True, exist_ok=True)
@@ -324,7 +331,8 @@ def setup_analysis(
         warnings.filterwarnings("ignore", category=UserWarning)
 
     # 4. Set random seed
-    np.random.seed(CONFIG['RANDOM_SEED'])
+    # Note: random seeding is handled by individual scripts via
+    # np.random.default_rng(CONFIG['RANDOM_SEED']) for isolated reproducibility.
 
     # 5. Copy script to output directory (centralized helper)
     script_path = Path(script_file)
@@ -392,6 +400,11 @@ def setup_analysis_in_dir(
     """
     from .constants import CONFIG
 
+    # Ensure the script's parent directory is on sys.path for local modules
+    script_parent = str(Path(script_file).resolve().parent)
+    if script_parent not in sys.path:
+        sys.path.insert(0, script_parent)
+
     results_dir = Path(results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -404,7 +417,8 @@ def setup_analysis_in_dir(
         warnings.filterwarnings("ignore", category=UserWarning)
 
     # Seed
-    np.random.seed(CONFIG['RANDOM_SEED'])
+    # Note: random seeding is handled by individual scripts via
+    # np.random.default_rng(CONFIG['RANDOM_SEED']) for isolated reproducibility.
 
     # Copy script
     script_path = Path(script_file)
