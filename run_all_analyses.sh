@@ -295,6 +295,13 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 print_success "Python interpreter is available"
 
+# Check project packages are installed (common + analyses)
+if ! "$PYTHON_BIN" -c "import common; import analyses" 2>/dev/null; then
+  print_error "Project packages not installed. Run: pip install -e ."
+  exit 1
+fi
+print_success "Project packages (common, analyses) installed"
+
 # Check CONFIG file
 if [ ! -f "$CONFIG_FILE" ]; then
   print_error "CONFIG file not found: $CONFIG_FILE"
