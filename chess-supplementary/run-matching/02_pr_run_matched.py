@@ -126,27 +126,23 @@ from common.bids_utils import get_subject_list, get_group_summary
 from common.neuro_utils import load_atlas
 from common.spm_utils import _normalize_subject_id, _get_spm_dir, _get_beta_filename
 
-# Chess-manifold modules (not an installable package; add parent to path)
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "chess-manifold"))
-
-from modules.data import (
+from analyses.manifold.data import (
     load_atlas_and_metadata,
     pivot_pr_long_to_subject_roi,
     correlate_pr_with_roi_size,
 )
-from modules.models import (
+from analyses.manifold.models import (
     train_logreg_on_pr,
     compute_pca_2d,
     compute_2d_decision_boundary,
     evaluate_classification_significance,
 )
-from modules.analysis import (
+from analyses.manifold.analysis import (
     summarize_pr_by_group,
     compare_groups_welch_fdr,
 )
-from modules.pr_computation import participation_ratio
-from modules.models import build_feature_matrix
+from analyses.manifold.pr_computation import participation_ratio
+from analyses.manifold.models import build_feature_matrix
 from common.group_stats import get_descriptives_per_roi
 
 import logging

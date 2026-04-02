@@ -75,7 +75,7 @@ import pickle
 
 from common import CONFIG, setup_script, log_script_end
 from common.report_utils import generate_latex_table, format_roi_stats_table
-from modules import RSA_TARGETS
+from analyses.rsa_rois.io import RSA_TARGETS
 
 # ============================================================================
 # Configuration & Setup

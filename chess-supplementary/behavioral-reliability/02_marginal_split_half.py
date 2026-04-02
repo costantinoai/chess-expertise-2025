@@ -64,12 +64,8 @@ from scipy import stats
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
 from common.bids_utils import get_participants_with_expertise
-# chess-behavioral modules (cross-analysis dependency)
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-behavioral"))
-
-from modules.data_loading import load_participant_trial_data
-from modules.rdm_utils import create_pairwise_df, aggregate_pairwise_counts
+from analyses.behavioral.data_loading import load_participant_trial_data
+from analyses.behavioral.rdm_utils import create_pairwise_df, aggregate_pairwise_counts
 
 config, out_dir, logger = setup_analysis(
     analysis_name="marginal_split_half",

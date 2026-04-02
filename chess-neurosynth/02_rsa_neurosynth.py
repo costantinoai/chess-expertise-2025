@@ -134,12 +134,12 @@ from common.bids_utils import get_subject_list
 from common.neuro_utils import load_nifti, fisher_z_transform
 
 from common.io_utils import find_nifti_files, split_by_group
-from modules.io_utils import load_term_maps, reorder_by_term
-from modules.maps_utils import (
+from analyses.neurosynth.io_utils import load_term_maps, reorder_by_term
+from analyses.neurosynth.maps_utils import (
     split_zmap_by_sign,
     compute_all_zmap_correlations,
 )
-from modules.glm_utils import build_design_matrix
+from analyses.neurosynth.glm_utils import build_design_matrix
 
 
 # =====================

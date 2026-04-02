@@ -76,7 +76,8 @@ from common.stats_utils import (
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
 
-from modules import load_eyetracking_dataframe, prepare_run_level_features
+from analyses.eyetracking.io import load_eyetracking_dataframe
+from analyses.eyetracking.features import prepare_run_level_features
 
 
 def summarize_subject_accuracies(y_true, y_pred, subject_ids):

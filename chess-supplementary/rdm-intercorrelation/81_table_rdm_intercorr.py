@@ -75,7 +75,7 @@ from pathlib import Path
 import pandas as pd
 
 from common import CONFIG, setup_script, log_script_end
-from modules import pretty_model_label
+from analyses.rdm_intercorrelation import pretty_model_label
 
 
 # ============================================================================

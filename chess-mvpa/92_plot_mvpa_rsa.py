@@ -73,7 +73,7 @@ from common.plotting import (
     CMAP_BRAIN,
     create_roi_group_legend,
 )
-from modules.mvpa_plot_utils import extract_mvpa_bar_data
+from analyses.mvpa.plot_utils import extract_mvpa_bar_data
 from common.neuro_utils import (
     load_glasser180_annotations,
     load_glasser180_region_info,
@@ -149,7 +149,7 @@ rsa_data = extract_mvpa_bar_data(
 # Load per-subject RSA data for boxplots
 from common.io_utils import find_subject_tsvs
 from common.bids_utils import get_participants_with_expertise
-from modules.mvpa_io import build_group_dataframe
+from analyses.mvpa.io import build_group_dataframe
 
 rsa_subject_dir = Path(CONFIG['BIDS_MVPA_RSA'])
 roi_col_names = roi_info['roi_name'].tolist()

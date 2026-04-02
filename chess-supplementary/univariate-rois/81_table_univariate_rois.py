@@ -75,7 +75,7 @@ import pickle
 
 from common import CONFIG, setup_script, log_script_end
 from common.report_utils import generate_latex_table, format_roi_stats_table
-from modules import UNIV_CONTRASTS
+from analyses.univariate_rois.io import UNIV_CONTRASTS
 
 # ============================================================================
 # Configuration & Setup

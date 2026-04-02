@@ -59,7 +59,7 @@ from common.stats_utils import (
     compute_mean_ci_and_ttest_vs_value,
 )
 
-from modules.io import load_familiarisation_data, MISSING_SUBJECTS
+from analyses.task_engagement.io import load_familiarisation_data, MISSING_SUBJECTS
 
 
 # ============================================================================

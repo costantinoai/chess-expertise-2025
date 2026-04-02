@@ -62,12 +62,9 @@ Analysis 2 from manuscript: Supplementary Table, Methods Sec 3.6
 import os
 from pathlib import Path
 
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "chess-manifold"))
-
 import pickle  # noqa: S301 - loading internal analysis artifacts only
 from common import setup_script, log_script_end
-from modules.tables import generate_pr_results_table
+from analyses.manifold.tables import generate_pr_results_table
 
 # ============================================================================
 # Configuration & Setup

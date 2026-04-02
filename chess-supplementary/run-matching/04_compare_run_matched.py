@@ -23,6 +23,7 @@ import pandas as pd
 from common import CONFIG
 
 script_dir = Path(__file__).parent
+repo_root = script_dir.parent.parent
 
 # =============================================================================
 # 1. PR comparison

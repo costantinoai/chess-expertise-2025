@@ -25,7 +25,7 @@ from common.plotting import (
     cm_to_inches,
     save_panel_pdf,
 )
-from modules.plotting import (
+from analyses.rdm_intercorrelation.plotting import (
     plot_correlation_bars,
     plot_variance_partition_bars,
 )

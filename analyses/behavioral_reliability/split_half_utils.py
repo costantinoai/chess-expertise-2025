@@ -131,7 +131,7 @@ def bootstrap_split_half_reliability(
     - Imports dependencies inside function to avoid sys.path issues
     """
     # Import dependencies inside function to avoid sys.path issues at module import time
-    from modules.rdm_utils import (
+    from analyses.behavioral.rdm_utils import (
         aggregate_pairwise_counts,
         compute_symmetric_rdm,
     )

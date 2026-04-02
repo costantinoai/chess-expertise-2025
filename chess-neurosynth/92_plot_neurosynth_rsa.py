@@ -69,7 +69,7 @@ from common.plotting import (
 )
 from common.neuro_utils import project_volume_to_surfaces, create_glasser22_contours
 from common import setup_script, log_script_end
-from modules.plot_utils import (
+from analyses.neurosynth.plot_utils import (
     plot_correlations_on_ax,
     plot_differences_on_ax,
     load_term_corr_triple,

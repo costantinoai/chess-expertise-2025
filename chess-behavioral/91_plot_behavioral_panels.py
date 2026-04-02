@@ -91,7 +91,7 @@ from common.plotting import (
 from common.rsa_utils import correlate_rdm_with_models
 from common.stats_utils import apply_fdr_correction
 from sklearn.manifold import MDS
-from modules.rdm_utils import normalize_matrix_by_frequency
+from analyses.behavioral.rdm_utils import normalize_matrix_by_frequency
 
 
 # =============================================================================

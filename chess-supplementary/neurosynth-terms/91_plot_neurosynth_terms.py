@@ -69,11 +69,7 @@ from common.plotting import (
 from common.neuro_utils import project_volume_to_surfaces, create_glasser22_contours
 from common.logging_utils import setup_analysis, log_script_end
 
-# chess-neurosynth modules (cross-analysis dependency)
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-neurosynth"))
-
-from modules.io_utils import load_term_maps
+from analyses.neurosynth.io_utils import load_term_maps
 
 # Conditionally start pylustrator BEFORE creating any figures
 if CONFIG['ENABLE_PYLUSTRATOR']:

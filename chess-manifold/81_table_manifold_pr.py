@@ -63,7 +63,7 @@ from pathlib import Path
 
 import pickle
 from common import setup_script, log_script_end
-from modules.tables import generate_pr_results_table
+from analyses.manifold.tables import generate_pr_results_table
 
 # ============================================================================
 # Configuration & Setup

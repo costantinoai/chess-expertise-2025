@@ -69,7 +69,7 @@ from common.plotting import (
     save_axes_svgs,
     save_panel_pdf,
 )
-from modules import RSA_TARGETS
+from analyses.rsa_rois.io import RSA_TARGETS
 
 
 # =============================================================================

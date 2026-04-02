@@ -75,7 +75,7 @@ from common.plotting import (
     save_axes_svgs,
     save_panel_pdf,
 )
-from modules.mvpa_plot_utils import extract_mvpa_bar_data
+from analyses.mvpa.plot_utils import extract_mvpa_bar_data
 
 
 # =============================================================================
@@ -173,7 +173,7 @@ rsa_data = extract_mvpa_bar_data(
 import pandas as pd
 from common.io_utils import find_subject_tsvs
 from common.bids_utils import get_participants_with_expertise
-from modules.mvpa_io import build_group_dataframe
+from analyses.mvpa.io import build_group_dataframe
 
 roi_col_names = roi_info['roi_name'].tolist()
 participants, (n_exp, n_nov) = get_participants_with_expertise(

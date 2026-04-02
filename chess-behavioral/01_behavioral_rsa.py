@@ -58,8 +58,8 @@ from common import (
 )
 from common.stats_utils import apply_fdr_correction
 
-from modules.data_loading import load_participant_trial_data
-from modules.rdm_utils import (
+from analyses.behavioral.data_loading import load_participant_trial_data
+from analyses.behavioral.rdm_utils import (
     create_pairwise_df,
     compute_symmetric_rdm,
     compute_normalized_rdm,

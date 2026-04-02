@@ -69,7 +69,7 @@ from common.plotting import (
     save_axes_svgs,
     save_panel_pdf,
 )
-from modules import UNIV_CONTRASTS
+from analyses.univariate_rois.io import UNIV_CONTRASTS
 
 
 # =============================================================================

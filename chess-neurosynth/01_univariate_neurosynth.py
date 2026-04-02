@@ -133,13 +133,13 @@ from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
  
 
-from modules.io_utils import (
+from analyses.neurosynth.io_utils import (
     load_term_maps,
     extract_run_label,
     reorder_by_term,
     find_group_tmaps,
 )
-from modules.maps_utils import (
+from analyses.neurosynth.maps_utils import (
     t_to_two_tailed_z,
     split_zmap_by_sign,
     compute_all_zmap_correlations,

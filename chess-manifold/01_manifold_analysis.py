@@ -111,23 +111,23 @@ from common.logging_utils import setup_analysis, log_script_end
 from common.bids_utils import get_subject_list, get_group_summary
 from common.neuro_utils import load_atlas
 
-from modules.data import (
+from analyses.manifold.data import (
     load_atlas_and_metadata,
     pivot_pr_long_to_subject_roi,
     correlate_pr_with_roi_size,
 )
-from modules.models import (
+from analyses.manifold.models import (
     train_logreg_on_pr,
     compute_pca_2d,
     compute_2d_decision_boundary,
     evaluate_classification_significance,
 )
-from modules.analysis import (
+from analyses.manifold.analysis import (
     summarize_pr_by_group,
     compare_groups_welch_fdr,
 )
-from modules.pr_computation import compute_subject_roi_prs
-from modules.models import build_feature_matrix
+from analyses.manifold.pr_computation import compute_subject_roi_prs
+from analyses.manifold.models import build_feature_matrix
 from common.group_stats import get_descriptives_per_roi
 
 # =============================================================================

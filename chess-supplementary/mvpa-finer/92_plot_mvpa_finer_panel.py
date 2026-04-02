@@ -8,8 +8,6 @@ mate, total pieces, legal moves, tactical motif, side to move), generates three
 panels: RSA barplot, SVM decoding barplot, and model RDM visualization.
 
 Uses pylustrator for interactive layout arrangement and reuses standardized
-plotting functions from common.plotting and chess-mvpa modules.
-
 Figures Produced
 ----------------
 
@@ -92,11 +90,7 @@ from common.plotting import (
     save_axes_svgs,
     save_panel_pdf,
 )
-# chess-mvpa modules (cross-analysis dependency)
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-mvpa"))
-
-from modules.mvpa_plot_utils import extract_mvpa_bar_data
+from analyses.mvpa.plot_utils import extract_mvpa_bar_data
 
 
 # =============================================================================
@@ -285,7 +279,7 @@ stim_colors, stim_alphas = compute_stimulus_palette(checkmate_stimuli)
 # Load per-subject data for boxplots
 from common.io_utils import find_subject_tsvs
 from common.bids_utils import get_participants_with_expertise
-from modules.mvpa_io import build_group_dataframe
+from analyses.mvpa.io import build_group_dataframe
 
 roi_col_names = roi_info['roi_name'].tolist()
 participants, _ = get_participants_with_expertise(

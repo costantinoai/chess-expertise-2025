@@ -67,7 +67,7 @@ from common.group_stats import get_descriptives_per_roi
 from common.stats_utils import per_roi_welch_and_fdr
 from nilearn.maskers import NiftiLabelsMasker
 
-from modules.io import UNIV_CONTRASTS, find_subject_contrast_path
+from analyses.univariate_rois.io import UNIV_CONTRASTS, find_subject_contrast_path
 
 
 # ============================================================================

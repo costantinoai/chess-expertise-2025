@@ -82,7 +82,7 @@ import pickle
 from typing import Dict, List
 
 
-from split_half_utils import (
+from analyses.behavioral_reliability.split_half_utils import (
     spearman_brown_correction,
     bootstrap_split_half_reliability,
 )
@@ -96,12 +96,8 @@ from common import (
 )
 
 # Reuse behavioral data loading from chess-behavioral
-# chess-behavioral modules (cross-analysis dependency)
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-behavioral"))
-
-from modules.data_loading import load_participant_trial_data
-from modules.rdm_utils import create_pairwise_df, aggregate_pairwise_counts, compute_symmetric_rdm
+from analyses.behavioral.data_loading import load_participant_trial_data
+from analyses.behavioral.rdm_utils import create_pairwise_df, aggregate_pairwise_counts, compute_symmetric_rdm
 
 # Reuse RSA correlation from common
 from common.rsa_utils import correlate_rdms
@@ -222,7 +218,7 @@ def _bootstrap_p_two_sided(samples: np.ndarray, null: float = 0.0) -> float:
 
 config, output_dir, logger = setup_analysis(
     analysis_name="behavioral_split_half",
-    results_base=Path(script_dir) / "results",
+    results_base=Path(__file__).parent / "results",
     script_file=__file__,
 )
 

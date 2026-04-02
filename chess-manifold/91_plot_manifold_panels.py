@@ -90,7 +90,7 @@ from common.plotting import (
     format_roi_labels_and_colors,
     draw_regression_line,
 )
-from modules.plotting import (
+from analyses.manifold.plotting import (
     compute_limits_with_padding,
     pca_axis_labels_from_explained,
     plot_topn_feature_importance_on_ax,

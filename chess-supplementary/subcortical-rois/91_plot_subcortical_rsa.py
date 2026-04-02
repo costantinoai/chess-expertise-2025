@@ -46,11 +46,7 @@ from common.plotting import (
     embed_figure_on_ax,
     create_roi_group_legend,
 )
-# chess-mvpa modules (cross-analysis dependency)
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent / "../.." / "chess-mvpa"))
-
-from modules.mvpa_plot_utils import extract_mvpa_bar_data
+from analyses.mvpa.plot_utils import extract_mvpa_bar_data
 
 
 # =============================================================================
