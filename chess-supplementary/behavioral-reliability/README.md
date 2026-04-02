@@ -65,7 +65,7 @@ Following conventional psychometric guidelines:
 - Python 3.8+
 - numpy, pandas, scipy
 - matplotlib, seaborn (for plotting)
-- Reuses modules from `chess-behavioral/` for data loading and RDM computation
+- Reuses `analyses/behavioral/` package for data loading and RDM computation
 
 See `requirements.txt` in the repository root for complete dependencies.
 
@@ -143,7 +143,7 @@ chess-supplementary/behavioral-reliability/
 ├── 81_table_split_half_reliability.py          # LaTeX/CSV table generation
 ├── METHODS.md                                  # Detailed methods from manuscript
 ├── DISCREPANCIES.md                            # Notes on analysis discrepancies
-├── modules/
+├── analyses/behavioral_reliability/            # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
 │   └── split_half_utils.py                     # Split-half and Spearman-Brown utilities
 └── results/                                    # Analysis outputs (timestamped)

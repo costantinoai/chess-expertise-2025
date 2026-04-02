@@ -177,7 +177,7 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 - Python 3.9+ with packages: numpy, pandas, scipy, matplotlib, nibabel, nilearn, statsmodels
 - MATLAB with CoSMoMVPA and LIBSVM (for subject-level SVM decoding and RSA)
 - Common utilities from `common/` (bids_utils, neuro_utils, report_utils, plotting, logging_utils, script_utils)
-- Shared modules from `chess-mvpa/modules/` (mvpa_io, mvpa_group, mvpa_plot_utils)
+- Shared modules from `analyses/mvpa/` (io, group, plot_utils)
 
 ## Data Requirements
 

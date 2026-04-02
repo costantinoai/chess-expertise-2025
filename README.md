@@ -62,8 +62,11 @@ We recommend using a virtual environment:
 conda env create -f environment.yml
 conda activate chess-expertise
 
+# Install the project packages (common + analyses) in editable mode
+pip install -e .
+
 # Option B: Use pip in virtualenv
-pip install -r requirements.txt
+pip install -r requirements.txt && pip install -e .
 ```
 
 ### LaTeX (optional, for compiling tables)
@@ -129,6 +132,7 @@ All analyses read their inputs from a **single external data root**. Configure t
         ├── SPM/                  # GLM beta images
         ├── mvpa-rsa/             # Subject-level RSA matrices
         ├── mvpa-decoding/        # Subject-level SVM accuracies
+        ├── mvpa-rsa-run-matched/ # Run-matched RSA matrices (supplementary)
         ├── rsa_searchlight/      # Searchlight maps
         ├── eye-tracking/         # Eye-tracking data
         └── atlases/              # ROI atlases and reference data

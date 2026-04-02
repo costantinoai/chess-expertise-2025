@@ -121,9 +121,9 @@ chess-supplementary/rdm-intercorrelation/
 ├── 01_rdm_intercorrelation.py             # Main analysis
 ├── 91_plot_rdm_intercorr.py               # Figure generation
 ├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-├── modules/
+├── analyses/rdm_intercorrelation/         # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
-│   └── rdm_utils.py                       # RDM correlation and partitioning utilities
+│   └── plotting.py                        # Plotting utilities
 └── results/
     └── rdm_intercorrelation/
         ├── *.csv                          # Statistical results

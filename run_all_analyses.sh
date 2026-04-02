@@ -33,9 +33,10 @@
 #   # Recommended (conda-forge):
 #   mamba env create -f environment.yml   # or: conda env create -f environment.yml
 #   conda activate chess-expertise
+#   pip install -e .                      # install common + analyses packages
 #   # Alternative (requirements.txt):
 #   conda create -n chess-expertise python=3.11
-#   conda activate chess-expertise && pip install -r requirements.txt
+#   conda activate chess-expertise && pip install -r requirements.txt && pip install -e .
 #   # Run everything
 #   ./run_all_analyses.sh --levels analysis,tables,figures
 #

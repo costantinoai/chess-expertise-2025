@@ -159,7 +159,7 @@ chess-behavioral/
 ├── 01_behavioral_rsa.py                   # Main analysis script
 ├── 81_table_behavioral_correlations.py    # LaTeX/CSV table generation
 ├── 91_plot_behavioral_panels.py           # Figure generation
-├── modules/
+├── analyses/behavioral/                   # Shared analysis modules (in repo root analyses/ package)
 │   ├── data_loading.py                    # BIDS data loaders
 │   └── rdm_utils.py                       # RDM computation and RSA
 ├── local/                                 # Data preparation (gitignored)
