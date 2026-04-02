@@ -34,6 +34,7 @@ This repository contains the complete analysis code for our study investigating 
 - [Dependencies](#dependencies)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+- [Reproducibility](#reproducibility)
 - [Citation](#citation)
 - [License](#license)
 - [Contact](#contact)
@@ -309,6 +310,32 @@ See [`chess-supplementary/README.md`](chess-supplementary/README.md) for details
 - Task engagement diagnostics and board preference feature drivers
 - Skill gradient analysis (Elo and familiarisation correlations)
 - Subcortical ROI analysis (CAB-NP atlas, 9 bilateral ROIs)
+
+## Reproducibility
+
+### What to Expect
+
+**Byte-identical outputs:**
+- All publication tables (`results-bundle/tables/*.tex`)
+- Behavioral analysis data files (all `.npy`, `.pkl`, `.csv`)
+- Within-group t-tests (`*_vs_chance.csv`)
+- Behavioral reliability, eyetracking, RDM intercorrelation, and task engagement CSVs
+
+**Expected floating-point variation (10th--16th decimal place):**
+- Between-group t-tests (`*_experts_vs_novices.csv`): CI bounds vary at ~1e-10 due to BLAS/LAPACK non-determinism
+- Manifold PR statistics (`pr_*.csv`, `pr_results.pkl`)
+- Neurosynth correlation CSVs (NIfTI resampling operations)
+- Skill-gradient permutation-based statistics
+
+These variations do **not** affect significance decisions, publication tables, or any scientific conclusions. The pipeline sets `OMP_NUM_THREADS=1` to minimise floating-point non-determinism.
+
+**Non-deterministic outputs (expected to differ):**
+- SVG/PDF figures (matplotlib rendering IDs and timestamps)
+- Script copies in `results/` directories (provenance snapshots)
+
+### Environment
+
+The pipeline was validated on Ubuntu 24.04 with Python 3.11.6 (numpy 1.26.4, scipy 1.15.1, pandas 2.3.1, nilearn 0.11.1, scikit-learn 1.7.1). See `environment.yml` for the full specification.
 
 ## Citation
 
