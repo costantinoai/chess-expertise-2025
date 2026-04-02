@@ -33,12 +33,9 @@ Notes for Academic Users
 
 import numpy as np
 import pandas as pd
-import sys
 from pathlib import Path
 from typing import Tuple, List
 
-# Add repo root to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import shared RSA functions from common
 from common.rsa_utils import (

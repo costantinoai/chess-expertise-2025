@@ -70,22 +70,12 @@ python chess-supplementary/univariate-rois/81_table_univariate_rois.py
 Supplementary Analysis: Whole-brain univariate contrasts (180 ROIs)
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 
-# Ensure repo root is on sys.path for 'common' imports
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
-        break
-
 from common import CONFIG, setup_script, log_script_end
 from common.report_utils import generate_latex_table, format_roi_stats_table
-from modules import UNIV_CONTRASTS
+from analyses.univariate_rois.io import UNIV_CONTRASTS
 
 # ============================================================================
 # Configuration & Setup

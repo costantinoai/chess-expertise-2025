@@ -20,20 +20,10 @@ Inputs
 - ROI metadata from CONFIG['ROI_CABNP']
 """
 
-import os
-import sys
 import pickle
 from pathlib import Path
 script_dir = Path(__file__).parent
 
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..', '..'), os.path.join(_cur, '..', '..', '..')):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
-        break
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
 
 from common import CONFIG
 
@@ -56,7 +46,7 @@ from common.plotting import (
     embed_figure_on_ax,
     create_roi_group_legend,
 )
-from modules.mvpa_plot_utils import extract_mvpa_bar_data
+from analyses.mvpa.plot_utils import extract_mvpa_bar_data
 
 
 # =============================================================================

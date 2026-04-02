@@ -99,9 +99,10 @@ chess-supplementary/eyetracking/
 ├── README.md                              # This file
 ├── 01_eye_decoding.py                     # Main decoding analysis
 ├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-├── modules/
+├── analyses/eyetracking/                  # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
-│   └── io.py                              # Eye-tracking data loading
+│   ├── io.py                              # Eye-tracking data loading
+│   └── features.py                        # Feature extraction utilities
 └── results/
     └── eyetracking_decoding/
         ├── *.json                         # Results dictionaries

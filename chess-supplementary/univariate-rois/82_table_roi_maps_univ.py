@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """Univariate ROIs — Manuscript Table (Significant ROIs Only)"""
-import sys
 from pathlib import Path
 import pandas as pd
 import pickle
 
-# Add repo root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from common.logging_utils import setup_analysis_in_dir, log_script_end
 from common.io_utils import find_latest_results_directory

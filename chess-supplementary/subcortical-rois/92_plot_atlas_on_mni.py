@@ -20,11 +20,8 @@ Inputs
 - CONFIG['ROI_CABNP_SUBCORTICAL_ATLAS']: CAB-NP subcortical atlas NIfTI
 """
 
-import os
-import sys
 from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from common import CONFIG
 

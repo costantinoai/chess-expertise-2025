@@ -75,34 +75,18 @@ All results are saved to results/<timestamp>_behavioral_split_half/:
 - 01_behavioral_split_half_reliability.py: Copy of this script
 """
 
-import sys
-import os
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import pickle
 from typing import Dict, List
 
-# Get absolute paths
-script_path = os.path.realpath(__file__)
-script_dir = os.path.dirname(script_path)
-repo_root = os.path.abspath(os.path.join(script_dir, '../..'))
 
-# Import LOCAL modules FIRST (before adding chess-behavioral to path)
-local_modules_path = os.path.join(script_dir, 'modules')
-sys.path.insert(0, local_modules_path)
-from split_half_utils import (
+from analyses.behavioral_reliability.split_half_utils import (
     spearman_brown_correction,
     bootstrap_split_half_reliability,
 )
-sys.path.pop(0)  # Remove local modules path
 
-# Add repo root to sys.path
-sys.path.insert(0, repo_root)
-
-# Add chess-behavioral to path (for modules.data_loading, modules.rdm_utils)
-chess_behavioral_dir = os.path.join(repo_root, 'chess-behavioral')
-sys.path.insert(0, chess_behavioral_dir)
 
 from common import (
     CONFIG,
@@ -112,8 +96,8 @@ from common import (
 )
 
 # Reuse behavioral data loading from chess-behavioral
-from modules.data_loading import load_participant_trial_data
-from modules.rdm_utils import create_pairwise_df, aggregate_pairwise_counts, compute_symmetric_rdm
+from analyses.behavioral.data_loading import load_participant_trial_data
+from analyses.behavioral.rdm_utils import create_pairwise_df, aggregate_pairwise_counts, compute_symmetric_rdm
 
 # Reuse RSA correlation from common
 from common.rsa_utils import correlate_rdms
@@ -234,7 +218,7 @@ def _bootstrap_p_two_sided(samples: np.ndarray, null: float = 0.0) -> float:
 
 config, output_dir, logger = setup_analysis(
     analysis_name="behavioral_split_half",
-    results_base=Path(script_dir) / "results",
+    results_base=Path(__file__).parent / "results",
     script_file=__file__,
 )
 

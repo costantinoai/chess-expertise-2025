@@ -12,9 +12,15 @@ Usage
 >>> print(CONFIG['BIDS_ROOT'])
 PosixPath('/path/to/data/BIDS')
 
-Note: Dataset paths are configured explicitly here. The only environment
-override is `CHESS_ENABLE_PYLUSTRATOR`, which is used by the batch pipeline to
-disable interactive layout editing without rewriting this file.
+Environment Variables
+---------------------
+CHESS_DATA_ROOT : str
+    Override the external manuscript-data directory. If unset, falls back to the
+    default path below. Set this so collaborators can run the code without editing
+    this file (e.g., ``export CHESS_DATA_ROOT=/data/chess-manuscript``).
+CHESS_ENABLE_PYLUSTRATOR : bool
+    Override the interactive pylustrator flag. Used by the batch pipeline to
+    disable interactive layout editing without rewriting this file.
 """
 
 import os
@@ -67,9 +73,11 @@ _DATA_DIR = _REPO_ROOT / "data"  # Local data assets (repo-internal, not primary
 # ============================================================================
 # External Manuscript Data Root
 # ============================================================================
-# IMPORTANT: Users must configure this path to their local manuscript-data location
-# See README for setup instructions
-_EXTERNAL_DATA_ROOT = Path("/media/costantino_ai/eik-T9/manuscript-data")
+# Override with CHESS_DATA_ROOT env var (recommended for collaborators).
+# Falls back to the default development path if unset.
+_EXTERNAL_DATA_ROOT = Path(
+    os.environ.get("CHESS_DATA_ROOT", "/media/costantino_ai/eik-T9/manuscript-data")
+)
 
 # ============================================================================
 # Final Results Output (Figures and Tables for Manuscript)
@@ -169,6 +177,7 @@ CONFIG = {
 
     # --- Analysis Derivatives ---
     'BIDS_MVPA_RSA': _BIDS_DERIVATIVES / "mvpa-rsa",           # MVPA RSA results (ROI-level)
+    'BIDS_MVPA_RSA_RUN_MATCHED': _BIDS_DERIVATIVES / "mvpa-rsa-run-matched",  # Run-matched RSA (ROI-level)
     'BIDS_MVPA_DECODING': _BIDS_DERIVATIVES / "mvpa-decoding",  # MVPA decoding results (ROI-level)
     'BIDS_RSA_SEARCHLIGHT': _BIDS_DERIVATIVES / "rsa_searchlight",  # RSA searchlight results
     'BIDS_BEHAVIORAL': _BIDS_DERIVATIVES / "chess-behavioural",  # Behavioral task data

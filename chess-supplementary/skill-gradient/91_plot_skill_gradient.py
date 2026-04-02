@@ -7,7 +7,6 @@ Generates one combined 3x3 figure:
   Rows 2-3 (d-i): Move accuracy vs neural measures (all participants) — all 6 metrics
 """
 
-import sys
 from pathlib import Path
 
 import pickle  # nosec B403 — trusted internal analysis outputs
@@ -18,10 +17,6 @@ from matplotlib.lines import Line2D
 from scipy import stats
 
 # Enable repo root imports
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 from common import CONFIG
 from common.script_utils import setup_script
 from common.logging_utils import log_script_end

@@ -91,7 +91,7 @@ chess-supplementary/univariate-rois/
 ├── README.md                              # This file
 ├── 01_univariate_roi_summary.py           # Main ROI summary analysis
 ├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-├── modules/
+├── analyses/univariate_rois/              # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
 │   └── io.py                              # Contrast map loading utilities
 └── results/

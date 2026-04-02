@@ -203,7 +203,7 @@ between experts and novices.
 
 - Python 3.9+ with packages: numpy, pandas, scipy, matplotlib, statsmodels, python-chess
 - Common utilities from `common/` (bids_utils, plotting, logging_utils, script_utils)
-- Local `modules/io.py` for familiarisation data loading
+- `analyses/task_engagement/io.py` for familiarisation data loading
 - Image processing: scipy.ndimage (Sobel edge detection) for stimulus feature extraction
 
 ## Data Requirements
@@ -378,7 +378,7 @@ chess-supplementary/task-engagement/
 ├── 92_plot_preference_features.py     # Diagnostic 5 figure: board images + scatter
 ├── 93_plot_gradient_panel.py          # Diagnostic 5 figure: bivariate vs partial + variance bars
 ├── README.md
-├── modules/
+├── analyses/task_engagement/           # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
 │   └── io.py                          # Familiarisation data loading utilities
 └── results/

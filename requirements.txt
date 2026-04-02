@@ -43,13 +43,7 @@ seaborn>=0.12.0,<1.0.0      # Statistical visualizations
 plotly>=5.14.0,<6.0.0       # Interactive 3D brain surface plots
 
 # =============================================================================
-# Optional Dependencies
+# Figure Layout and Export
 # =============================================================================
-# These are optional but recommended for specific features:
-#
-# pylustrator>=1.2.0        # Publication figure layout (interactive)
-# mat73>=0.62               # MATLAB v7.3 file loading (behavioral data)
-# kaleido>=0.2.1            # Static image export for plotly (PNG, PDF, SVG)
-#
-# Install optional dependencies with:
-#   pip install pylustrator mat73 kaleido
+pylustrator>=1.2.0            # Publication figure layout (interactive)
+kaleido>=0.2.1                # Static image export for plotly (PNG, PDF, SVG)

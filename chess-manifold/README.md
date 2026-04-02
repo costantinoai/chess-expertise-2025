@@ -179,7 +179,7 @@ chess-manifold/
 ├── METHODS.md                       # Detailed methods from manuscript
 ├── RESULTS.md                       # Detailed results summary
 ├── DISCREPANCIES.md                 # Notes on analysis discrepancies
-├── modules/
+├── analyses/manifold/               # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
 │   ├── analysis.py                  # Group comparison and FDR correction
 │   ├── data.py                      # Data loading and reshaping utilities

@@ -70,22 +70,12 @@ python chess-supplementary/rsa-rois/81_table_rsa_rois.py
 Supplementary Analysis: Whole-brain RSA (180 ROIs)
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 
-# Ensure repo root is on sys.path for 'common' imports
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
-        break
-
 from common import CONFIG, setup_script, log_script_end
 from common.report_utils import generate_latex_table, format_roi_stats_table
-from modules import RSA_TARGETS
+from analyses.rsa_rois.io import RSA_TARGETS
 
 # ============================================================================
 # Configuration & Setup

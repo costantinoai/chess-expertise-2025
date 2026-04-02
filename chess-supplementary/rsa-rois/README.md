@@ -83,7 +83,7 @@ chess-supplementary/rsa-rois/
 ├── README.md                              # This file
 ├── 01_rsa_roi_summary.py                  # Main ROI summary analysis
 ├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-├── modules/
+├── analyses/rsa_rois/                     # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
 │   └── io.py                              # RSA map loading utilities
 └── results/

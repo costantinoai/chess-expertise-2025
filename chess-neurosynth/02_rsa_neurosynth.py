@@ -122,12 +122,8 @@ All results are saved to results/<timestamp>_neurosynth_rsa/:
 - 02_rsa_neurosynth.py: Copy of this script
 """
 
-import os
-import sys
 from pathlib import Path
 
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 script_dir = Path(__file__).parent
 
 from nilearn.glm.second_level import SecondLevelModel
@@ -138,12 +134,12 @@ from common.bids_utils import get_subject_list
 from common.neuro_utils import load_nifti, fisher_z_transform
 
 from common.io_utils import find_nifti_files, split_by_group
-from modules.io_utils import load_term_maps, reorder_by_term
-from modules.maps_utils import (
+from analyses.neurosynth.io_utils import load_term_maps, reorder_by_term
+from analyses.neurosynth.maps_utils import (
     split_zmap_by_sign,
     compute_all_zmap_correlations,
 )
-from modules.glm_utils import build_design_matrix
+from analyses.neurosynth.glm_utils import build_design_matrix
 
 
 # =====================
@@ -243,7 +239,8 @@ for pattern, pretty in PATTERNS.items():
     # cognitive functions are most strongly associated with regions showing
     # expertise-related differences in RSA correlations.
     df_pos, df_neg, df_diff = compute_all_zmap_correlations(
-        z_pos, z_neg, term_maps, ref_img=con_img
+        z_pos, z_neg, term_maps, ref_img=con_img,
+        random_state=config['RANDOM_SEED'],
     )
 
     # Reorder rows by canonical term order for consistency across analyses

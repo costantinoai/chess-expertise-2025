@@ -60,22 +60,11 @@ Analysis 2 from manuscript: Supplementary Table, Methods Sec 3.6
 """
 
 import os
-import sys
 from pathlib import Path
 
-# Ensure repo root is on sys.path for 'common' imports
-_cur = os.path.dirname(__file__)
-# Add repo root for 'common' and chess-manifold for 'modules'
-_repo_root = os.path.abspath(os.path.join(_cur, '..', '..'))
-if _repo_root not in sys.path:
-    sys.path.insert(0, _repo_root)
-_manifold_root = os.path.join(_repo_root, 'chess-manifold')
-if _manifold_root not in sys.path:
-    sys.path.insert(0, _manifold_root)
-
-import pickle  # noqa: S301 - internal analysis artifacts only
+import pickle  # noqa: S301 - loading internal analysis artifacts only
 from common import setup_script, log_script_end
-from modules.tables import generate_pr_results_table
+from analyses.manifold.tables import generate_pr_results_table
 
 # ============================================================================
 # Configuration & Setup

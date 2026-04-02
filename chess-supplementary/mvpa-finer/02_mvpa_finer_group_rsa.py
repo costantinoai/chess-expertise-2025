@@ -8,16 +8,9 @@ latest MATLAB outputs under CONFIG['BIDS_MVPA'] matching CONFIG['MVPA_PATTERN_CM
 timestamped results in this package.
 """
 
-import os
-import sys
 from pathlib import Path
 import pickle
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Add repo root for 'common' module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-# Add chess-mvpa to import path to reuse its modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-mvpa')))
 script_dir = Path(__file__).parent
 
 from common import CONFIG
@@ -29,11 +22,11 @@ from common.bids_utils import (
 from common.neuro_utils import get_roi_names_and_colors
 from common.report_utils import write_group_stats_outputs
 
-from modules.mvpa_io import (
+from analyses.mvpa.io import (
     find_subject_tsvs,
     build_group_dataframe,
 )
-from modules.mvpa_group import (
+from analyses.mvpa.group import (
     compute_per_roi_group_comparison,
     compute_per_roi_vs_chance_tests,
     split_data_by_target_and_group,

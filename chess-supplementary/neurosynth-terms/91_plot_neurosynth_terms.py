@@ -43,18 +43,8 @@ Usage
 python chess-supplementary/neurosynth-terms/91_plot_neurosynth_terms.py
 """
 
-import os
-import sys
 from pathlib import Path
 script_dir = Path(__file__).parent
-
-# Ensure repo root is on sys.path for 'common' imports
-_cur = os.path.dirname(__file__)
-for _up in (os.path.join(_cur, '..'), os.path.join(_cur, '..', '..')):
-    _cand = os.path.abspath(_up)
-    if os.path.isdir(os.path.join(_cand, 'common')) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
-        break
 
 # Import CONFIG first to check pylustrator flag
 from common import CONFIG
@@ -79,8 +69,7 @@ from common.plotting import (
 from common.neuro_utils import project_volume_to_surfaces, create_glasser22_contours
 from common.logging_utils import setup_analysis, log_script_end
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'chess-neurosynth')))
-from modules.io_utils import load_term_maps
+from analyses.neurosynth.io_utils import load_term_maps
 
 # Conditionally start pylustrator BEFORE creating any figures
 if CONFIG['ENABLE_PYLUSTRATOR']:

@@ -41,15 +41,11 @@ Strategy (r=0.251), and Visual Similarity (r=-0.116); Novices show no
 significant correlations after FDR correction.
 """
 
-import sys
-import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import pickle
 
-# Add parent (repo root) to sys.path for 'common'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import from common utilities
 from common import (
@@ -62,9 +58,8 @@ from common import (
 )
 from common.stats_utils import apply_fdr_correction
 
-# Import from behavioral modules (now accessible via sys.path)
-from modules.data_loading import load_participant_trial_data
-from modules.rdm_utils import (
+from analyses.behavioral.data_loading import load_participant_trial_data
+from analyses.behavioral.rdm_utils import (
     create_pairwise_df,
     compute_symmetric_rdm,
     compute_normalized_rdm,

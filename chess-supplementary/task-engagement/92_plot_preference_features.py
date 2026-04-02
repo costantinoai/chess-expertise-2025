@@ -12,7 +12,6 @@ Board borders colored by check status. Scatter highlights top-3 and bottom-3
 at full alpha; remaining boards at half alpha.
 """
 
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -23,10 +22,6 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from scipy import stats
-
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
 
 from common import CONFIG
 from common.script_utils import setup_script

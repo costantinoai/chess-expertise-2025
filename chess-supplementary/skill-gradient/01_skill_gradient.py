@@ -40,7 +40,6 @@ Outputs
 """
 
 import pickle  # nosec B403 — trusted internal analysis outputs
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -48,10 +47,6 @@ import pandas as pd
 from scipy import stats
 
 # Enable repo root imports
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
 from utils import compute_subject_mean_pr, load_bids_tsvs

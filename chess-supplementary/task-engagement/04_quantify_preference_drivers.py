@@ -63,12 +63,7 @@ Outputs
 - feature_variance_partitioning.csv: Delta-R2 per block per group
 """
 
-import sys
 from pathlib import Path
-
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
 
 import numpy as np
 import pandas as pd
@@ -95,7 +90,7 @@ config, out_dir, logger = setup_analysis(
     script_file=__file__,
 )
 
-STIMULI_DIR = CONFIG['EXTERNAL_DATA_ROOT'] / "stimuli"
+STIMULI_DIR = CONFIG['BIDS_ROOT'] / "stimuli"
 
 # The 8 features in perceptual → relational order
 # "Advantage" features use (white - black) or (black_exposure - white_exposure)

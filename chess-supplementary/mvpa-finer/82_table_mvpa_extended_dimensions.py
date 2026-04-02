@@ -5,7 +5,6 @@ from pathlib import Path
 import pandas as pd
 import pickle
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from common import CONFIG
 from common.logging_utils import setup_analysis_in_dir, log_script_end

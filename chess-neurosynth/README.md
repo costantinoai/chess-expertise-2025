@@ -242,12 +242,13 @@ chess-neurosynth/
 ├── METHODS.md                            # Detailed methods from manuscript
 ├── RESULTS.md                            # Detailed results summary
 ├── DISCREPANCIES.md                      # Notes on analysis discrepancies
-├── modules/
+├── analyses/neurosynth/                  # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
 │   ├── io_utils.py                       # Loading term maps and group t-maps
 │   ├── maps_utils.py                     # T-to-Z conversion, map splitting, correlations
 │   ├── glm_utils.py                      # Second-level GLM design matrix
-│   └── plotting.py                       # Plotting utilities
+│   ├── plot_utils.py                     # Plotting utilities
+│   └── tables.py                         # Table formatting
 ├── local/                                # Local data preparation scripts
 └── results/                              # Analysis outputs (timestamped)
     ├── <timestamp>_neurosynth_univariate/

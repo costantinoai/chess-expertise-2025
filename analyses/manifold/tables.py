@@ -10,15 +10,12 @@ generate_pr_results_table : Create multi-column LaTeX table with group compariso
 """
 
 import logging
-import sys
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
 
-# Add repo root to path for common imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from common.report_utils import save_table_with_manuscript_copy
 from common.tables import generate_styled_table, build_c_only_colspec
 from common.formatters import format_ci as fmt_ci_global, format_p_cell, shorten_roi_name

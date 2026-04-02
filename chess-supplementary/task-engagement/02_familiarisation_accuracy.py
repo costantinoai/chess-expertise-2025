@@ -45,7 +45,6 @@ Outputs
 - familiarisation_group_stats.csv: Group-level summary statistics
 """
 
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -53,10 +52,6 @@ import pandas as pd
 from scipy import stats
 
 # Enable repo root imports
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
 from common.stats_utils import (
@@ -64,7 +59,7 @@ from common.stats_utils import (
     compute_mean_ci_and_ttest_vs_value,
 )
 
-from modules.io import load_familiarisation_data, MISSING_SUBJECTS
+from analyses.task_engagement.io import load_familiarisation_data, MISSING_SUBJECTS
 
 
 # ============================================================================

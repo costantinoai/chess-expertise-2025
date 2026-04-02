@@ -55,17 +55,12 @@ All outputs are saved to results/<timestamp>_rsa_rois/:
 - rsa_group_stats.pkl (dict with per-target Welch table and descriptives)
 """
 
-import sys
 from pathlib import Path
 import pickle
 import numpy as np
 import pandas as pd
 
 # Enable repo root imports
-repo_root = Path(__file__).resolve().parent.parent.parent
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
 from common.bids_utils import get_participants_with_expertise, load_roi_metadata
@@ -74,7 +69,7 @@ from common.group_stats import get_descriptives_per_roi
 from common.stats_utils import per_roi_welch_and_fdr
 from nilearn.maskers import NiftiLabelsMasker
 
-from modules.io import RSA_TARGETS, find_subject_rsa_path
+from analyses.rsa_rois.io import RSA_TARGETS, find_subject_rsa_path
 
 
 # ============================================================================

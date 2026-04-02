@@ -293,11 +293,11 @@ chess-mvpa/
 ├── METHODS.md                         # Detailed methods from manuscript
 ├── RESULTS.md                         # Detailed results summary
 ├── DISCREPANCIES.md                   # Notes on analysis discrepancies
-├── modules/
+├── analyses/mvpa/                     # Shared analysis modules (in repo root analyses/ package)
 │   ├── __init__.py
-│   ├── mvpa_io.py                     # Loading subject-level MVPA results
-│   ├── mvpa_group.py                  # Group-level statistical tests
-│   └── plotting.py                    # Plotting utilities
+│   ├── io.py                          # Loading subject-level MVPA results
+│   ├── group.py                       # Group-level statistical tests
+│   └── plot_utils.py                  # Plotting utilities
 ├── local/                             # Local data preparation scripts
 └── results/
     └── mvpa_group/
