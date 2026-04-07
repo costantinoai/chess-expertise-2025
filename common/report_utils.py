@@ -626,47 +626,30 @@ def save_table_with_manuscript_copy(
     logger: Optional[logging.Logger] = None
 ) -> Path:
     """
-    Save a LaTeX table to results directory and optionally copy to manuscript folder.
+    Save a LaTeX table to its canonical location under
+    ``results/<analysis>/tables/``.
 
-    This function saves the LaTeX table to the specified output path and, if
-    MANUSCRIPT_TABLES_DIR is configured and exists, also copies it to the
-    manuscript tables folder for automatic inclusion in the LaTeX manuscript.
+    The ``manuscript_name`` argument is accepted for backwards-compatible call
+    sites but is now ignored: the unified ``results/`` tree is the single
+    canonical destination for every LaTeX table, so no second copy to a
+    separate manuscript folder is performed.
 
     Parameters
     ----------
     latex_table : str
-        The complete LaTeX table code to save
+        The complete LaTeX table code to save.
     output_path : Path
-        Primary save location (in results/tables/)
+        Destination path, typically produced by
+        ``common.results_for('<analysis>', 'tables') / '<name>.tex'``.
     manuscript_name : str, optional
-        Name for the manuscript copy (e.g., 'rsa_main_dims.tex').
-        If None, no manuscript copy is created.
+        Ignored. Kept for backwards compatibility with existing call sites.
     logger : logging.Logger, optional
-        Logger instance for logging progress
+        Logger instance for logging progress.
 
     Returns
     -------
     Path
-        Path to the primary saved table file
-
-    Notes
-    -----
-    - Always saves to output_path (results directory)
-    - If manuscript_name is provided and MANUSCRIPT_TABLES_DIR exists, also
-      copies to manuscript folder
-    - If MANUSCRIPT_TABLES_DIR is configured but doesn't exist, logs a warning
-      and skips manuscript copy
-
-    Example
-    -------
-    >>> from common import CONFIG
-    >>> latex_code = r"\\begin{table}...\\end{table}"
-    >>> save_table_with_manuscript_copy(
-    ...     latex_code,
-    ...     Path("results/tables/mvpa_rsa_summary.tex"),
-    ...     manuscript_name="rsa_main_dims.tex",
-    ...     logger=logger
-    ... )
+        Path to the saved table file.
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -679,24 +662,11 @@ def save_table_with_manuscript_copy(
             logger.error(msg)
         raise ValueError(msg)
 
-    # Save to primary location (results directory)
     with open(output_path, 'w') as f:
         f.write(latex_table)
 
     if logger:
         logger.info(f"LaTeX table saved to: {output_path}")
-
-    # Copy to manuscript tables directory (configured consolidated location)
-    from . import CONFIG
-    manuscript_dir = CONFIG.get('MANUSCRIPT_TABLES_DIR')
-    if (manuscript_dir is not None) and (manuscript_name is not None):
-        manuscript_dir = Path(manuscript_dir)
-        manuscript_dir.mkdir(parents=True, exist_ok=True)
-        manuscript_path = manuscript_dir / manuscript_name
-        with open(manuscript_path, 'w') as f:
-            f.write(latex_table)
-        if logger:
-            logger.info(f"Table copied to manuscript: {manuscript_path}")
 
     return output_path
 

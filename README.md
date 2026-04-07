@@ -249,30 +249,48 @@ See individual analysis READMEs for details:
 
 ## Outputs
 
-All analyses save artefacts to the results directory within their respective folders:
+Every Python analysis writes into a **single unified `results/` tree** at the repo root. Each analysis owns one subfolder with three fixed buckets:
 
 ```
-chess-{analysis}/results/{analysis_name}/
-├── *.npy                   # Numerical arrays (RDMs, coordinates, etc.)
-├── *.pkl                   # Python objects (results dictionaries)
-├── *.csv                   # Summary tables
-├── *.log                   # Execution logs
-├── {script_name}.py        # Copy of analysis script (for reproducibility)
-├── tables/                 # LaTeX and CSV tables
-│   └── *.tex, *.csv
-└── figures/                # Publication-ready figures
-    ├── *.svg, *.pdf        # Individual panels
-    └── panels/             # Multi-panel figures
-        └── *_panel.pdf
+results/
+├── behavioral/
+│   ├── data/        # Numerical aggregates (CSV, TSV, JSON, NPY, PKL)
+│   ├── tables/      # Formatted tables (LaTeX, CSV)
+│   └── figures/     # Rendered figures (PDF, PNG, SVG)
+├── manifold/{data,tables,figures}/
+├── mvpa/{data,tables,figures}/
+├── neurosynth/{data,tables,figures}/
+├── supplementary/
+│   ├── behavioral-reliability/{data,tables,figures}/
+│   ├── eyetracking/{data,tables,figures}/
+│   ├── mvpa-finer/{data,tables,figures}/
+│   ├── neurosynth-terms/{data,tables,figures}/
+│   ├── rdm-intercorrelation/{data,tables,figures}/
+│   ├── rsa-rois/{data,tables,figures}/
+│   ├── run-matching/{data,tables,figures}/
+│   ├── skill-gradient/{data,tables,figures}/
+│   ├── subcortical-rois/{data,tables,figures}/
+│   ├── task-engagement/{data,tables,figures}/
+│   └── univariate-rois/{data,tables,figures}/
+└── MANIFEST.json    # Git commit hash + Python version + recompute date
 ```
 
-Additionally, publication-ready PDFs and LaTeX tables are copied to a consolidated bundle under `results-bundle/` for easy sharing:
+The idiomatic accessor is `common.results_for(analysis, kind)`:
 
+```python
+from common import results_for
+out = results_for('mvpa', 'figures') / 'rsa_roi_panel.pdf'
+fig.savefig(out)
 ```
-results-bundle/
-├── figures/    # Final panels (PDF)
-└── tables/     # Final tables (LaTeX)
-```
+
+which returns `<repo>/results/mvpa/figures/` (creating the directory if missing). Every figure and table has exactly one canonical location under `results/<analysis>/{data,tables,figures}/`.
+
+**`results/` is NOT committed to git.** It is regenerated locally by running `./run_all_analyses.sh group` and distributed in two places:
+
+1. **GitHub release artifact** — a zipped snapshot of `results/` at the published commit, attached to the corresponding tagged release (bundle F, `chess-bids_F_code-results.zip`).
+2. **RDR repository** — the same snapshot is uploaded alongside the BIDS dataset at `doi:10.48804/VVCEWP` so users who download the data can also download the paper's figures and tables without cloning the code.
+
+This keeps the git repo small (only source code), while preserving a stable, citable `results/` snapshot for every release. The old per-analysis `chess-*/results/` folders and the separate `results-bundle/` "manuscript copy" are gone — neither git-tracked nor written to disk during normal analysis runs.
 
 ## Analysis Overview
 
@@ -316,7 +334,7 @@ See [`chess-supplementary/README.md`](chess-supplementary/README.md) for details
 ### What to Expect
 
 **Byte-identical outputs:**
-- All publication tables (`results-bundle/tables/*.tex`)
+- All publication tables (`results/*/tables/*.tex`)
 - Behavioral analysis data files (all `.npy`, `.pkl`, `.csv`)
 - Within-group t-tests (`*_vs_chance.csv`)
 - Behavioral reliability, eyetracking, RDM intercorrelation, and task engagement CSVs

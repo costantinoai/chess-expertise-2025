@@ -610,50 +610,28 @@ def save_panel_pdf(fig, output_file: Path | str, dpi: int = 450) -> Path:
     """
     Save full arranged panel as PDF with tight bbox and return path.
 
-    Automatically copies the PDF to the manuscript figures folder if
-    CONFIG['MANUSCRIPT_FIGURES_DIR'] is set and the folder exists.
+    The output should be placed under ``results/<analysis>/figures/`` via
+    ``common.results_for('<analysis>', 'figures') / 'my_figure.pdf'`` — the
+    unified results/ tree is the single canonical destination for every
+    rendered figure in the repo.
 
     Parameters
     ----------
     fig : matplotlib.figure.Figure
-        Figure to save
+        Figure to save.
     output_file : Path | str
-        Output path for the PDF (in results directory)
+        Destination path. Parent directory is created if missing.
     dpi : int, default=450
-        DPI for figure rendering
+        DPI for figure rendering.
 
     Returns
     -------
     Path
-        Path to the saved PDF file (in results directory)
-
-    Notes
-    -----
-    If CONFIG['MANUSCRIPT_FIGURES_DIR'] is configured and exists, the PDF
-    is also copied to that location for LaTeX manuscript compilation.
-    The manuscript copy uses the same filename as the original.
+        Path to the saved PDF file.
     """
-    import shutil
-    import warnings
-    import logging
-
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_file, format='pdf', bbox_inches='tight', dpi=dpi)
-
-    # Copy to manuscript figures directory (configured consolidated location)
-    try:
-        from ..constants import CONFIG
-        manuscript_dir = CONFIG.get('MANUSCRIPT_FIGURES_DIR')
-        if manuscript_dir is not None:
-            manuscript_dir = Path(manuscript_dir)
-            manuscript_dir.mkdir(parents=True, exist_ok=True)
-            manuscript_path = manuscript_dir / output_file.name
-            shutil.copy2(output_file, manuscript_path)
-            logging.getLogger('chess_analysis').info(f"Copied figure to manuscript: {manuscript_path}")
-    except (ImportError, KeyError) as e:
-        logging.getLogger('chess_analysis').debug(f"Skipping manuscript copy (CONFIG unavailable): {e}")
-
     return output_file
 
 def save_axes_pngs(fig, out_dir: Path | str, prefix: str,

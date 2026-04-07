@@ -80,19 +80,11 @@ _EXTERNAL_DATA_ROOT = Path(
 )
 
 # ============================================================================
-# Final Results Output (Figures and Tables for Manuscript)
+# Unified results/ tree (canonical location for every Python analysis output)
 # ============================================================================
-# Central location in repo for final publication-ready outputs.
-# save_panel_pdf() and save_table_with_manuscript_copy() automatically copy
-# outputs here. This folder is gitignored (regenerable from analysis scripts).
-# Set to None to disable automatic copying.
-_FINAL_RESULTS_DIR = _REPO_ROOT / "results-bundle"
-_MANUSCRIPT_FIGURES_DIR = _FINAL_RESULTS_DIR / "figures"
-_MANUSCRIPT_TABLES_DIR = _FINAL_RESULTS_DIR / "tables"
-
-# Optional always-on bundle (non-timestamped) for consolidated outputs
-# Note: manuscript outputs (PDF panels, LaTeX tables) are consolidated under
-# results-bundle/. No other consolidated copies are made.
+# Every analysis writes into results/<analysis>/{data,tables,figures}/
+# under the repo root. See results_for() below for the idiomatic accessor.
+_RESULTS_ROOT = _REPO_ROOT / "results"
 
 # ============================================================================
 # Intermediate Path Construction (private - build CONFIG paths from these)
@@ -140,15 +132,11 @@ CONFIG = {
     'NEUROSYNTH_ROOT': _NEUROSYNTH_ROOT,
 
     # ========================================================================
-    # Final Results Output (Figures and Tables)
+    # Unified results/ tree
     # ========================================================================
-    # Central repository location (./final_results/) for publication-ready outputs.
-    # save_panel_pdf() and save_table_with_manuscript_copy() automatically copy
-    # final PDFs and LaTeX tables here. Gitignored but in repo (regenerable).
-    # Set to None to disable automatic copying.
-    'FINAL_RESULTS_DIR': _FINAL_RESULTS_DIR,
-    'MANUSCRIPT_FIGURES_DIR': _MANUSCRIPT_FIGURES_DIR,  # ./final_results/figures
-    'MANUSCRIPT_TABLES_DIR': _MANUSCRIPT_TABLES_DIR,    # ./final_results/tables
+    # Every analysis writes into results/<analysis>/{data,tables,figures}/.
+    # Use results_for(analysis, kind) below to get a Path and auto-create it.
+    'RESULTS_ROOT': _RESULTS_ROOT,
 
     # --- ROI Definitions ---
     'ROI_ROOT': _ROI_ROOT,                                      # Base ROI directory
@@ -266,6 +254,56 @@ CONFIG = {
     },
 }
 
+def results_for(analysis: str, kind: str) -> Path:
+    """
+    Return the results/ subfolder path for a given analysis and kind, creating
+    it on disk if it does not exist.
+
+    Every Python analysis writes to the unified tree
+
+        <repo_root>/results/<analysis>/{data,tables,figures}/
+
+    where ``<analysis>`` is the analysis name (e.g. ``'behavioral'``,
+    ``'mvpa'``, ``'neurosynth'``, ``'supplementary/skill-gradient'``)
+    and ``kind`` is one of ``'data'``, ``'tables'``, or ``'figures'``.
+
+    Parameters
+    ----------
+    analysis : str
+        Analysis identifier. May include a ``supplementary/`` prefix for
+        supplementary analyses (e.g. ``'supplementary/eyetracking'``).
+    kind : str
+        One of ``'data'``, ``'tables'``, ``'figures'``.
+
+    Returns
+    -------
+    pathlib.Path
+        Absolute path to ``<repo>/results/<analysis>/<kind>/``. The directory
+        is created (``mkdir -p``) before being returned.
+
+    Raises
+    ------
+    ValueError
+        If ``kind`` is not one of the three allowed values.
+
+    Examples
+    --------
+    >>> from common import results_for
+    >>> out = results_for('mvpa', 'data')
+    >>> out.name, out.parent.name
+    ('data', 'mvpa')
+    """
+    allowed_kinds = {"data", "tables", "figures"}
+    if kind not in allowed_kinds:
+        raise ValueError(
+            f"results_for: kind must be one of {sorted(allowed_kinds)}, got {kind!r}"
+        )
+    path = _RESULTS_ROOT / analysis / kind
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 __all__ = [
     'CONFIG',
+    'results_for',
 ]

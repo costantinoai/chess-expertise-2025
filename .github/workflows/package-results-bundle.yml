@@ -1,0 +1,141 @@
+name: Package results/ as release artifact (Bundle F)
+
+# Runs when a GitHub release is published (i.e. when `gh release create <tag>`
+# is issued, or when a release draft is promoted to "published" in the UI).
+# The job regenerates the code-repo `results/` tree from the current commit,
+# zips it, and uploads the resulting archive to the release as
+# `chess-bids_F_code-results.zip` -- the same artifact that ships as bundle F
+# alongside the BIDS dataset in the RDR repository.
+#
+# Requirements
+# ------------
+# - `results/` is not committed to git (see .gitignore). It must be regenerated
+#   on the runner, which requires read access to the BIDS dataset.
+# - The BIDS dataset is ~250 GB and cannot be downloaded on GitHub-hosted
+#   runners. Therefore this workflow runs on a self-hosted runner labelled
+#   `self-hosted, chess-data`. The runner is expected to have:
+#     * A local copy of the BIDS dataset at the path set in CHESS_DATA_ROOT
+#       (default: /media/costantino_ai/eik-T9/manuscript-data).
+#     * The `ml` mamba environment installed under ~/miniforge3/envs/ml.
+#
+# If you do not have a self-hosted runner with data access, delete this file
+# and upload `chess-bids_F_code-results.zip` manually via
+#     gh release upload <tag> chess-bids_F_code-results.zip
+# after running `./run_all_analyses.sh group` and zipping `results/` locally.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach the bundle to (e.g. v1.0.0). Required when dispatched manually.'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # needed to upload release assets
+
+jobs:
+  package-and-upload:
+    runs-on: [self-hosted, chess-data]
+    timeout-minutes: 240
+
+    env:
+      CHESS_DATA_ROOT: /media/costantino_ai/eik-T9/manuscript-data
+      BUNDLE_NAME: chess-bids_F_code-results.zip
+      # Bounce all potentially-unsafe interpolations through env: so they
+      # never land inside a shell string literal. See
+      # https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
+      EVENT_NAME: ${{ github.event_name }}
+      RELEASE_TAG_FROM_EVENT: ${{ github.event.release.tag_name }}
+      INPUT_TAG: ${{ inputs.tag }}
+
+    steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            TAG="$RELEASE_TAG_FROM_EVENT"
+          else
+            TAG="$INPUT_TAG"
+          fi
+          if [[ -z "${TAG:-}" ]]; then
+            echo "No release tag resolved (EVENT_NAME=$EVENT_NAME)." >&2
+            exit 1
+          fi
+          # Sanity check: allow only typical tag characters.
+          if [[ ! "$TAG" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Rejecting suspicious tag: $TAG" >&2
+            exit 1
+          fi
+          printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+          printf 'RELEASE_TAG=%s\n' "$TAG" >> "$GITHUB_ENV"
+
+      - name: Checkout code at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Verify BIDS dataset is reachable
+        run: |
+          set -euo pipefail
+          if [[ ! -d "$CHESS_DATA_ROOT/BIDS" ]]; then
+            echo "CHESS_DATA_ROOT/BIDS does not exist on this runner." >&2
+            exit 1
+          fi
+          echo "BIDS root: $CHESS_DATA_ROOT/BIDS"
+          du -sh "$CHESS_DATA_ROOT/BIDS/derivatives" || true
+
+      - name: Regenerate results/ via run_all_analyses.sh group
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          source ~/miniforge3/etc/profile.d/conda.sh
+          conda activate ml
+          which python
+          python --version
+          # group = only the Python group/table/plot layer. No MATLAB re-runs,
+          # no fmriprep/SPM pipelines. Matches the default behaviour of
+          # run_all_analyses.sh when called without arguments.
+          ./run_all_analyses.sh group
+
+      - name: Write results/MANIFEST.json with provenance metadata
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib, subprocess, sys, datetime
+          root = pathlib.Path("results")
+          root.mkdir(exist_ok=True)
+          commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          pyver = sys.version.split()[0]
+          doc = {
+              "commit": commit,
+              "python": pyver,
+              "generated_utc": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+              "tag": os.environ.get("RELEASE_TAG", ""),
+              "description": "Snapshot of chess-expertise-2025 results/ for release bundle F.",
+          }
+          (root / "MANIFEST.json").write_text(json.dumps(doc, indent=2) + "\n")
+          print("Wrote", root / "MANIFEST.json")
+          PY
+
+      - name: Zip results/ into bundle F archive
+        run: |
+          set -euo pipefail
+          zip -r -q "$BUNDLE_NAME" results
+          ls -lh "$BUNDLE_NAME"
+          sha256sum "$BUNDLE_NAME" > "${BUNDLE_NAME}.sha256"
+
+      - name: Upload archive and checksum to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "$BUNDLE_NAME" \
+            "${BUNDLE_NAME}.sha256" \
+            --clobber
