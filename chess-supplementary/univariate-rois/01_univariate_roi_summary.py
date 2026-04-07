@@ -19,7 +19,7 @@ Data
 ----
 - Participants: All subjects in participants.tsv (n_experts, n_novices derived
   at runtime via BIDS participants table).
-- Imaging: First-level SPM contrasts from CONFIG['SPM_GLM_DIR']/smooth4.
+- Imaging: First-level SPM contrasts from CONFIG['SPM_GLM_SMOOTH4'].
 - Volumetric atlas: Glasser-180 bilateral atlas in MNI152NLin2009cAsym space (180 ROIs total).
 - ROI metadata: region_info.tsv from CONFIG['ROI_GLASSER_180'].
 

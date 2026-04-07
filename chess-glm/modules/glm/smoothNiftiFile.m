@@ -5,10 +5,13 @@ function newFilePath = smoothNiftiFile(niiFile, outPath, fwhm)
     subAndTask = split(niiName, "_"); %#ok<NASGU>
 
     if nargin < 2 || isempty(outPath)
+        % Fallback workdir for smoothed intermediate BOLD files. All callers
+        % in the current pipeline pass an explicit outPath, so this branch is
+        % effectively dead code retained for API compatibility.
         splitPath = strsplit(niiFile, '/');
         idx = find(contains(splitPath, 'BIDS'));
         bidsPath = strjoin(splitPath(1:idx), '/');
-        outPath = fullfile(bidsPath, 'derivatives', 'SPM', 'smoothed');
+        outPath = fullfile(bidsPath, 'derivatives', 'fmriprep_spm-smoothed', 'workdir');
     end
     if nargin < 3 || isempty(fwhm)
         fwhm = [4 4 4]; % Default to 4 mm per manuscript

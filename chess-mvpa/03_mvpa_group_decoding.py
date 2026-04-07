@@ -20,9 +20,10 @@ Subject-level decoding accuracies were computed using linear support vector
 machines (SVMs) trained and tested on trial-wise beta estimates extracted
 from 22 bilateral cortical regions (Glasser multimodal parcellation). Subject-
 level analyses were performed separately for each classification target and
-each ROI. Results are stored as TSV files in BIDS/derivatives/mvpa-decoding/,
-with one file per subject following BIDS-like naming:
-sub-XX_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv.
+each ROI. Results are stored as TSV files in
+BIDS/derivatives/fmriprep_spm-unsmoothed_decoding/, with one file per subject
+following BIDS naming:
+sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv.
 
 Participants: N=40 (20 experts, 20 novices).
 Stimuli: 40 chess board positions (20 check, 20 non-check).

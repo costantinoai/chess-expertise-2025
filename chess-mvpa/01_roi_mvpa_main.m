@@ -37,7 +37,7 @@ addpath(fullfile(fileparts(fileparts(mfilename('fullpath'))), 'common'));
 cfg = chess_config();
 
 derivativesDir = cfg.derivatives;
-glmRoot        = cfg.glmUnsmoothed;
+glmRoot        = cfg.spmUnsmoothed;
 roiAtlas       = cfg.roiGlasser22Atlas;
 roiTSV         = cfg.roiGlasser22TSV;
 outRootSVM     = cfg.mvpaDecoding;
@@ -187,15 +187,17 @@ for s = 1:numel(subDirs)
     end
 
     % ---------------------- Save TSV outputs ----------------------
-    % BIDS-like naming: sub-XX_space-MNI152NLin2009cAsym_roi-glasser_<suffix>.tsv
+    % BIDS naming with explicit stat- entity:
+    %   sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv
+    %   sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv
     svm_tbl = array2table(svm_mat, 'VariableNames', matlab_safe_names(region_names));
     svm_tbl = addvars(svm_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    svmFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv', subName);
+    svmFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv', subName);
     writetable(svm_tbl, fullfile(subOutSVM, svmFilename), 'FileType','text', 'Delimiter','\t');
 
     rsa_tbl = array2table(rsa_mat, 'VariableNames', matlab_safe_names(region_names));
     rsa_tbl = addvars(rsa_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv', subName);
+    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv', subName);
     writetable(rsa_tbl, fullfile(subOutRSA, rsaFilename), 'FileType','text', 'Delimiter','\t');
 
     fprintf('[INFO]   Saved SVM and RSA TSV files for %s\n', subName);

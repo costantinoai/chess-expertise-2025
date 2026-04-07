@@ -101,15 +101,17 @@ _MANUSCRIPT_TABLES_DIR = _FINAL_RESULTS_DIR / "tables"
 # BIDS base directories
 _BIDS_ROOT = _EXTERNAL_DATA_ROOT / "BIDS"
 _BIDS_DERIVATIVES = _BIDS_ROOT / "derivatives"
+_BIDS_SOURCEDATA = _BIDS_ROOT / "sourcedata"
 
-# ROI base directories (under BIDS/derivatives/atlases/)
-_ROI_ROOT = _BIDS_DERIVATIVES / "atlases"
+# ROI base directories (under BIDS/sourcedata/atlases/ — primary reference
+# atlases are stored in sourcedata per the BIDS Templates and Atlases spec).
+_ROI_ROOT = _BIDS_SOURCEDATA / "atlases"
 _ROI_GLASSER_22_DIR = _ROI_ROOT / "glasser22"
 _ROI_GLASSER_180_DIR = _ROI_ROOT / "glasser180"
 _ROI_GLASSER_180_SURFACE_DIR = _ROI_ROOT / "glasser180-surface"
 _ROI_CABNP_DIR = _ROI_ROOT / "cab-np"
 
-# Neurosynth base directory (under BIDS/derivatives/atlases/)
+# Neurosynth base directory (under BIDS/sourcedata/atlases/)
 _NEUROSYNTH_ROOT = _ROI_ROOT / "neurosynth"
 
 # ============================================================================
@@ -169,21 +171,20 @@ CONFIG = {
     'STIMULI_FILE': _BIDS_ROOT / "stimuli" / "stimuli.tsv",  # Chess board stimulus metadata
 
     # --- Preprocessing Outputs ---
-    'BIDS_FMRIPREP': _BIDS_DERIVATIVES / "fmriprep",            # fMRIPrep outputs
-    # Canonical SPM GLM derivatives root (single source of truth)
-    'SPM_GLM_DIR': _BIDS_DERIVATIVES / "SPM",
-    'SPM_GLM_UNSMOOTHED': _BIDS_DERIVATIVES / "SPM" / "GLM-unsmoothed",  # Unsmoothed GLM results
-    'SPM_GLM_SMOOTH4': _BIDS_DERIVATIVES / "SPM" / "GLM-smooth4",        # 4mm smoothed GLM results
+    'BIDS_FMRIPREP': _BIDS_DERIVATIVES / "fmriprep",                               # fMRIPrep outputs
+    'SPM_GLM_UNSMOOTHED': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed",           # SPM first-level GLM on unsmoothed BOLD
+    'SPM_GLM_SMOOTH4': _BIDS_DERIVATIVES / "fmriprep_spm-smoothed",                # SPM first-level GLM on 4 mm smoothed BOLD
 
-    # --- Analysis Derivatives ---
-    'BIDS_MVPA_RSA': _BIDS_DERIVATIVES / "mvpa-rsa",           # MVPA RSA results (ROI-level)
-    'BIDS_MVPA_RSA_RUN_MATCHED': _BIDS_DERIVATIVES / "mvpa-rsa-run-matched",  # Run-matched RSA (ROI-level)
-    'BIDS_MVPA_DECODING': _BIDS_DERIVATIVES / "mvpa-decoding",  # MVPA decoding results (ROI-level)
-    'BIDS_RSA_SEARCHLIGHT': _BIDS_DERIVATIVES / "rsa_searchlight",  # RSA searchlight results
-    'BIDS_BEHAVIORAL': _BIDS_DERIVATIVES / "chess-behavioural",  # Behavioral task data
-    'BIDS_EYETRACK': _BIDS_DERIVATIVES / "eye-tracking",        # Eye-tracking derivatives
-    'BIDS_MVPA_RSA_SUBCORTICAL': _BIDS_DERIVATIVES / "mvpa-rsa-subcortical",  # Subcortical RSA results
-    'BIDS_MVPA_DECODING_SUBCORTICAL': _BIDS_DERIVATIVES / "mvpa-decoding-subcortical",  # Subcortical decoding results
+    # --- Analysis Derivatives (provenance-chain naming) ---
+    'BIDS_MVPA_RSA': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_rsa",                       # ROI RSA
+    'BIDS_MVPA_RSA_RUN_MATCHED': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_rsa-run-matched",   # Run-matched ROI RSA
+    'BIDS_MVPA_DECODING': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_decoding",             # ROI decoding
+    'BIDS_RSA_SEARCHLIGHT': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_searchlight-rsa",    # Whole-brain searchlight RSA
+    'BIDS_BEHAVIORAL_RSA': _BIDS_DERIVATIVES / "behavioral-rsa",                              # Per-subject behavioral preference RDMs
+    'BIDS_MANIFOLD': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_manifold",                  # Per-subject neural Participation Ratio per ROI
+    'BIDS_EYETRACK': _BIDS_DERIVATIVES / "bidsmreye",                                         # BidsMReye gaze estimates
+    'BIDS_MVPA_RSA_SUBCORTICAL': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_rsa-subcortical",             # Subcortical ROI RSA
+    'BIDS_MVPA_DECODING_SUBCORTICAL': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_decoding-subcortical",   # Subcortical ROI decoding
 
     # --- External Resources ---
     'NEUROSYNTH_TERMS_DIR': _NEUROSYNTH_ROOT / "terms",         # Neurosynth term maps

@@ -281,7 +281,7 @@ def validate_subject_data(subject_id, check_glm=True, check_mvpa=False, check_rs
         rsa_dir = Path(CONFIG['BIDS_RSA_SEARCHLIGHT']) / subject_id
         if not rsa_dir.exists():
             result['valid'] = False
-            result['missing'].append('rsa_searchlight')
+            result['missing'].append('searchlight-rsa')
             result['messages'].append(f"No RSA searchlight results for {subject_id}")
 
     return result
@@ -703,7 +703,8 @@ def validate_bids_paths():
         CONFIG['BIDS_ROOT'],
         CONFIG['BIDS_DERIVATIVES'],
         CONFIG['BIDS_PARTICIPANTS'],
-        CONFIG['SPM_GLM_DIR'],
+        CONFIG['SPM_GLM_UNSMOOTHED'],
+        CONFIG['SPM_GLM_SMOOTH4'],
     ]
 
     missing_paths = [p for p in required_paths if not p.exists()]

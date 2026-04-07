@@ -21,8 +21,8 @@ neural representational dissimilarity matrices (RDMs) with theoretical model
 RDMs. Neural RDMs were constructed from trial-wise beta estimates within each
 of 22 bilateral cortical regions (Glasser multimodal parcellation). Subject-
 level correlations (Spearman or Pearson) are stored as TSV files in
-BIDS/derivatives/mvpa-rsa/, with one file per subject following BIDS-like
-naming: sub-XX_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv.
+BIDS/derivatives/fmriprep_spm-unsmoothed_rsa/, with one file per subject
+following BIDS naming: sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv.
 
 Participants: N=40 (20 experts, 20 novices).
 Stimuli: 40 chess board positions (20 check, 20 non-check).
