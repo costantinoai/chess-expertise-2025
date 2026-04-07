@@ -55,7 +55,7 @@ EXP_COL = COLORS_EXPERT_NOVICE['expert']
 NOV_COL = COLORS_EXPERT_NOVICE['novice']
 C_CM = COLORS_CHECKMATE_NONCHECKMATE['checkmate']
 C_NC = COLORS_CHECKMATE_NONCHECKMATE['non_checkmate']
-STIMULI_DIR = CONFIG['EXTERNAL_DATA_ROOT'] / "stimuli"
+STIMULI_DIR = CONFIG['BIDS_ROOT'] / "stimuli"
 
 # ============================================================================
 # Load data

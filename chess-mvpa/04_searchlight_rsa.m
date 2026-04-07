@@ -69,10 +69,10 @@
 %% Outputs
 %% -------
 %% Subject-level whole-brain RSA maps saved to:
-%%   <BIDS_DERIVATIVES>/mvpa/<timestamp>_searchlight_rsa/sub-XX/
-%%     ├── sub-XX_searchlight_checkmate.nii.gz
-%%     ├── sub-XX_searchlight_visual_similarity.nii.gz
-%%     └── sub-XX_searchlight_strategy.nii.gz
+%%   <BIDS_DERIVATIVES>/rsa_searchlight/sub-XX/
+%%     ├── sub-XX_desc-searchlight_checkmate_stat-r_map.nii.gz
+%%     ├── sub-XX_desc-searchlight_visual_similarity_stat-r_map.nii.gz
+%%     └── sub-XX_desc-searchlight_strategy_stat-r_map.nii.gz
 %%
 %% Each map contains Pearson r values at each voxel, quantifying the strength
 %% of neural-model correspondence. Values range from -1 (perfect anti-correlation)
@@ -105,9 +105,8 @@ derivativesDir = cfg.derivatives;
 % Searchlight RSA uses unsmoothed data to preserve spatial specificity
 glmRoot = cfg.glmUnsmoothed;
 
-% Output root with timestamp for reproducibility
-ts = datestr(now, 'yyyymmdd-HHMMSS');
-outRoot = fullfile(derivativesDir, 'mvpa', [ts, '_searchlight_rsa']);
+% Output root: BIDS-curated rsa_searchlight derivative folder
+outRoot = cfg.rsaSearchlight;
 mkdir_p(outRoot);
 
 fprintf('[INFO] Searchlight RSA analysis starting at: %s\n', datestr(now));
@@ -242,8 +241,8 @@ for s = 1:numel(subDirs)
                                    rsa_args, optRSA);
         elapsed = toc;
 
-        % Save NIfTI result (gzipped to save space)
-        outFile = fullfile(subOutDir, sprintf('%s_searchlight_%s.nii.gz', ...
+        % Save NIfTI result (gzipped to save space) using BIDS-curated naming
+        outFile = fullfile(subOutDir, sprintf('%s_desc-searchlight_%s_stat-r_map.nii.gz', ...
                                               subName, suffix));
         cosmo_map2fmri(sl_rsa, outFile);
 
