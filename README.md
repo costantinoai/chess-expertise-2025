@@ -45,7 +45,7 @@ This repository contains the complete analysis code for our study investigating 
 
 - **Python 3.9–3.12** (tested on 3.11)
 - **MATLAB R2019b or higher** (optional, only for subject-level GLM and MVPA. Group stats are computed in Python)
-- **SPM12** (optional, for first-level GLM preprocessing)
+- **SPM12** (optional, for first-level GLM. This can be skipped: result from the GLM are provided in the RDR KU Leuven companion data repository.)
 
 ### Clone Repository
 
