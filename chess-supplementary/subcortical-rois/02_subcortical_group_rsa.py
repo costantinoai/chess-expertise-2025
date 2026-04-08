@@ -21,7 +21,7 @@ Subject-level RSA correlation coefficients were computed by correlating neural
 RDMs with theoretical model RDMs within each subcortical ROI. Neural RDMs were
 constructed from trial-wise beta estimates within each ROI, then correlated
 (Spearman) with model RDMs. Subject-level correlations are stored as TSV files
-in BIDS/derivatives/mvpa-rsa-subcortical/.
+in BIDS/derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/.
 
 Participants: N=40 (20 experts, 20 novices).
 Stimuli: 40 chess board positions (20 check, 20 non-check).
@@ -182,21 +182,13 @@ for tgt in targets:
 for tgt, blocks in method_results.items():
     write_group_stats_outputs(results_dir, "rsa_corr", tgt, blocks)
 
-# Save pickle for plotting (same format as cortical mvpa_group_stats.pkl)
-# NOTE: pickle used here for compatibility with the existing cortical pipeline
-# plotting infrastructure which expects this format
-artifact_index_path = results_dir / "subcortical_group_stats.pkl"
-if artifact_index_path.exists():
-    try:
-        with open(artifact_index_path, "rb") as f:
-            prev = pickle.load(f)
-    except Exception:
-        prev = {}
-else:
-    prev = {}
-prev["rsa_corr"] = method_results
+# Save the RSA half into its own file so the RSA and decoding group
+# stages do not collide under the unified results/ tree. The matching
+# decoding-stage file is produced by 03_subcortical_group_decoding.py
+# and both halves are merged by analyses.mvpa.io.load_mvpa_group_stats.
+artifact_index_path = results_dir / "subcortical_group_stats_rsa.pkl"
 with open(artifact_index_path, "wb") as f:
-    pickle.dump(prev, f)
+    pickle.dump({"rsa_corr": method_results}, f)
 
 logger.info("Saved group statistics artifacts (subcortical RSA)")
 logger.info(f"All outputs saved to: {results_dir}")

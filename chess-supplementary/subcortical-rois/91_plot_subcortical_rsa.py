@@ -76,7 +76,7 @@ RESULTS_DIR = results_dir
 FIGURES_DIR = dirs['figures']
 
 logger.info("Loading subcortical RSA group statistics...")
-with open(RESULTS_DIR / "subcortical_group_stats.pkl", "rb") as f:
+with open(RESULTS_DIR / "subcortical_group_stats_rsa.pkl", "rb") as f:
     group_stats = pickle.load(f)
 
 roi_info = load_roi_metadata(CONFIG["ROI_CABNP"])

@@ -11,7 +11,8 @@ METHODS
 
 Data
 ----
-Subject-level SVM decoding accuracies from mvpa-decoding-subcortical/.
+Subject-level SVM decoding accuracies from
+BIDS/derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/.
 Participants: N=40 (20 experts, 20 novices). ROIs: 9 bilateral subcortical.
 
 Statistical Testing
@@ -132,16 +133,13 @@ for tgt in targets:
 for tgt, blocks in method_results.items():
     write_group_stats_outputs(results_dir, "svm", tgt, blocks)
 
-# Merge into unified pickle (same as cortical mvpa_group_stats.pkl pattern)
-artifact_index_path = results_dir / "subcortical_group_stats.pkl"
-if artifact_index_path.exists():
-    with open(artifact_index_path, "rb") as f:
-        prev = pickle.load(f)
-else:
-    prev = {}
-prev["svm"] = method_results
+# Save the decoding half into its own file so the RSA and decoding
+# group stages do not collide under the unified results/ tree. The
+# matching RSA-stage file is produced by 02_subcortical_group_rsa.py and
+# both halves are merged by analyses.mvpa.io.load_mvpa_group_stats.
+artifact_index_path = results_dir / "subcortical_group_stats_svm.pkl"
 with open(artifact_index_path, "wb") as f:
-    pickle.dump(prev, f)
+    pickle.dump({"svm": method_results}, f)
 
 logger.info("Saved group statistics artifacts (subcortical decoding)")
 log_script_end(logger)
