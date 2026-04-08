@@ -2,35 +2,23 @@
 """Univariate ROIs — Manuscript Table (Significant ROIs Only)"""
 from pathlib import Path
 import pandas as pd
-import pickle
+import pickle  # noqa: S403 — used only to load trusted internal artefacts
 
-
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
-from common.report_utils import save_table_with_manuscript_copy
+from common import setup_script, log_script_end
 from common.formatters import format_ci, format_p_cell, shorten_roi_name
 
-# Find results directory
-results_dir = find_latest_results_directory(
-    Path(__file__).parent / 'results',
-    pattern='*univariate_rois',
-    create_subdirs=['tables'],
-    require_exists=True,
-    verbose=True
+# Unified results tree: reads 01_univariate_roi_summary.py's outputs from
+# results/supplementary/univariate-rois/data/ and writes the final
+# manuscript table into results/supplementary/univariate-rois/tables/.
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='univariate_rois',
+    output_subdirs=['tables'],
+    log_name='tables_roi_maps_univ.log',
 )
+tables_dir = dirs['tables']
 
-# Setup logging
-_, _, logger = setup_analysis_in_dir(
-    results_dir,
-    script_file=__file__,
-    extra_config={"RESULTS_DIR": str(results_dir)},
-    suppress_warnings=True,
-    log_name='tables_roi_maps_univ.log'
-)
-
-tables_dir = results_dir / 'tables'
-
-# Load data
+# Load data (pickle produced by chess-supplementary/univariate-rois/01_univariate_roi_summary.py)
 logger.info("Loading univariate group statistics...")
 with open(results_dir / 'univ_group_stats.pkl', 'rb') as f:
     group_stats = pickle.load(f)
