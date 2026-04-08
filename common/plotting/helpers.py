@@ -610,11 +610,6 @@ def save_panel_pdf(fig, output_file: Path | str, dpi: int = 450) -> Path:
     """
     Save full arranged panel as PDF with tight bbox and return path.
 
-    The output should be placed under ``results/<analysis>/figures/`` via
-    ``common.results_for('<analysis>', 'figures') / 'my_figure.pdf'`` — the
-    unified results/ tree is the single canonical destination for every
-    rendered figure in the repo.
-
     Parameters
     ----------
     fig : matplotlib.figure.Figure

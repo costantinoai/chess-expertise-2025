@@ -626,21 +626,18 @@ def save_table_with_manuscript_copy(
     logger: Optional[logging.Logger] = None
 ) -> Path:
     """
-    Save a LaTeX table to its canonical location under
-    ``results/<analysis>/tables/``.
+    Save a LaTeX table to ``output_path``.
 
     The ``manuscript_name`` argument is accepted for backwards-compatible call
-    sites but is now ignored: the unified ``results/`` tree is the single
-    canonical destination for every LaTeX table, so no second copy to a
-    separate manuscript folder is performed.
+    sites but is now ignored: scripts write to a single canonical location
+    under ``results/<analysis>/tables/`` and no second copy is made.
 
     Parameters
     ----------
     latex_table : str
         The complete LaTeX table code to save.
     output_path : Path
-        Destination path, typically produced by
-        ``common.results_for('<analysis>', 'tables') / '<name>.tex'``.
+        Destination path.
     manuscript_name : str, optional
         Ignored. Kept for backwards compatibility with existing call sites.
     logger : logging.Logger, optional

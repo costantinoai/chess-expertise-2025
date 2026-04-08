@@ -4,6 +4,11 @@
 
 This analysis quantifies the effective dimensionality of neural representations in chess-related brain regions using the participation ratio (PR) metric. We hypothesize that chess expertise alters the dimensionality of multivoxel representations—specifically, that experts may show more compressed or structured representational geometries compared to novices. PR values are computed per subject per ROI, compared between groups, and used to classify expertise level.
 
+## Required bundles
+
+- `01_manifold_analysis.py` reads SPM unsmoothed beta images and the Glasser-22 atlas → needs **A** (core) + **D** (spm).
+- `81_table_manifold_pr.py` and `91_plot_manifold_panels.py` only consume the outputs of 01 from the repo `results/` tree (no extra bundle).
+
 ## Methods
 
 ### Rationale
@@ -79,7 +84,7 @@ Principal component analysis (PCA) was performed on the standardized 22-dimensio
   - Columns: `roi_id`, `roi_name`, `hemisphere`
 - **Participant data**: `BIDS/participants.tsv`
   - Columns: `participant_id`, `group` (expert/novice)
-- **Beta images**: `BIDS/derivatives/SPM/GLM-unsmoothed/sub-*/exp/beta_*.nii.gz`
+- **Beta images**: `BIDS/derivatives/fmriprep_spm-unsmoothed/sub-*/exp/beta_*.nii.gz`
   - Trial-wise beta estimates from SPM12 first-level GLMs (unsmoothed)
   - One beta image per stimulus per run
 
@@ -108,12 +113,14 @@ cd chess-manifold
 python 01_manifold_analysis.py
 ```
 
-**Outputs** (saved to `chess-manifold/results/manifold/`):
+**Outputs** (saved to `results/manifold/data/`):
 - `pr_results.pkl`: Complete results dictionary (includes the long-format PR table used by plots/tables)
 - `pr_summary_stats.csv`: Group means, standard errors, and 95% CIs per ROI
 - `pr_statistical_tests.csv`: Welch t-tests, FDR-corrected q-values, Cohen's d per ROI
 - `pr_classification_tests.csv`: Classification accuracy and permutation p-values for ROI and PCA-2D spaces
 - `01_manifold_analysis.py`: Copy of the analysis script
+
+Note: in a future commit this script will be split into `01_*_subject.py` (writes per-subject derivatives to BIDS) and `02_*_group.py` (reads those derivatives and writes to the repo `results/` tree).
 
 **Expected runtime**: ~10-15 minutes (depends on number of voxels per ROI)
 
@@ -123,7 +130,7 @@ python 01_manifold_analysis.py
 python chess-manifold/81_table_manifold_pr.py
 ```
 
-**Outputs** (saved to `chess-manifold/results/manifold/tables/`):
+**Outputs** (saved to `results/manifold/tables/`):
 - `manifold_pr_results.tex`: LaTeX table with group statistics and t-test results
 - `manifold_pr_results.csv`: CSV version of the table
 
@@ -133,7 +140,7 @@ python chess-manifold/81_table_manifold_pr.py
 python chess-manifold/91_plot_manifold_panels.py
 ```
 
-**Outputs** (saved to `chess-manifold/results/manifold/figures/`):
+**Outputs** (saved to `results/manifold/figures/`):
 - Individual axes as SVG:
   - `manifold_bars__Bars_Top_Mean_PR.svg`
   - `manifold_bars__Bars_Bottom_Diff_PR.svg`
@@ -179,20 +186,20 @@ chess-manifold/
 ├── METHODS.md                       # Detailed methods from manuscript
 ├── RESULTS.md                       # Detailed results summary
 ├── DISCREPANCIES.md                 # Notes on analysis discrepancies
-├── analyses/manifold/               # Shared analysis modules (in repo root analyses/ package)
-│   ├── __init__.py
-│   ├── analysis.py                  # Group comparison and FDR correction
-│   ├── data.py                      # Data loading and reshaping utilities
-│   ├── models.py                    # Classification, PCA, permutation tests
-│   ├── pr_computation.py            # Core PR computation from beta images
-│   ├── plotting.py                  # Plotting utilities
-│   ├── tables.py                    # Table formatting
-│   └── utils.py                     # General utilities
-├── local/                           # Local data preparation scripts
-└── results/
-    └── manifold/
-        ├── *.pkl                    # Python objects
-        ├── *.csv                    # Summary tables
-        ├── tables/                  # LaTeX tables
-        └── figures/                 # Publication figures
+└── analyses/manifold/               # Shared analysis modules (in repo root analyses/ package)
+    ├── __init__.py
+    ├── analysis.py                  # Group comparison and FDR correction
+    ├── data.py                      # Data loading and reshaping utilities
+    ├── models.py                    # Classification, PCA, permutation tests
+    ├── pr_computation.py            # Core PR computation from beta images
+    ├── plotting.py                  # Plotting utilities
+    ├── tables.py                    # Table formatting
+    └── utils.py                     # General utilities
+
+results/manifold/                    # Unified results tree (not committed)
+├── data/                            # *.pkl, *.csv numerical results
+├── tables/                          # LaTeX tables
+└── figures/                         # Publication figures
 ```
+
+The `results/` tree is distributed as a release artifact (`chess-bids_F_code-results.zip`) and via the RDR repo; it is not tracked in git. Use `from common import results_for; results_for('manifold', 'data')` as the idiomatic accessor.

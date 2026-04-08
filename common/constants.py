@@ -254,56 +254,6 @@ CONFIG = {
     },
 }
 
-def results_for(analysis: str, kind: str) -> Path:
-    """
-    Return the results/ subfolder path for a given analysis and kind, creating
-    it on disk if it does not exist.
-
-    Every Python analysis writes to the unified tree
-
-        <repo_root>/results/<analysis>/{data,tables,figures}/
-
-    where ``<analysis>`` is the analysis name (e.g. ``'behavioral'``,
-    ``'mvpa'``, ``'neurosynth'``, ``'supplementary/skill-gradient'``)
-    and ``kind`` is one of ``'data'``, ``'tables'``, or ``'figures'``.
-
-    Parameters
-    ----------
-    analysis : str
-        Analysis identifier. May include a ``supplementary/`` prefix for
-        supplementary analyses (e.g. ``'supplementary/eyetracking'``).
-    kind : str
-        One of ``'data'``, ``'tables'``, ``'figures'``.
-
-    Returns
-    -------
-    pathlib.Path
-        Absolute path to ``<repo>/results/<analysis>/<kind>/``. The directory
-        is created (``mkdir -p``) before being returned.
-
-    Raises
-    ------
-    ValueError
-        If ``kind`` is not one of the three allowed values.
-
-    Examples
-    --------
-    >>> from common import results_for
-    >>> out = results_for('mvpa', 'data')
-    >>> out.name, out.parent.name
-    ('data', 'mvpa')
-    """
-    allowed_kinds = {"data", "tables", "figures"}
-    if kind not in allowed_kinds:
-        raise ValueError(
-            f"results_for: kind must be one of {sorted(allowed_kinds)}, got {kind!r}"
-        )
-    path = _RESULTS_ROOT / analysis / kind
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 __all__ = [
     'CONFIG',
-    'results_for',
 ]

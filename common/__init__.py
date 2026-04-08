@@ -19,7 +19,7 @@ Example Usage
 __version__ = "0.1.0"
 
 # Configuration
-from .constants import CONFIG, results_for
+from .constants import CONFIG
 # Provide module-level proxies for commonly used labels/order
 MODEL_ORDER = CONFIG.get('MODEL_ORDER')
 MODEL_LABELS = CONFIG.get('MODEL_LABELS')
@@ -112,7 +112,6 @@ from .neuro_utils import load_nifti, create_glasser22_contours
 __all__ = [
     # Configuration
     'CONFIG',
-    'results_for',
     'MODEL_ORDER',
     'MODEL_LABELS',
     'MODEL_LABELS_PRETTY',

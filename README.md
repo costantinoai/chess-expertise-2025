@@ -249,7 +249,7 @@ See individual analysis READMEs for details:
 
 ## Outputs
 
-Every Python analysis writes into a **single unified `results/` tree** at the repo root. Each analysis owns one subfolder with three fixed buckets:
+Every Python analysis writes into a single unified `results/` tree at the repo root. Each analysis owns one subfolder with three fixed buckets:
 
 ```
 results/
@@ -260,37 +260,21 @@ results/
 ├── manifold/{data,tables,figures}/
 ├── mvpa/{data,tables,figures}/
 ├── neurosynth/{data,tables,figures}/
-├── supplementary/
-│   ├── behavioral-reliability/{data,tables,figures}/
-│   ├── eyetracking/{data,tables,figures}/
-│   ├── mvpa-finer/{data,tables,figures}/
-│   ├── neurosynth-terms/{data,tables,figures}/
-│   ├── rdm-intercorrelation/{data,tables,figures}/
-│   ├── rsa-rois/{data,tables,figures}/
-│   ├── run-matching/{data,tables,figures}/
-│   ├── skill-gradient/{data,tables,figures}/
-│   ├── subcortical-rois/{data,tables,figures}/
-│   ├── task-engagement/{data,tables,figures}/
-│   └── univariate-rois/{data,tables,figures}/
-└── MANIFEST.json    # Git commit hash + Python version + recompute date
+└── supplementary/
+    ├── behavioral-reliability/{data,tables,figures}/
+    ├── eyetracking/{data,tables,figures}/
+    ├── mvpa-finer/{data,tables,figures}/
+    ├── neurosynth-terms/{data,tables,figures}/
+    ├── rdm-intercorrelation/{data,tables,figures}/
+    ├── rsa-rois/{data,tables,figures}/
+    ├── run-matching/{data,tables,figures}/
+    ├── skill-gradient/{data,tables,figures}/
+    ├── subcortical-rois/{data,tables,figures}/
+    ├── task-engagement/{data,tables,figures}/
+    └── univariate-rois/{data,tables,figures}/
 ```
 
-The idiomatic accessor is `common.results_for(analysis, kind)`:
-
-```python
-from common import results_for
-out = results_for('mvpa', 'figures') / 'rsa_roi_panel.pdf'
-fig.savefig(out)
-```
-
-which returns `<repo>/results/mvpa/figures/` (creating the directory if missing). Every figure and table has exactly one canonical location under `results/<analysis>/{data,tables,figures}/`.
-
-**`results/` is NOT committed to git.** It is regenerated locally by running `./run_all_analyses.sh group` and distributed in two places:
-
-1. **GitHub release artifact** — a zipped snapshot of `results/` at the published commit, attached to the corresponding tagged release (bundle F, `chess-bids_F_code-results.zip`).
-2. **RDR repository** — the same snapshot is uploaded alongside the BIDS dataset at `doi:10.48804/VVCEWP` so users who download the data can also download the paper's figures and tables without cloning the code.
-
-This keeps the git repo small (only source code), while preserving a stable, citable `results/` snapshot for every release. The old per-analysis `chess-*/results/` folders and the separate `results-bundle/` "manuscript copy" are gone — neither git-tracked nor written to disk during normal analysis runs.
+`results/` is regenerated locally by running the analysis scripts (`./run_all_analyses.sh group` runs every group/table/plot script in the repo). It is not tracked in git.
 
 ## Analysis Overview
 

@@ -4,6 +4,11 @@
 
 This analysis examines behavioral similarity judgments from a 1-back preference task performed during fMRI scanning. Participants (20 experts, 20 novices) indicated which of two consecutively presented chess boards they preferred. We test whether behavioral preferences correlate with theoretical models of chess board similarity.
 
+## Required bundles
+
+- `01_behavioral_rsa.py` needs **A** (core: BIDS events, stimuli, participants).
+- `81_table_behavioral_correlations.py` and `91_plot_behavioral_panels.py` only consume the outputs of 01 from the repo `results/` tree (no bundle download required beyond A).
+
 ## Methods
 
 ### Task and Data
@@ -101,7 +106,7 @@ Expected structure under this folder:
 python chess-behavioral/01_behavioral_rsa.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/`):
+**Outputs** (saved to `results/behavioral/data/`):
 - `expert_behavioral_rdm.npy`: Expert group RDM (40×40)
 - `novice_behavioral_rdm.npy`: Novice group RDM (40×40)
 - `expert_directional_dsm.npy`: Expert directional preference matrix (40×40)
@@ -111,6 +116,8 @@ python chess-behavioral/01_behavioral_rsa.py
 - `correlation_results.pkl`: RSA correlation statistics with FDR correction
 - `correlation_summary.csv`: Human-readable summary table
 
+Note: in a future commit this script will be split into `01_*_subject.py` (writes per-subject derivatives to BIDS) and `02_*_group.py` (reads those derivatives and writes to the repo `results/` tree).
+
 **Expected runtime**: ~2-3 minutes
 
 ### Step 2: Generate Tables
@@ -119,7 +126,7 @@ python chess-behavioral/01_behavioral_rsa.py
 python chess-behavioral/81_table_behavioral_correlations.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/tables/`):
+**Outputs** (saved to `results/behavioral/tables/`):
 - `behavioral_rsa_correlations.tex`: LaTeX table
 - `behavioral_rsa_correlations.csv`: CSV table
 
@@ -129,7 +136,7 @@ python chess-behavioral/81_table_behavioral_correlations.py
 python chess-behavioral/91_plot_behavioral_panels.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/figures/`):
+**Outputs** (saved to `results/behavioral/figures/`):
 - Individual axes as SVG/PDF: `behavioral_A1_RDM_Experts.svg`, etc.
 - Complete panels: `panels/behavioral_rsa_panel.pdf`
 - Normalized RDM panel: `panels/behavioral_rsa_normalized_panel.pdf`
@@ -159,18 +166,15 @@ chess-behavioral/
 ├── 01_behavioral_rsa.py                   # Main analysis script
 ├── 81_table_behavioral_correlations.py    # LaTeX/CSV table generation
 ├── 91_plot_behavioral_panels.py           # Figure generation
-├── analyses/behavioral/                   # Shared analysis modules (in repo root analyses/ package)
-│   ├── data_loading.py                    # BIDS data loaders
-│   └── rdm_utils.py                       # RDM computation and RSA
-├── local/                                 # Data preparation (gitignored)
-│   ├── convert_mat_to_bids_events_v3.py   # MATLAB to BIDS conversion (authoritative)
-│   └── participants_descriptive_stats.py  # Demographic statistics
-└── results/
-    └── behavioral_rsa/
-        ├── *.npy                          # Numerical results
-        ├── *.pkl                          # Python objects
-        ├── *.csv                          # Summary tables
-        ├── tables/                        # LaTeX tables
-        └── figures/                       # Publication figures
+└── analyses/behavioral/                   # Shared analysis modules (in repo root analyses/ package)
+    ├── data_loading.py                    # BIDS data loaders
+    └── rdm_utils.py                       # RDM computation and RSA
+
+results/behavioral/                        # Unified results tree (not committed)
+├── data/                                  # *.npy, *.pkl, *.csv numerical results
+├── tables/                                # LaTeX tables
+└── figures/                               # Publication figures
 ```
+
+The `results/` tree is distributed as a release artifact (`chess-bids_F_code-results.zip`) and via the RDR repo; it is not tracked in git. Use `from common import results_for; results_for('behavioral', 'data')` as the idiomatic accessor.
 
