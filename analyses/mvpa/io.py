@@ -9,6 +9,7 @@ These functions are intentionally minimal and reuse common utilities upstream.
 
 from __future__ import annotations
 
+import pickle  # noqa: S403 — loads only trusted internal analysis artefacts
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 import pandas as pd
@@ -121,8 +122,45 @@ def build_group_dataframe(
     return pd.concat(rows, axis=0, ignore_index=True)
 
 
+def load_mvpa_group_stats(data_dir: Path, prefix: str = "mvpa_group_stats") -> Dict:
+    """Load the split RSA + SVM group-stats pickles and merge them.
+
+    The RSA group stage (``02_*_group_rsa.py``) and the decoding group
+    stage (``03_*_group_decoding.py``) each write their own pickle under
+    the unified ``results/<analysis>/data/`` tree so they cannot clobber
+    one another. This helper returns the same ``{'rsa_corr': ..., 'svm':
+    ...}`` dict that downstream plotting / table scripts already expect.
+
+    Parameters
+    ----------
+    data_dir : Path
+        The analysis's ``results/<analysis>/data/`` directory.
+    prefix : str, default ``"mvpa_group_stats"``
+        Filename prefix; the helper reads
+        ``<data_dir>/<prefix>_rsa.pkl`` and ``<data_dir>/<prefix>_svm.pkl``.
+        Override to ``"mvpa_finer_group_stats"`` or
+        ``"subcortical_group_stats"`` for the matching pipelines.
+
+    Returns
+    -------
+    dict
+        Merged group-stats dict. Missing halves are simply absent.
+    """
+    merged: Dict = {}
+    for key, stem in [("rsa_corr", "rsa"), ("svm", "svm")]:
+        path = Path(data_dir) / f"{prefix}_{stem}.pkl"
+        if not path.exists():
+            continue
+        with open(path, "rb") as f:
+            blob = pickle.load(f)
+        if isinstance(blob, dict) and key in blob:
+            merged[key] = blob[key]
+    return merged
+
+
 __all__ = [
     "find_subject_tsvs",
     "load_subject_tsv",
     "build_group_dataframe",
+    "load_mvpa_group_stats",
 ]
