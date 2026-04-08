@@ -610,50 +610,23 @@ def save_panel_pdf(fig, output_file: Path | str, dpi: int = 450) -> Path:
     """
     Save full arranged panel as PDF with tight bbox and return path.
 
-    Automatically copies the PDF to the manuscript figures folder if
-    CONFIG['MANUSCRIPT_FIGURES_DIR'] is set and the folder exists.
-
     Parameters
     ----------
     fig : matplotlib.figure.Figure
-        Figure to save
+        Figure to save.
     output_file : Path | str
-        Output path for the PDF (in results directory)
+        Destination path. Parent directory is created if missing.
     dpi : int, default=450
-        DPI for figure rendering
+        DPI for figure rendering.
 
     Returns
     -------
     Path
-        Path to the saved PDF file (in results directory)
-
-    Notes
-    -----
-    If CONFIG['MANUSCRIPT_FIGURES_DIR'] is configured and exists, the PDF
-    is also copied to that location for LaTeX manuscript compilation.
-    The manuscript copy uses the same filename as the original.
+        Path to the saved PDF file.
     """
-    import shutil
-    import warnings
-    import logging
-
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_file, format='pdf', bbox_inches='tight', dpi=dpi)
-
-    # Copy to manuscript figures directory (configured consolidated location)
-    try:
-        from ..constants import CONFIG
-        manuscript_dir = CONFIG.get('MANUSCRIPT_FIGURES_DIR')
-        if manuscript_dir is not None:
-            manuscript_dir = Path(manuscript_dir)
-            manuscript_dir.mkdir(parents=True, exist_ok=True)
-            manuscript_path = manuscript_dir / output_file.name
-            shutil.copy2(output_file, manuscript_path)
-            logging.getLogger('chess_analysis').info(f"Copied figure to manuscript: {manuscript_path}")
-    except (ImportError, KeyError) as e:
-        logging.getLogger('chess_analysis').debug(f"Skipping manuscript copy (CONFIG unavailable): {e}")
-
     return output_file
 
 def save_axes_pngs(fig, out_dir: Path | str, prefix: str,
@@ -785,6 +758,8 @@ def create_standalone_colorbar(
     output_path: Optional[Path] = None,
     params: dict | None = None,
     tick_position: Optional[str] = None,
+    label_pad: Optional[float] = None,
+    drop_leading_zero: bool = False,
 ) -> plt.Figure:
     """
     Create a standalone colorbar figure with 3 ticks (vmin, center, vmax).
@@ -808,6 +783,15 @@ def create_standalone_colorbar(
     tick_position : str, optional
         Position of ticks and labels. For vertical: 'left' or 'right' (default: 'right').
         For horizontal: 'top' or 'bottom' (default: 'bottom').
+    label_pad : float, optional
+        Override the label padding (in points). If omitted, sensible defaults
+        are used for each tick position. Pass an explicit value when two
+        colorbars need to share the same label-to-tick spacing.
+    drop_leading_zero : bool, default=False
+        When True, format tick values in ``(-1, 1)`` without the leading zero
+        (e.g. ``.50`` instead of ``0.50``). Useful for normalised colorbars
+        where every tick is bounded above by 1 and the leading zero adds
+        noise without information.
 
     Returns
     -------
@@ -895,7 +879,22 @@ def create_standalone_colorbar(
         else:
             return f"{val:.2f}"
 
-    cbar.set_ticklabels([format_tick(t) for t in ticks])
+    def strip_leading_zero(s):
+        # ".50" instead of "0.50", "-.50" instead of "-0.50". Untouched
+        # for values where dropping the zero would be ambiguous (>= 1 in
+        # absolute value, or already empty/integer).
+        if not s or '.' not in s:
+            return s
+        if s.startswith('0.'):
+            return s[1:]
+        if s.startswith('-0.'):
+            return '-' + s[2:]
+        return s
+
+    formatted_ticks = [format_tick(t) for t in ticks]
+    if drop_leading_zero:
+        formatted_ticks = [strip_leading_zero(s) for s in formatted_ticks]
+    cbar.set_ticklabels(formatted_ticks)
 
     # Position ticks and labels
     if tick_position:
@@ -922,9 +921,11 @@ def create_standalone_colorbar(
             cbar.set_label(label, fontsize=params['font_size_title'] * 2)  # Use 2x title size for label
         else:
             if tick_position == 'left':
-                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=90, labelpad=5)
+                pad = label_pad if label_pad is not None else 5
+                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=90, labelpad=pad)
             else:
-                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=270, labelpad=12)
+                pad = label_pad if label_pad is not None else 12
+                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=270, labelpad=pad)
 
     # Set colorbar outline width
     cbar.outline.set_linewidth(params['plot_linewidth'])

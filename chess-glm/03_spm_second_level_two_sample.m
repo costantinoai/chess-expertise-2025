@@ -12,7 +12,7 @@
 %%
 %% Data
 %% - Inputs: first-level subject GLM directories containing `con_*.nii` files
-%%   under the GLM root produced by 01_spm_glm_autocontrast.m.
+%%   under the GLM root produced by 01_spm_glm_firstlevel.m.
 %% - Group membership: parsed from `<BIDS_ROOT>/participants.tsv` (column `group`).
 %%
 %% Procedure
@@ -48,8 +48,8 @@ BIDS_ROOT    = cfg.bidsRoot;
 SPACE        = getenv_default('CHESS_GLM_SPACE', 'MNI');
 SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '4'));
 
-% First-level GLM root (BIDS-like): derivatives/SPM/smooth<MM>
-glmRoot = fullfile(cfg.spmDir, sprintf('smooth%d', SMOOTH_MM));
+% First-level GLM root (BIDS-like): derivatives/fmriprep_spm-smoothed
+glmRoot = cfg.spmSmoothed;
 
 % No second-level smoothing; group analyses run on first-level smoothed (4mm) contrasts
 

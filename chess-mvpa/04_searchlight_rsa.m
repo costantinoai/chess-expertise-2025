@@ -69,10 +69,10 @@
 %% Outputs
 %% -------
 %% Subject-level whole-brain RSA maps saved to:
-%%   <BIDS_DERIVATIVES>/rsa_searchlight/sub-XX/
-%%     ├── sub-XX_desc-searchlight_checkmate_stat-r_map.nii.gz
-%%     ├── sub-XX_desc-searchlight_visual_similarity_stat-r_map.nii.gz
-%%     └── sub-XX_desc-searchlight_strategy_stat-r_map.nii.gz
+%%   <BIDS_DERIVATIVES>/fmriprep_spm-unsmoothed_searchlight-rsa/sub-XX/
+%%     ├── sub-XX_space-MNI152NLin2009cAsym_desc-checkmate_stat-r_searchlight.nii.gz
+%%     ├── sub-XX_space-MNI152NLin2009cAsym_desc-visualSimilarity_stat-r_searchlight.nii.gz
+%%     └── sub-XX_space-MNI152NLin2009cAsym_desc-strategy_stat-r_searchlight.nii.gz
 %%
 %% Each map contains Pearson r values at each voxel, quantifying the strength
 %% of neural-model correspondence. Values range from -1 (perfect anti-correlation)
@@ -103,9 +103,10 @@ derivativesDir = cfg.derivatives;
 
 % GLM root for unsmoothed SPM outputs (subject folders live here)
 % Searchlight RSA uses unsmoothed data to preserve spatial specificity
-glmRoot = cfg.glmUnsmoothed;
+glmRoot = cfg.spmUnsmoothed;
 
-% Output root: BIDS-curated rsa_searchlight derivative folder
+% Output root: BIDS searchlight RSA derivative folder
+% (derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/)
 outRoot = cfg.rsaSearchlight;
 mkdir_p(outRoot);
 
@@ -202,10 +203,12 @@ for s = 1:numel(subDirs)
 
     %% 6) RUN SEARCHLIGHT RSA FOR EACH MODEL RDM --------------------------
 
-    % Map model field names to output-friendly suffixes
+    % Map model field names to BIDS desc- entity values (camelCase; BIDS
+    % entity values cannot contain underscores -- underscore is the entity
+    % delimiter).
     suffixMap = containers.Map( ...
         {'checkmate', 'visualStimuli', 'categories'}, ...
-        {'checkmate', 'visual_similarity', 'strategy'} ...
+        {'checkmate', 'visualSimilarity', 'strategy'} ...
     );
 
     % Set parallel processing options (use all available cores)
@@ -241,8 +244,9 @@ for s = 1:numel(subDirs)
                                    rsa_args, optRSA);
         elapsed = toc;
 
-        % Save NIfTI result (gzipped to save space) using BIDS-curated naming
-        outFile = fullfile(subOutDir, sprintf('%s_desc-searchlight_%s_stat-r_map.nii.gz', ...
+        % Save NIfTI result (gzipped to save space) using BIDS entity naming:
+        % sub-XX_space-MNI152NLin2009cAsym_desc-<regressor>_stat-r_searchlight.nii.gz
+        outFile = fullfile(subOutDir, sprintf('%s_space-MNI152NLin2009cAsym_desc-%s_stat-r_searchlight.nii.gz', ...
                                               subName, suffix));
         cosmo_map2fmri(sl_rsa, outFile);
 
@@ -257,7 +261,7 @@ fprintf('[INFO] Searchlight RSA finished at: %s\n', datestr(now));
 fprintf('[INFO] Results saved to: %s\n', outRoot);
 
 %% ========================================================================
-%  HELPER FUNCTIONS (consistent with 01_roi_mvpa_main.m)
+%  HELPER FUNCTIONS (consistent with 01_roi_mvpa_subject.m)
 %% ========================================================================
 
 function out = getenv_default(name, default)
@@ -285,7 +289,7 @@ end
 
 function [checkmateVec, categoriesVec, stimVec, visStimVec] = parse_label_regressors(ds)
     % Parse label strings to extract regressors
-    % Matches logic from 01_roi_mvpa_main.m for consistency
+    % Matches logic from 01_roi_mvpa_subject.m for consistency
     %
     % Returns:
     %   checkmateVec  : binary (2=checkmate 'C', 1=non-checkmate 'NC')

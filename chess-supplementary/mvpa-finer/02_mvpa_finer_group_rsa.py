@@ -96,8 +96,13 @@ for tgt in targets:
 for tgt, blocks in method_results.items():
     write_group_stats_outputs(out_dir, method, tgt, blocks)
 
-with open(out_dir / 'mvpa_group_stats.pkl', 'wb') as f:
-    pickle.dump({'rsa_corr': method_results}, f)
+# Write the RSA half into its own file so the RSA and decoding group
+# stages do not collide under the unified results/ tree. The matching
+# decoding-stage file is produced by 03_mvpa_finer_group_decoding.py
+# and both halves are merged by analyses.mvpa.io.load_mvpa_group_stats.
+pkl_path = out_dir / 'mvpa_finer_group_stats_rsa.pkl'
+with open(pkl_path, 'wb') as _pkl_fh:
+    pickle.dump({'rsa_corr': method_results}, _pkl_fh)
 
 logger.info("Saved group statistics artifacts (MVPA finer RSA)")
 log_script_end(logger)

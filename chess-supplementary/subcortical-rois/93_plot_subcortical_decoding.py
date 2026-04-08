@@ -69,9 +69,13 @@ RESULTS_DIR = results_dir
 FIGURES_DIR = dirs['figures']
 
 logger.info("Loading subcortical SVM + RSA group statistics...")
-# Read unified artifact pickle (same format as cortical mvpa_group_stats.pkl)
-with open(RESULTS_DIR / "subcortical_group_stats.pkl", "rb") as f:
-    group_stats = pickle.load(f)
+# Load the split RSA + decoding stats pair. 02_subcortical_group_rsa.py
+# writes subcortical_group_stats_rsa.pkl; 03_subcortical_group_decoding.py
+# writes subcortical_group_stats_svm.pkl. The helper merges both halves
+# back into the legacy {'rsa_corr': ..., 'svm': ...} schema this script
+# expects.
+from analyses.mvpa.io import load_mvpa_group_stats
+group_stats = load_mvpa_group_stats(RESULTS_DIR, prefix='subcortical_group_stats')
 
 roi_info = load_roi_metadata(CONFIG["ROI_CABNP"])
 apply_nature_rc()

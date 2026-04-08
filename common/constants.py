@@ -80,19 +80,11 @@ _EXTERNAL_DATA_ROOT = Path(
 )
 
 # ============================================================================
-# Final Results Output (Figures and Tables for Manuscript)
+# Unified results/ tree (canonical location for every Python analysis output)
 # ============================================================================
-# Central location in repo for final publication-ready outputs.
-# save_panel_pdf() and save_table_with_manuscript_copy() automatically copy
-# outputs here. This folder is gitignored (regenerable from analysis scripts).
-# Set to None to disable automatic copying.
-_FINAL_RESULTS_DIR = _REPO_ROOT / "results-bundle"
-_MANUSCRIPT_FIGURES_DIR = _FINAL_RESULTS_DIR / "figures"
-_MANUSCRIPT_TABLES_DIR = _FINAL_RESULTS_DIR / "tables"
-
-# Optional always-on bundle (non-timestamped) for consolidated outputs
-# Note: manuscript outputs (PDF panels, LaTeX tables) are consolidated under
-# results-bundle/. No other consolidated copies are made.
+# Every analysis writes into results/<analysis>/{data,tables,figures}/
+# under the repo root. See results_for() below for the idiomatic accessor.
+_RESULTS_ROOT = _REPO_ROOT / "results"
 
 # ============================================================================
 # Intermediate Path Construction (private - build CONFIG paths from these)
@@ -101,15 +93,17 @@ _MANUSCRIPT_TABLES_DIR = _FINAL_RESULTS_DIR / "tables"
 # BIDS base directories
 _BIDS_ROOT = _EXTERNAL_DATA_ROOT / "BIDS"
 _BIDS_DERIVATIVES = _BIDS_ROOT / "derivatives"
+_BIDS_SOURCEDATA = _BIDS_ROOT / "sourcedata"
 
-# ROI base directories (under BIDS/derivatives/atlases/)
-_ROI_ROOT = _BIDS_DERIVATIVES / "atlases"
+# ROI base directories (under BIDS/sourcedata/atlases/ — primary reference
+# atlases are stored in sourcedata per the BIDS Templates and Atlases spec).
+_ROI_ROOT = _BIDS_SOURCEDATA / "atlases"
 _ROI_GLASSER_22_DIR = _ROI_ROOT / "glasser22"
 _ROI_GLASSER_180_DIR = _ROI_ROOT / "glasser180"
 _ROI_GLASSER_180_SURFACE_DIR = _ROI_ROOT / "glasser180-surface"
 _ROI_CABNP_DIR = _ROI_ROOT / "cab-np"
 
-# Neurosynth base directory (under BIDS/derivatives/atlases/)
+# Neurosynth base directory (under BIDS/sourcedata/atlases/)
 _NEUROSYNTH_ROOT = _ROI_ROOT / "neurosynth"
 
 # ============================================================================
@@ -138,15 +132,11 @@ CONFIG = {
     'NEUROSYNTH_ROOT': _NEUROSYNTH_ROOT,
 
     # ========================================================================
-    # Final Results Output (Figures and Tables)
+    # Unified results/ tree
     # ========================================================================
-    # Central repository location (./final_results/) for publication-ready outputs.
-    # save_panel_pdf() and save_table_with_manuscript_copy() automatically copy
-    # final PDFs and LaTeX tables here. Gitignored but in repo (regenerable).
-    # Set to None to disable automatic copying.
-    'FINAL_RESULTS_DIR': _FINAL_RESULTS_DIR,
-    'MANUSCRIPT_FIGURES_DIR': _MANUSCRIPT_FIGURES_DIR,  # ./final_results/figures
-    'MANUSCRIPT_TABLES_DIR': _MANUSCRIPT_TABLES_DIR,    # ./final_results/tables
+    # Every analysis writes into results/<analysis>/{data,tables,figures}/.
+    # Use results_for(analysis, kind) below to get a Path and auto-create it.
+    'RESULTS_ROOT': _RESULTS_ROOT,
 
     # --- ROI Definitions ---
     'ROI_ROOT': _ROI_ROOT,                                      # Base ROI directory
@@ -169,21 +159,20 @@ CONFIG = {
     'STIMULI_FILE': _BIDS_ROOT / "stimuli" / "stimuli.tsv",  # Chess board stimulus metadata
 
     # --- Preprocessing Outputs ---
-    'BIDS_FMRIPREP': _BIDS_DERIVATIVES / "fmriprep",            # fMRIPrep outputs
-    # Canonical SPM GLM derivatives root (single source of truth)
-    'SPM_GLM_DIR': _BIDS_DERIVATIVES / "SPM",
-    'SPM_GLM_UNSMOOTHED': _BIDS_DERIVATIVES / "SPM" / "GLM-unsmoothed",  # Unsmoothed GLM results
-    'SPM_GLM_SMOOTH4': _BIDS_DERIVATIVES / "SPM" / "GLM-smooth4",        # 4mm smoothed GLM results
+    'BIDS_FMRIPREP': _BIDS_DERIVATIVES / "fmriprep",                               # fMRIPrep outputs
+    'SPM_GLM_UNSMOOTHED': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed",           # SPM first-level GLM on unsmoothed BOLD
+    'SPM_GLM_SMOOTH4': _BIDS_DERIVATIVES / "fmriprep_spm-smoothed",                # SPM first-level GLM on 4 mm smoothed BOLD
 
-    # --- Analysis Derivatives ---
-    'BIDS_MVPA_RSA': _BIDS_DERIVATIVES / "mvpa-rsa",           # MVPA RSA results (ROI-level)
-    'BIDS_MVPA_RSA_RUN_MATCHED': _BIDS_DERIVATIVES / "mvpa-rsa-run-matched",  # Run-matched RSA (ROI-level)
-    'BIDS_MVPA_DECODING': _BIDS_DERIVATIVES / "mvpa-decoding",  # MVPA decoding results (ROI-level)
-    'BIDS_RSA_SEARCHLIGHT': _BIDS_DERIVATIVES / "rsa_searchlight",  # RSA searchlight results
-    'BIDS_BEHAVIORAL': _BIDS_DERIVATIVES / "chess-behavioural",  # Behavioral task data
-    'BIDS_EYETRACK': _BIDS_DERIVATIVES / "eye-tracking",        # Eye-tracking derivatives
-    'BIDS_MVPA_RSA_SUBCORTICAL': _BIDS_DERIVATIVES / "mvpa-rsa-subcortical",  # Subcortical RSA results
-    'BIDS_MVPA_DECODING_SUBCORTICAL': _BIDS_DERIVATIVES / "mvpa-decoding-subcortical",  # Subcortical decoding results
+    # --- Analysis Derivatives (provenance-chain naming) ---
+    'BIDS_MVPA_RSA': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_rsa",                       # ROI RSA
+    'BIDS_MVPA_RSA_RUN_MATCHED': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_rsa-run-matched",   # Run-matched ROI RSA
+    'BIDS_MVPA_DECODING': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_decoding",             # ROI decoding
+    'BIDS_RSA_SEARCHLIGHT': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_searchlight-rsa",    # Whole-brain searchlight RSA
+    'BIDS_BEHAVIORAL_RSA': _BIDS_DERIVATIVES / "behavioral-rsa",                              # Per-subject behavioral preference RDMs
+    'BIDS_MANIFOLD': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_manifold",                  # Per-subject neural Participation Ratio per ROI
+    'BIDS_EYETRACK': _BIDS_DERIVATIVES / "bidsmreye",                                         # BidsMReye gaze estimates
+    'BIDS_MVPA_RSA_SUBCORTICAL': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_rsa-subcortical",             # Subcortical ROI RSA
+    'BIDS_MVPA_DECODING_SUBCORTICAL': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_decoding-subcortical",   # Subcortical ROI decoding
 
     # --- External Resources ---
     'NEUROSYNTH_TERMS_DIR': _NEUROSYNTH_ROOT / "terms",         # Neurosynth term maps
@@ -222,7 +211,7 @@ CONFIG = {
     # ========================================================================
     # Display/Plotting Configuration
     # ========================================================================
-    'ENABLE_PYLUSTRATOR': _read_env_bool('CHESS_ENABLE_PYLUSTRATOR', True),  # Interactive layout editing; batch runs disable via env override
+    'ENABLE_PYLUSTRATOR': _read_env_bool('CHESS_ENABLE_PYLUSTRATOR', False),  # Interactive layout editing; batch runs keep this off (export CHESS_ENABLE_PYLUSTRATOR=1 to re-enable interactively)
     'NEUROSYNTH_TERM_ORDER': [                                  # Term ordering for plots
         'working memory',
         'navigation',

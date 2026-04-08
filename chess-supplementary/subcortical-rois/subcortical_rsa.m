@@ -4,9 +4,10 @@
 %% Purpose
 %% - Per-subject ROI decoding (SVM) and RSA correlations for subcortical
 %%   ROIs using the Cole-Anticevic Brain-wide Network Partition (CAB-NP).
-%% - Mirrors chess-mvpa/01_roi_mvpa_main.m exactly, with only:
+%% - Mirrors chess-mvpa/01_roi_mvpa_subject.m exactly, with only:
 %%     1) CAB-NP subcortical bilateral atlas instead of Glasser-22
-%%     2) Outputs to mvpa-rsa-subcortical/ and mvpa-decoding-subcortical/
+%%     2) Outputs to fmriprep_spm-unsmoothed_rsa-subcortical/ and
+%%        fmriprep_spm-unsmoothed_decoding-subcortical/
 %%
 %% Dimensions tested (all 40 boards):
 %%   1) checkmate (binary: checkmate vs non-checkmate)
@@ -16,8 +17,10 @@
 %% Output
 %% - Subject-level TSV files saved under:
 %%     <BIDS_DERIVATIVES>/
-%%       mvpa-decoding-subcortical/sub-XX/sub-XX_..._roi-cabnp_accuracy.tsv
-%%       mvpa-rsa-subcortical/sub-XX/sub-XX_..._roi-cabnp_rdm.tsv
+%%       fmriprep_spm-unsmoothed_decoding-subcortical/sub-XX/
+%%         sub-XX_..._roi-cabnp_stat-accuracy_decoding.tsv
+%%       fmriprep_spm-unsmoothed_rsa-subcortical/sub-XX/
+%%         sub-XX_..._roi-cabnp_stat-r_rsa.tsv
 %% - Each file contains multiple target rows (one row per target dimension)
 %%
 %% Dependencies
@@ -33,7 +36,7 @@ addpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'common
 cfg = chess_config();
 
 derivativesDir = cfg.derivatives;
-glmRoot        = cfg.glmUnsmoothed;
+glmRoot        = cfg.spmUnsmoothed;
 
 % ROI atlas: CAB-NP subcortical bilateral atlas (resampled to functional space)
 % Use .nii (uncompressed) since SPM's spm_vol does not support .nii.gz
@@ -41,8 +44,10 @@ roiAtlas = cfg.roiCabnpAtlas;
 roiTSV   = cfg.roiCabnpTSV;
 
 % Output roots: subcortical SVM and RSA results
-outRootSVM = fullfile(derivativesDir, 'mvpa-decoding-subcortical');
-outRootRSACorr = fullfile(derivativesDir, 'mvpa-rsa-subcortical');
+% (derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/ and
+%  derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/)
+outRootSVM = cfg.mvpaDecodingSubcortical;
+outRootRSACorr = cfg.mvpaRsaSubcortical;
 mkdir_p(outRootSVM); mkdir_p(outRootRSACorr);
 
 fprintf('[INFO] ROI atlas: %s\n', roiAtlas);
@@ -260,13 +265,13 @@ for s = 1:numel(subDirs)
     % SVM decoding accuracy
     svm_tbl = array2table(svm_mat, 'VariableNames', matlab_safe_names(region_names));
     svm_tbl = addvars(svm_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    svmFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-cabnp_accuracy.tsv', subName);
+    svmFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-cabnp_stat-accuracy_decoding.tsv', subName);
     writetable(svm_tbl, fullfile(subOutSVM, svmFilename), 'FileType','text', 'Delimiter','\t');
 
     % RSA correlations
     rsa_tbl = array2table(rsa_mat, 'VariableNames', matlab_safe_names(region_names));
     rsa_tbl = addvars(rsa_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-cabnp_rdm.tsv', subName);
+    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-cabnp_stat-r_rsa.tsv', subName);
     writetable(rsa_tbl, fullfile(subOutRSA, rsaFilename), 'FileType','text', 'Delimiter','\t');
 
     fprintf('[INFO]   Saved SVM and RSA TSVs for %s\n', subName);

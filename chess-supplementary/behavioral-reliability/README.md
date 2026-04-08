@@ -4,6 +4,41 @@
 
 This analysis assesses the internal consistency of behavioral representational dissimilarity matrices (RDMs) using split-half reliability with Spearman-Brown correction. We quantify uncertainty using non-parametric bootstrap across random participant splits to test whether expert and novice groups show reliable and distinct similarity structures in their preference judgments.
 
+## Required bundles
+
+- `01_behavioral_split_half_reliability.py` and `02_marginal_split_half.py` read BIDS events, stimuli, and participants directly → needs **A** (core) only.
+- `81_table_split_half_reliability.py` and `91_plot_reliability_panels.py` only consume the outputs of 01/02 from the repo `results/` tree (no extra bundle).
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  EV["sub-*/func/ (events)"]:::in
+
+  S01["01_behavioral_split_half_reliability.py"]:::sc
+  S02["02_marginal_split_half.py"]:::sc
+  S81["81_table_split_half_reliability.py"]:::sc
+  S91["91_plot_reliability_panels.py"]:::sc
+  DATA["results/supplementary/behavioral-reliability/data/"]:::rl
+  TABLES["results/supplementary/behavioral-reliability/tables/"]:::rl
+  FIGURES["results/supplementary/behavioral-reliability/figures/"]:::rl
+
+  EV --> S01 --> DATA
+  PT --> S01
+  EV --> S02 --> DATA
+  ST --> S02
+  PT --> S02
+
+  DATA --> S81 --> TABLES
+  DATA --> S91 --> FIGURES
+```
+
 ## Methods
 
 ### Rationale
@@ -96,7 +131,7 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 python chess-supplementary/behavioral-reliability/01_behavioral_split_half_reliability.py
 ```
 
-**Outputs** (saved to `chess-supplementary/behavioral-reliability/results/behavioral_split_half/`):
+**Outputs** (saved to `results/supplementary/behavioral-reliability/data/`):
 - `reliability_metrics.pkl`: Full reliability statistics for table generation
 - `reliability_summary.csv`: Human-readable summary (bootstrap CIs and p_boot)
 - `split_rdm_distributions.npz`: Bootstrap distributions of r_half and r_full

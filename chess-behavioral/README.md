@@ -4,6 +4,49 @@
 
 This analysis examines behavioral similarity judgments from a 1-back preference task performed during fMRI scanning. Participants (20 experts, 20 novices) indicated which of two consecutively presented chess boards they preferred. We test whether behavioral preferences correlate with theoretical models of chess board similarity.
 
+## Required bundles
+
+- `01_behavioral_rsa_subject.py` needs **A** (core: BIDS events, stimuli, participants) and writes per-subject preference RDMs into `derivatives/behavioral-rsa/` (bundle E).
+- `02_behavioral_rsa_group.py` reads those per-subject RDMs from bundle E and writes group aggregates (correlations, FDR-corrected stats, group mean RDMs, DSMs) into `results/behavioral/data/`.
+- `81_table_behavioral_correlations.py` and `91_plot_behavioral_panels.py` only consume outputs of `02_behavioral_rsa_group.py` from the repo `results/` tree.
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef out fill:#fff5b1,stroke:#b08800,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  EV["sub-*/func/ (events)"]:::in
+
+  B01["01_behavioral_rsa_subject.py"]:::sc
+  B02["02_behavioral_rsa_group.py"]:::sc
+  B81["81_table_behavioral_correlations.py"]:::sc
+  B91["91_plot_behavioral_panels.py"]:::sc
+  BRSA[derivatives/behavioral-rsa/]:::out
+  DATA["results/behavioral/data/"]:::rl
+  TABLES["results/behavioral/tables/"]:::rl
+  FIGURES["results/behavioral/figures/"]:::rl
+
+  EV --> B01
+  PT --> B01
+  B01 --> BRSA
+
+  BRSA --> B02
+  PT --> B02
+  ST --> B02
+  B02 --> DATA
+
+  DATA --> B81 --> TABLES
+  PT --> B81
+  DATA --> B91 --> FIGURES
+  PT --> B91
+```
+
 ## Methods
 
 ### Task and Data
@@ -94,45 +137,51 @@ Expected structure under this folder:
 
 ## Running the Analysis
 
-### Step 1: Run Main Analysis
+### Step 1: Per-subject preference RDMs
 
 ```bash
 # From repository root (recommended)
-python chess-behavioral/01_behavioral_rsa.py
+python chess-behavioral/01_behavioral_rsa_subject.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/`):
-- `expert_behavioral_rdm.npy`: Expert group RDM (40×40)
-- `novice_behavioral_rdm.npy`: Novice group RDM (40×40)
-- `expert_directional_dsm.npy`: Expert directional preference matrix (40×40)
-- `novice_directional_dsm.npy`: Novice directional preference matrix (40×40)
-- `expert_mds_coords.npy`: Expert MDS 2D coordinates (40×2)
-- `novice_mds_coords.npy`: Novice MDS 2D coordinates (40×2)
+**Outputs** (saved to `BIDS/derivatives/behavioral-rsa/sub-*/`):
+- `sub-XX_desc-preference_rdm.tsv`: Count-normalized preference RDM (40×40) per subject.
+- `sub-XX_desc-preference_rdm.json`: Sidecar describing the matrix, units, and source events.
+
+### Step 2: Group aggregation
+
+```bash
+python chess-behavioral/02_behavioral_rsa_group.py
+```
+
+**Outputs** (saved to `results/behavioral/data/`):
+- `expert_behavioral_rdm.npy` / `novice_behavioral_rdm.npy`: count-normalized group RDMs (40×40)
+- `expert_behavioral_rdm_raw.npy` / `novice_behavioral_rdm_raw.npy`: raw-count variants
+- `expert_directional_dsm.npy` / `novice_directional_dsm.npy`: normalized directional preference matrices
+- `expert_directional_dsm_raw.npy` / `novice_directional_dsm_raw.npy`: raw-count directional matrices
+- `expert_mds_coords.npy` / `novice_mds_coords.npy`: MDS 2D embeddings
 - `correlation_results.pkl`: RSA correlation statistics with FDR correction
 - `correlation_summary.csv`: Human-readable summary table
 
-**Expected runtime**: ~2-3 minutes
-
-### Step 2: Generate Tables
+### Step 3: Generate Tables
 
 ```bash
 python chess-behavioral/81_table_behavioral_correlations.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/tables/`):
+**Outputs** (saved to `results/behavioral/tables/`):
 - `behavioral_rsa_correlations.tex`: LaTeX table
 - `behavioral_rsa_correlations.csv`: CSV table
 
-### Step 3: Generate Figures
+### Step 4: Generate Figures
 
 ```bash
 python chess-behavioral/91_plot_behavioral_panels.py
 ```
 
-**Outputs** (saved to `chess-behavioral/results/behavioral_rsa/figures/`):
+**Outputs** (saved to `results/behavioral/figures/`):
 - Individual axes as SVG/PDF: `behavioral_A1_RDM_Experts.svg`, etc.
-- Complete panels: `panels/behavioral_rsa_panel.pdf`
-- Normalized RDM panel: `panels/behavioral_rsa_normalized_panel.pdf`
+- Complete panel: `panels/behavioral_rsa_panel.pdf` (raw directional DSMs + count-normalized RDMs + MDS + correlation bars)
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 
@@ -156,21 +205,23 @@ This demonstrates that chess expertise shapes behavioral similarity judgments al
 ```
 chess-behavioral/
 ├── README.md                              # This file
-├── 01_behavioral_rsa.py                   # Main analysis script
+├── 01_behavioral_rsa_subject.py           # Per-subject preference RDMs → BIDS derivatives
+├── 02_behavioral_rsa_group.py             # Group aggregate + stats → results/behavioral/data/
 ├── 81_table_behavioral_correlations.py    # LaTeX/CSV table generation
-├── 91_plot_behavioral_panels.py           # Figure generation
-├── analyses/behavioral/                   # Shared analysis modules (in repo root analyses/ package)
-│   ├── data_loading.py                    # BIDS data loaders
-│   └── rdm_utils.py                       # RDM computation and RSA
-├── local/                                 # Data preparation (gitignored)
-│   ├── convert_mat_to_bids_events_v3.py   # MATLAB to BIDS conversion (authoritative)
-│   └── participants_descriptive_stats.py  # Demographic statistics
-└── results/
-    └── behavioral_rsa/
-        ├── *.npy                          # Numerical results
-        ├── *.pkl                          # Python objects
-        ├── *.csv                          # Summary tables
-        ├── tables/                        # LaTeX tables
-        └── figures/                       # Publication figures
+└── 91_plot_behavioral_panels.py           # Figure generation
+
+BIDS/derivatives/behavioral-rsa/           # Per-subject derivatives (bundle E)
+└── sub-*/sub-*_desc-preference_rdm.{tsv,json}
+
+analyses/behavioral/                       # Shared analysis modules (repo root analyses/ package)
+├── data_loading.py                        # BIDS data loaders
+└── rdm_utils.py                           # RDM / DSM computation and RSA
+
+results/behavioral/                        # Unified repo results tree (not committed)
+├── data/                                  # *.npy, *.pkl, *.csv numerical results
+├── tables/                                # LaTeX tables
+└── figures/                               # Publication figures
 ```
+
+The `results/` tree is distributed as a release artifact (`chess-bids_F_code-results.zip`) and via the RDR repo; it is not tracked in git. Use `from common import results_for; results_for('behavioral', 'data')` as the idiomatic accessor.
 

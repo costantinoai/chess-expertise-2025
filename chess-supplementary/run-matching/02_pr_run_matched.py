@@ -1,10 +1,11 @@
 """
 Participation Ratio (PR) Manifold Analysis — RUN-MATCHED CONTROL
 
-This is a verbatim copy of chess-manifold/01_manifold_analysis.py with ONE
-change: both experts and novices are capped at exactly 8 runs (expert group
-mean) to verify that unequal run counts do not drive the reported effects.
-See reviewer R2 Major Comment 3.
+This is a verbatim copy of chess-manifold/01_manifold_subject.py +
+chess-manifold/02_manifold_group.py (fused into a single script) with
+ONE change: both experts and novices are capped at exactly 8 runs
+(expert group mean) to verify that unequal run counts do not drive the
+reported effects. See reviewer R2 Major Comment 3.
 
 The only modification is a local version of load_spm_beta_images() that
 filters out runs > MAX_RUNS before averaging betas. Everything else
@@ -99,13 +100,12 @@ Statistical Assumptions and Limitations
 
 Outputs
 -------
-All results are saved to results/<timestamp>_manifold/:
+All results are saved to results/supplementary/run-matching/data/:
 - pr_results.pkl: Complete results dictionary (for plotting scripts)
 - pr_long_format.csv: Subject-level PR values (long format)
 - pr_summary_stats.csv: Group means, CIs, SEMs per ROI
 - pr_statistical_tests.csv: Welch t-tests, FDR-corrected q-values, Cohen's d
 - pr_classification_tests.csv: Classification accuracy, permutation p-values
-- 01_manifold_analysis.py: Copy of this script
 """
 
 import re

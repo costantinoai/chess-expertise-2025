@@ -127,8 +127,12 @@ FIGURES_DIR = dirs['figures']
 # Dict structure: group_stats['rsa_corr'][target_name]['welch_expert_vs_novice']
 # Contains: ROI_Label, mean_diff (Δr), p_val_fdr, group means and CIs
 logger.info("Loading MVPA RSA group statistics...")
-with open(RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
-    group_stats = pickle.load(f)
+# RSA half of the split pickle pair; 93_plot_mvpa_decoding.py loads both
+# halves via analyses.mvpa.io.load_mvpa_group_stats when it needs the
+# SVM + RSA comparison.
+_pkl_src = RESULTS_DIR / "mvpa_group_stats_rsa.pkl"
+with open(_pkl_src, "rb") as _pkl_fh:
+    group_stats = pickle.load(_pkl_fh)
 
 # Load ROI metadata for Glasser 22-region parcellation
 # Contains: roi_id, pretty_name, color, group/family information

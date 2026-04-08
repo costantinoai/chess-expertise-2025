@@ -9,7 +9,7 @@ Generates one combined 3x3 figure:
 
 from pathlib import Path
 
-import pickle  # nosec B403 — trusted internal analysis outputs
+import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -70,10 +70,12 @@ logger.info(f"Loaded Elo correlations: {len(elo_all)} rows")
 logger.info(f"Loaded familiarisation data: {len(fam_subj)} subjects")
 logger.info(f"Experts with Elo: {len(expert_ids)}")
 
-# PR: load from pickle (same source as analysis script)
-pr_pkl = Path(CONFIG['REPO_ROOT']) / 'chess-manifold/results/manifold/pr_results.pkl'
-with open(pr_pkl, 'rb') as f:  # nosec B301 — trusted internal pkl
-    pr_data = pickle.load(f)  # nosec B301
+# PR: load from pickle (same trusted internal source as the analysis
+# script; written by chess-manifold/02_manifold_group.py into the
+# unified results/ tree under results/manifold/data/).
+pr_pkl = Path(CONFIG['RESULTS_ROOT']) / 'manifold' / 'data' / 'pr_results.pkl'
+with open(pr_pkl, 'rb') as f:
+    pr_data = pickle.load(f)
 pr_long = pr_data['pr_long_format']
 expert_mean_pr = compute_subject_mean_pr(pr_long, subject_ids=expert_ids)
 

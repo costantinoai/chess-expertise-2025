@@ -1,0 +1,107 @@
+name: Package results/ as release artifact (Bundle F)
+
+# Packages an already-populated `results/` tree as a single zip archive
+# (+ SHA-256 sidecar) and attaches it to the GitHub release as
+# `chess-bids_F_code-results.zip` -- the same artifact that ships as bundle F
+# alongside the BIDS dataset in the RDR repository.
+#
+# This workflow does NOT regenerate `results/`. It assumes the tree already
+# exists in the workspace where the job runs. The maintainer is responsible
+# for populating `results/` before tagging the release, typically by running
+# `./run_all_analyses.sh group` on a machine with read access to the BIDS
+# dataset. Because `results/` is not committed to git (see .gitignore), the
+# job must run on a runner whose checkout directory already contains a
+# populated `results/` -- most commonly a self-hosted runner on the same
+# machine where the maintainer develops.
+#
+# Usage
+# -----
+#   1. Locally:  ./run_all_analyses.sh group   (populates results/)
+#   2. Locally:  gh release create <tag>       (creates the release)
+#   3. Workflow fires on `release: published`, zips results/, computes
+#      sha256, uploads the zip + sha256 to the release.
+#
+# You can also dispatch it manually with `workflow_dispatch` to re-upload
+# the zip against an existing release tag.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach the bundle to (e.g. v1.0.0). Required when dispatched manually.'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # needed to upload release assets
+
+jobs:
+  package-and-upload:
+    runs-on: [self-hosted, chess-data]
+    timeout-minutes: 30
+
+    env:
+      BUNDLE_NAME: chess-bids_F_code-results.zip
+      # Route untrusted interpolations through env: so they never end up
+      # inside a shell string literal (action-injection guidance).
+      EVENT_NAME: ${{ github.event_name }}
+      RELEASE_TAG_FROM_EVENT: ${{ github.event.release.tag_name }}
+      INPUT_TAG: ${{ inputs.tag }}
+
+    steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            TAG="$RELEASE_TAG_FROM_EVENT"
+          else
+            TAG="$INPUT_TAG"
+          fi
+          if [[ -z "${TAG:-}" ]]; then
+            echo "No release tag resolved (EVENT_NAME=$EVENT_NAME)." >&2
+            exit 1
+          fi
+          if [[ ! "$TAG" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Rejecting suspicious tag: $TAG" >&2
+            exit 1
+          fi
+          printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+          printf 'RELEASE_TAG=%s\n' "$TAG" >> "$GITHUB_ENV"
+
+      - name: Checkout code at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Verify results/ exists in the workspace
+        run: |
+          set -euo pipefail
+          if [[ ! -d results ]]; then
+            echo "ERROR: results/ directory is missing from the workspace." >&2
+            echo "Populate it locally with ./run_all_analyses.sh group before tagging." >&2
+            exit 1
+          fi
+          echo "results/ size: $(du -sh results | awk '{print $1}')"
+          find results -maxdepth 2 -type d | sort
+
+      - name: Zip results/ and compute SHA-256
+        run: |
+          set -euo pipefail
+          zip -r -q "$BUNDLE_NAME" results
+          ls -lh "$BUNDLE_NAME"
+          sha256sum "$BUNDLE_NAME" > "${BUNDLE_NAME}.sha256"
+          cat "${BUNDLE_NAME}.sha256"
+
+      - name: Upload archive and checksum to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "$BUNDLE_NAME" \
+            "${BUNDLE_NAME}.sha256" \
+            --clobber

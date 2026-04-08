@@ -350,6 +350,50 @@ def compute_directional_dsm(pairwise_df: pd.DataFrame) -> np.ndarray:
     return dsm
 
 
+def compute_normalized_dsm(pairwise_df: pd.DataFrame) -> np.ndarray:
+    """
+    Compute count-normalized directional DSM from pairwise data.
+
+    Same exposure-confound correction as ``compute_normalized_rdm``: divide
+    each cell by the total number of comparisons made for that pair, so the
+    resulting score is the *fraction* of comparisons that went one way
+    rather than a raw count.
+
+    DSM_norm[i,j] = (count(i>j) - count(j>i)) / (count(i>j) + count(j>i))
+
+    Values lie in [-1, +1]:
+        +1  every comparison preferred i over j
+         0  perfect tie (or pair never compared)
+        -1  every comparison preferred j over i
+
+    By construction ``|DSM_norm[i,j]| == RDM_norm[i,j]``, so DSM_norm and
+    RDM_norm share the same dynamic range and can be plotted on a single
+    diverging colorbar.
+
+    Parameters
+    ----------
+    pairwise_df : pd.DataFrame
+        Pairwise comparison data with 'better' and 'worse' columns.
+        Optionally includes 'count' column if aggregated.
+
+    Returns
+    -------
+    np.ndarray
+        Count-normalized antisymmetric DSM matrix (n_stimuli x n_stimuli)
+    """
+    count_matrix = _build_count_matrix(pairwise_df, dtype=float)
+
+    # Numerator: count(i>j) - count(j>i)  (signed difference)
+    numerator = count_matrix - count_matrix.T
+    # Denominator: count(i>j) + count(j>i)  (total comparisons for the pair)
+    denominator = count_matrix + count_matrix.T
+    # Pairs never compared map to 0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        dsm_norm = np.where(denominator > 0, numerator / denominator, 0.0)
+
+    return dsm_norm
+
+
 def aggregate_pairwise_counts(pairwise_dfs: List[pd.DataFrame]) -> pd.DataFrame:
     """
     Aggregate raw pairwise comparisons into counts per (better, worse) pair.
@@ -460,7 +504,9 @@ def normalize_matrix_by_frequency(pairwise_df, matrix):
 __all__ = [
     'create_pairwise_df',
     'compute_symmetric_rdm',
+    'compute_normalized_rdm',
     'compute_directional_dsm',
+    'compute_normalized_dsm',
     'aggregate_pairwise_counts',
     'correlate_with_all_models',
     'normalize_matrix_by_frequency',

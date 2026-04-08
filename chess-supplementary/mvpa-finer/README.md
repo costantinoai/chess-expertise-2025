@@ -4,6 +4,60 @@
 
 This supplementary analysis extends the main MVPA analysis by performing RSA and SVM decoding with finer categorical distinctions using only the 20 checkmate chess boards. Five additional dimensions are analyzed: Strategy (within checkmate), Motif, Total number of pieces, Total legal moves, and Number of moves to checkmate. This finer analysis assesses what information can be decoded within the checkmate class, offering insights into how strategic information is structured in expert and novice representations.
 
+## Required bundles
+
+- `01_roi_decoding_fine.m` (MATLAB subject script) reads SPM unsmoothed betas from `derivatives/fmriprep_spm-unsmoothed/` and the Glasser-22 atlas from `sourcedata/atlases/glasser22/`; it appends the new `_half` target rows to the same per-subject TSVs under `derivatives/fmriprep_spm-unsmoothed_rsa/` and `derivatives/fmriprep_spm-unsmoothed_decoding/` → needs **A** (core) + **D** (spm).
+- `02_mvpa_finer_group_rsa.py` and `03_mvpa_finer_group_decoding.py` read those per-subject TSVs → need **A** (core) + **E** (analyses).
+- `81/82/92` table and plot scripts only consume the outputs of `02`/`03` from the repo `results/` tree (no extra bundle).
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef out fill:#fff5b1,stroke:#b08800,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+  A22[sourcedata/atlases/glasser22/]:::in
+
+  MF01["01_roi_decoding_fine.m"]:::sc
+  MF02["02_mvpa_finer_group_rsa.py"]:::sc
+  MF03["03_mvpa_finer_group_decoding.py"]:::sc
+  MF81["81_table_mvpa_finer_rsa.py"]:::sc
+  MF82a["82_table_mvpa_finer_decoding.py"]:::sc
+  MF82b["82_table_mvpa_extended_dimensions.py"]:::sc
+  MF92["92_plot_mvpa_finer_panel.py"]:::sc
+
+  MR["derivatives/fmriprep_spm-unsmoothed_rsa/ (extra cols)"]:::out
+  MD["derivatives/fmriprep_spm-unsmoothed_decoding/ (extra cols)"]:::out
+  DATA["results/supplementary/mvpa-finer/data/"]:::rl
+  TABLES["results/supplementary/mvpa-finer/tables/"]:::rl
+  FIGURES["results/supplementary/mvpa-finer/figures/"]:::rl
+
+  GLMU --> MF01
+  A22 --> MF01
+  ST --> MF01
+  MF01 --> MR
+  MF01 --> MD
+
+  MR --> MF02
+  PT --> MF02
+  MF02 --> DATA
+
+  MD --> MF03
+  PT --> MF03
+  MF03 --> DATA
+
+  DATA --> MF81 --> TABLES
+  DATA --> MF82a --> TABLES
+  DATA --> MF82b --> TABLES
+  DATA --> MF92 --> FIGURES
+```
+
 ## Methods
 
 ### Rationale
@@ -18,11 +72,13 @@ The main MVPA analysis uses all 40 boards. This supplementary analysis focuses o
 
 ### Categorical Dimensions (Checkmate Boards Only)
 
-1. **Strategy**: Same as main analysis, but using only 20 checkmate boards
-2. **Motif**: Tactical motif characterizing the checkmate sequence (e.g., fork, pin, skewer, back-rank mate)
-3. **Total pieces**: Number of pieces on the board
-4. **Legal moves**: Total number of available legal moves
-5. **Moves to checkmate**: Number of white moves required to reach checkmate
+1. **Strategy** (`strategy_half`): Same as main analysis, but using only 20 checkmate boards
+2. **Motif** (`motif_half`): Tactical motif characterizing the checkmate sequence (e.g., fork, pin, skewer, back-rank mate)
+3. **Total pieces** (`total_pieces_half`): Number of pieces on the board
+4. **Legal moves** (`legal_moves_half`): Total number of available legal moves
+5. **Moves to checkmate** (`check_n_half`): Number of white moves required to reach checkmate
+
+These are the `_half` suffixed targets documented in the root-level sidecar of the `fmriprep_spm-unsmoothed_rsa/` and `fmriprep_spm-unsmoothed_decoding/` derivative folders.
 
 ### Subject-Level Analysis (MATLAB/CoSMoMVPA)
 
@@ -57,10 +113,10 @@ See `requirements.txt` in the repository root for complete dependencies.
 ### Input Files
 
 Same as main MVPA analysis (`chess-mvpa/`):
-- **SPM GLM outputs**: `BIDS/derivatives/SPM/GLM-unsmoothed/sub-*/exp/`
-- **Atlas**: `rois/glasser22/tpl-...desc-22_bilateral_resampled.nii.gz`
+- **SPM GLM outputs**: `BIDS/derivatives/fmriprep_spm-unsmoothed/sub-*/exp/`
+- **Atlas**: `BIDS/sourcedata/atlases/glasser22/tpl-...desc-22_bilateral_resampled.nii.gz`
 - **Participant data**: `BIDS/participants.tsv`
-- **Stimulus metadata**: `stimuli/stimuli.tsv` (with checkmate-specific columns)
+- **Stimulus metadata**: `BIDS/stimuli/stimuli.tsv` (with checkmate-specific columns)
 
 ## Running the Analysis
 
@@ -68,10 +124,10 @@ Same as main MVPA analysis (`chess-mvpa/`):
 
 ```matlab
 % From MATLAB, cd to chess-supplementary/mvpa-finer/
-01_roi_decoding_fine.m
+01_roi_decoding_fine
 ```
 
-**Outputs**: Subject-level TSV files in BIDS derivatives (same structure as main MVPA)
+**Outputs**: appended rows in the per-subject TSV files under `derivatives/fmriprep_spm-unsmoothed_rsa/sub-*/` and `derivatives/fmriprep_spm-unsmoothed_decoding/sub-*/` (same filenames as the main MVPA analysis; `_half` targets live in the `target` column).
 
 **Expected runtime**: ~2-5 minutes per subject
 
@@ -82,7 +138,7 @@ Same as main MVPA analysis (`chess-mvpa/`):
 python chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py
 ```
 
-**Outputs** (saved to `chess-supplementary/mvpa-finer/results/mvpa_finer_group_rsa/`):
+**Outputs** (saved to `results/supplementary/mvpa-finer/data/`):
 - Statistical results per target (CSV files)
 - `mvpa_group_stats.pkl`: Complete results dictionary
 
@@ -94,7 +150,7 @@ python chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py
 python chess-supplementary/mvpa-finer/03_mvpa_finer_group_decoding.py
 ```
 
-**Outputs** (saved to `chess-supplementary/mvpa-finer/results/mvpa_finer_group_decoding/`):
+**Outputs** (saved to `results/supplementary/mvpa-finer/data/`):
 - Statistical results per target (CSV files)
 - `mvpa_group_stats.pkl`: Complete results dictionary
 
@@ -106,10 +162,14 @@ python chess-supplementary/mvpa-finer/03_mvpa_finer_group_decoding.py
 # Tables
 python chess-supplementary/mvpa-finer/81_table_mvpa_finer_rsa.py
 python chess-supplementary/mvpa-finer/82_table_mvpa_finer_decoding.py
+python chess-supplementary/mvpa-finer/82_table_mvpa_extended_dimensions.py
 
 # Figures
 python chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
 ```
+
+- Tables → `results/supplementary/mvpa-finer/tables/`
+- Figures → `results/supplementary/mvpa-finer/figures/`
 
 ## Key Results
 
@@ -127,10 +187,10 @@ chess-supplementary/mvpa-finer/
 ├── 03_mvpa_finer_group_decoding.py        # Python: Group-level decoding statistics
 ├── 81_table_mvpa_finer_rsa.py             # LaTeX/CSV table generation (RSA)
 ├── 82_table_mvpa_finer_decoding.py        # LaTeX/CSV table generation (decoding)
+├── 82_table_mvpa_extended_dimensions.py   # Extended dimension summary table
 ├── 92_plot_mvpa_finer_panel.py            # Figure generation
 ├── METHODS.md                             # Detailed methods from manuscript
-├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-└── results/
-    ├── mvpa_finer_group_rsa/
-    └── mvpa_finer_group_decoding/
+└── DISCREPANCIES.md                       # Notes on analysis discrepancies
 ```
+
+Outputs are written to `results/supplementary/mvpa-finer/{data,tables,figures}/` in the unified repo results tree.

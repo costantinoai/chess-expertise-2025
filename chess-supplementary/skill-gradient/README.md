@@ -13,6 +13,43 @@ are used:
    on the 20 checkmate boards used in fMRI, correlated with neural metrics
    across all participants (n=38) and within experts only.
 
+## Required bundles
+
+- `01_skill_gradient.py` reads per-subject RSA TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa/` and decoding TSVs from `derivatives/fmriprep_spm-unsmoothed_decoding/` → needs **A** (core) + **E** (analyses).
+- It also reads the manifold group aggregate and the familiarisation-accuracy aggregate from the repo `results/` tree (no extra bundle).
+- `91_plot_skill_gradient.py` consumes the outputs of `01` from the repo `results/` tree.
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  MR[derivatives/fmriprep_spm-unsmoothed_rsa/]:::in
+  MD[derivatives/fmriprep_spm-unsmoothed_decoding/]:::in
+  MANDATA["results/manifold/data/"]:::rl
+  TASKDATA["results/supplementary/task-engagement/data/"]:::rl
+
+  SG01["01_skill_gradient.py"]:::sc
+  SG91["91_plot_skill_gradient.py"]:::sc
+  DATA["results/supplementary/skill-gradient/data/"]:::rl
+  FIGURES["results/supplementary/skill-gradient/figures/"]:::rl
+
+  MR --> SG01
+  MD --> SG01
+  MANDATA --> SG01
+  TASKDATA --> SG01
+  PT --> SG01
+  SG01 --> DATA
+
+  DATA --> SG91 --> FIGURES
+  MANDATA --> SG91
+  PT --> SG91
+```
+
 ## Methods
 
 ### Rationale
@@ -30,9 +67,9 @@ continuous skill measures within and across groups.
 - Familiarisation accuracy from pre-scan checkmate detection task (all participants, n=38)
 
 **Neural measures**:
-- RSA model fit (checkmate, strategy) from BIDS `derivatives/mvpa-rsa/`
-- SVM decoding accuracy (checkmate, strategy) from BIDS `derivatives/mvpa-decoding/`
-- Participation ratio (PR) from `chess-manifold/results/manifold/pr_results.pkl`
+- RSA model fit (checkmate, strategy) from `derivatives/fmriprep_spm-unsmoothed_rsa/`
+- SVM decoding accuracy (checkmate, strategy) from `derivatives/fmriprep_spm-unsmoothed_decoding/`
+- Participation ratio (PR) from the chess-manifold group aggregate in `results/manifold/data/`
 
 ### Correlation Procedure
 
@@ -69,11 +106,11 @@ skill gradient.
 
 ### Input Files
 
-- **Participant metadata**: `BIDS_ROOT/participants.tsv` (Elo in `rating` column)
-- **Participation ratio**: `chess-manifold/results/manifold/pr_results.pkl`
-- **RSA per-subject results**: `BIDS_ROOT/derivatives/mvpa-rsa/sub-XX/*.tsv`
-- **Decoding per-subject results**: `BIDS_ROOT/derivatives/mvpa-decoding/sub-XX/*.tsv`
-- **Familiarisation accuracy**: `chess-supplementary/task-engagement/results/familiarisation_accuracy/familiarisation_subject_accuracy.csv`
+- **Participant metadata**: `BIDS/participants.tsv` (Elo in `rating` column)
+- **Participation ratio**: `results/manifold/data/pr_results.pkl` (from chess-manifold group aggregate)
+- **RSA per-subject results**: `BIDS/derivatives/fmriprep_spm-unsmoothed_rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv`
+- **Decoding per-subject results**: `BIDS/derivatives/fmriprep_spm-unsmoothed_decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv`
+- **Familiarisation accuracy**: `results/supplementary/task-engagement/data/familiarisation_subject_accuracy.csv`
 
 ### Data Location
 
@@ -94,6 +131,7 @@ python 01_skill_gradient.py
 ```
 
 Computes Elo and familiarisation correlations with all neural metrics (RSA, decoding, PR) at the mean and per-ROI level, with FDR correction.
+Outputs to `results/supplementary/skill-gradient/data/`.
 
 ### Step 2: Generate skill gradient figures
 
@@ -102,6 +140,7 @@ python 91_plot_skill_gradient.py
 ```
 
 Produces the combined 3x3 panel: Elo correlations (row 1, experts only) and familiarisation correlations (rows 2--3, all participants and experts only).
+Outputs to `results/supplementary/skill-gradient/figures/`.
 
 ## Key Results
 
@@ -136,18 +175,7 @@ range restriction within the expert group.
 chess-supplementary/skill-gradient/
 ├── 01_skill_gradient.py               # Main analysis: Elo and familiarisation correlations with neural metrics
 ├── 91_plot_skill_gradient.py          # Combined 3x3 figure: Elo (row 1) + familiarisation (rows 2-3)
-├── README.md
-└── results/
-    └── skill_gradient/
-        ├── elo_pr_correlations.csv
-        ├── elo_rsa_correlations.csv
-        ├── elo_decoding_correlations.csv
-        ├── elo_correlations_all.csv
-        ├── familiarisation_subject_enriched.csv
-        ├── familiarisation_neural_correlations.csv
-        └── figures/
-            ├── skill_gradient_panel.pdf
-            ├── elo_correlations_panel.pdf
-            ├── familiarisation_correlations_panel.pdf
-            └── familiarisation_correlations_experts_panel.pdf
+└── README.md
 ```
+
+Outputs are written to `results/supplementary/skill-gradient/{data,figures}/` in the unified repo results tree.

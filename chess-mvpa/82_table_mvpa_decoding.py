@@ -85,8 +85,10 @@ tables_dir = dirs['tables']
 # ============================================================================
 
 logger.info("Loading MVPA group statistics from pickle file...")
-with open(RESULTS_DIR / 'mvpa_group_stats.pkl', 'rb') as f:
-    index = pickle.load(f)
+# Decoding half of the split pickle pair. The RSA half lives in
+# mvpa_group_stats_rsa.pkl (read by 81_table_mvpa_rsa.py).
+with open(RESULTS_DIR / 'mvpa_group_stats_svm.pkl', 'rb') as fh:
+    index = pickle.load(fh)
 
 # Extract SVM decoding targets
 svm_data = index.get('svm', {})

@@ -60,12 +60,11 @@ BIDS_ROOT    = cfg.bidsRoot;
 SPACE        = getenv_default('CHESS_GLM_SPACE', 'MNI');          % 'MNI' or 'T1w'
 SMOOTH_MM    = str2double_safe(getenv_default('CHESS_GLM_SMOOTH_MM', '4'));
 
-% fMRIPrep root and output roots (BIDS-like derivatives)
+% fMRIPrep root and output roots (BIDS-like derivatives, provenance-chain named)
 fmriprepRoot = cfg.fmriprep;
-glmBase      = cfg.spmDir;
 % Separate output roots for unsmoothed and smoothed (4 mm) first-level GLMs
-outRootUns   = fullfile(glmBase, 'unsmoothed');
-outRootSm4   = fullfile(glmBase, sprintf('smooth%d', SMOOTH_MM));
+outRootUns   = cfg.spmUnsmoothed;
+outRootSm4   = cfg.spmSmoothed;
 tempDir      = fullfile(DERIVATIVES, 'fmriprep-preSPM');
 
 % Subject selection and runs

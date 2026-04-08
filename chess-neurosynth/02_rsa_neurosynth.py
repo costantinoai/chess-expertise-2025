@@ -147,12 +147,22 @@ from analyses.neurosynth.glm_utils import build_design_matrix
 # =====================
 SMOOTHING_FWHM_MM = None
 
-# Patterns and pretty labels
-PATTERNS = {
-    'searchlight_checkmate': "Checkmate | RSA searchlight",
-    'searchlight_strategy': "Strategy | RSA searchlight",
-    'searchlight_visual_similarity': "Visual Similarity | RSA searchlight",
-}
+# Patterns and pretty labels.
+#
+# Each entry is (output_stem, file_match_substring, pretty_label):
+#   - output_stem  : prefix used when writing zmap_<stem>.nii.gz and the
+#                    per-pattern term-correlation CSVs (downstream tables /
+#                    plotting scripts read these by stem).
+#   - file_match   : substring used to glob the per-subject searchlight maps
+#                    in derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/.
+#                    The maps are named
+#                    sub-XX_space-MNI152NLin2009cAsym_desc-<reg>_stat-r_searchlight.nii.gz
+#                    so we match on the BIDS desc- entity.
+PATTERNS = [
+    ('searchlight_checkmate',         'desc-checkmate',         "Checkmate | RSA searchlight"),
+    ('searchlight_strategy',          'desc-strategy',          "Strategy | RSA searchlight"),
+    ('searchlight_visual_similarity', 'desc-visualSimilarity', "Visual Similarity | RSA searchlight"),
+]
 
 
 # 1) Setup
@@ -190,14 +200,14 @@ all_diff = {}
 # Process each RSA model pattern (checkmate, strategy, visual similarity).
 # For each, we'll compute a group contrast z-map (Experts > Novices) and correlate
 # it with Neurosynth term maps to identify functional associations.
-for pattern, pretty in PATTERNS.items():
+for stem, file_match, pretty in PATTERNS:
 
-    logger.info(f"Processing pattern: {pattern} → {pretty}")
+    logger.info(f"Processing pattern: {stem} → {pretty}")
 
     # Find subject-level searchlight correlation maps matching this pattern.
     # Each file is a 3D NIfTI volume with correlation coefficients at each voxel.
-    files = find_nifti_files(rsa_root, pattern=pattern)
-    logger.info(f"Found {len(files)} matching subject maps for pattern '{pattern}'")
+    files = find_nifti_files(rsa_root, pattern=file_match)
+    logger.info(f"Found {len(files)} matching subject maps for '{file_match}'")
 
     # Split files by expertise group based on subject IDs
     exp_files, nov_files = split_by_group(files, experts, novices)
@@ -224,8 +234,10 @@ for pattern, pretty in PATTERNS.items():
     con_img = slm.compute_contrast('group', output_type='z_score')
     z_map = con_img.get_fdata()
 
-    # Save the group z-map for visualization in plotting scripts
-    safe_base = pattern.replace(' ', '_')
+    # Save the group z-map for visualization in plotting scripts.
+    # ``stem`` already encodes the analysis (e.g. "searchlight_checkmate")
+    # and is the filename convention every downstream consumer expects.
+    safe_base = stem
     con_img.to_filename(str(output_dir / f"zmap_{safe_base}.nii.gz"))
 
     # Split the z-map by sign to separately analyze regions with expert-enhanced
@@ -253,8 +265,10 @@ for pattern, pretty in PATTERNS.items():
     df_neg.to_csv(output_dir / f"{safe_base}_term_corr_negative.csv", index=False)
     df_diff.to_csv(output_dir / f"{safe_base}_term_corr_difference.csv", index=False)
 
-    # Store for combined multi-panel tables (generated in plotting scripts)
-    key = pattern.split('_', 1)[1] if '_' in pattern else pattern
+    # Store for combined multi-panel tables (generated in plotting scripts).
+    # ``stem`` is e.g. "searchlight_checkmate"; strip the "searchlight_"
+    # prefix so the multi-panel tables are keyed on the model name only.
+    key = stem.split('_', 1)[1] if '_' in stem else stem
     all_pos[key] = df_pos
     all_neg[key] = df_neg
     all_diff[key] = df_diff

@@ -18,9 +18,9 @@
 %%   sub-01 (had 6), sub-02 (had 6), sub-39 (had 7),
 %%   sub-15, sub-17, sub-18, sub-19, sub-21 (had 10 each)
 %%
-%% MODIFICATIONS vs chess-mvpa/01_roi_mvpa_main.m
+%% MODIFICATIONS vs chess-mvpa/01_roi_mvpa_subject.m
 %%   1. Run-capping filter applied after dataset loading (~line 93)
-%%   2. Output dirs changed to mvpa-rsa-run8/ and mvpa-decoding-run8/
+%%   2. Output dir changed to fmriprep_spm-unsmoothed_rsa-run-matched/
 %%
 %% Everything else is identical: same ROI atlas, RSA measure, SVM
 %% classifier, targets, and helper functions.
@@ -38,12 +38,14 @@ addpath(fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'common
 cfg = chess_config();
 
 derivativesDir = cfg.derivatives;
-glmRoot        = cfg.glmUnsmoothed;
+glmRoot        = cfg.spmUnsmoothed;
 roiAtlas       = cfg.roiGlasser22Atlas;
 roiTSV         = cfg.roiGlasser22TSV;
 
 % Output root: save results in BIDS derivatives alongside other MVPA outputs.
-outRootRSACorr = fullfile(derivativesDir, 'mvpa-rsa-run-matched');
+% (derivatives/fmriprep_spm-unsmoothed_rsa-run-matched/ — points at
+%  cfg.mvpaRsaRunMatched, kept as a derivativesDir join here for legibility.)
+outRootRSACorr = cfg.mvpaRsaRunMatched;
 mkdir_p(outRootRSACorr);
 
 fprintf('[INFO] RSA outputs will be written under: %s\n', outRootRSACorr);
@@ -198,7 +200,7 @@ for s = 1:numel(subDirs)
     % ---------------------- Save RSA TSV output ----------------------
     rsa_tbl = array2table(rsa_mat, 'VariableNames', matlab_safe_names(region_names));
     rsa_tbl = addvars(rsa_tbl, string(targetNames), 'Before', 1, 'NewVariableNames','target');
-    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv', subName);
+    rsaFilename = sprintf('%s_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv', subName);
     writetable(rsa_tbl, fullfile(subOutRSA, rsaFilename), 'FileType','text', 'Delimiter','\t');
 
     fprintf('[INFO]   Saved RSA TSV for %s\n', subName);

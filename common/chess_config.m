@@ -22,13 +22,16 @@ function cfg = chess_config()
     % ======================================================================
     cfg.bidsRoot       = fullfile(cfg.dataRoot, 'BIDS');
     cfg.derivatives    = fullfile(cfg.bidsRoot, 'derivatives');
+    cfg.sourcedata     = fullfile(cfg.bidsRoot, 'sourcedata');
     cfg.participants   = fullfile(cfg.bidsRoot, 'participants.tsv');
     cfg.stimuliFile    = fullfile(cfg.bidsRoot, 'stimuli', 'stimuli.tsv');
 
     % ======================================================================
-    % ROI atlases (under BIDS/derivatives/atlases/)
+    % ROI atlases (under BIDS/sourcedata/atlases/ -- primary reference
+    % atlases are stored in sourcedata per the BIDS Templates and Atlases
+    % spec).
     % ======================================================================
-    cfg.atlasRoot = fullfile(cfg.derivatives, 'atlases');
+    cfg.atlasRoot = fullfile(cfg.sourcedata, 'atlases');
 
     % Glasser 22 bilateral cortical ROIs
     cfg.roiGlasser22Dir   = fullfile(cfg.atlasRoot, 'glasser22');
@@ -57,19 +60,25 @@ function cfg = chess_config()
     % Preprocessing derivatives
     % ======================================================================
     cfg.fmriprep       = fullfile(cfg.derivatives, 'fmriprep');
-    cfg.spmDir         = fullfile(cfg.derivatives, 'SPM');
-    cfg.glmUnsmoothed  = fullfile(cfg.spmDir, 'GLM-unsmoothed');
-    cfg.glmSmooth4     = fullfile(cfg.spmDir, 'GLM-smooth4');
 
     % ======================================================================
-    % Analysis derivatives
+    % First-level SPM GLMs (provenance-chain naming)
     % ======================================================================
-    cfg.mvpaRsa              = fullfile(cfg.derivatives, 'mvpa-rsa');
-    cfg.mvpaDecoding         = fullfile(cfg.derivatives, 'mvpa-decoding');
-    cfg.rsaSearchlight       = fullfile(cfg.derivatives, 'rsa_searchlight');
-    cfg.mvpaRsaSubcortical   = fullfile(cfg.derivatives, 'mvpa-rsa-subcortical');
-    cfg.mvpaDecodingSubcortical = fullfile(cfg.derivatives, 'mvpa-decoding-subcortical');
-    cfg.eyeTracking          = fullfile(cfg.derivatives, 'eye-tracking');
+    cfg.spmUnsmoothed  = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed');
+    cfg.spmSmoothed    = fullfile(cfg.derivatives, 'fmriprep_spm-smoothed');
+
+    % ======================================================================
+    % Analysis derivatives (produced from spmUnsmoothed unless noted)
+    % ======================================================================
+    cfg.mvpaRsa                 = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed_rsa');
+    cfg.mvpaDecoding            = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed_decoding');
+    cfg.rsaSearchlight          = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed_searchlight-rsa');
+    cfg.mvpaRsaRunMatched       = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed_rsa-run-matched');
+    cfg.mvpaRsaSubcortical      = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed_rsa-subcortical');
+    cfg.mvpaDecodingSubcortical = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed_decoding-subcortical');
+    cfg.manifold                = fullfile(cfg.derivatives, 'fmriprep_spm-unsmoothed_manifold');
+    cfg.behavioralRsa           = fullfile(cfg.derivatives, 'behavioral-rsa');
+    cfg.eyeTracking             = fullfile(cfg.derivatives, 'bidsmreye');
 
 end
 

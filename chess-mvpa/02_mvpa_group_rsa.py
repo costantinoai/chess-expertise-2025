@@ -21,8 +21,8 @@ neural representational dissimilarity matrices (RDMs) with theoretical model
 RDMs. Neural RDMs were constructed from trial-wise beta estimates within each
 of 22 bilateral cortical regions (Glasser multimodal parcellation). Subject-
 level correlations (Spearman or Pearson) are stored as TSV files in
-BIDS/derivatives/mvpa-rsa/, with one file per subject following BIDS-like
-naming: sub-XX_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv.
+BIDS/derivatives/fmriprep_spm-unsmoothed_rsa/, with one file per subject
+following BIDS naming: sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv.
 
 Participants: N=40 (20 experts, 20 novices).
 Stimuli: 40 chess board positions (20 check, 20 non-check).
@@ -214,19 +214,12 @@ for tgt in targets:
 for tgt, blocks in method_results.items():
     write_group_stats_outputs(results_dir, "rsa_corr", tgt, blocks)
 
-# Merge with existing artifact index if present (single unified folder)
-artifact_index_path = results_dir / "mvpa_group_stats.pkl"
-if artifact_index_path.exists():
-    try:
-        with open(artifact_index_path, "rb") as f:
-            prev = pickle.load(f)
-    except Exception:
-        prev = {}
-else:
-    prev = {}
-prev["rsa_corr"] = method_results
+# Write RSA group stats into its own pickle so the RSA and decoding
+# group stages don't collide in the unified results/ tree. The matching
+# decoding-stage pickle is produced by 03_mvpa_group_decoding.py.
+artifact_index_path = results_dir / "mvpa_group_stats_rsa.pkl"
 with open(artifact_index_path, "wb") as f:
-    pickle.dump(prev, f)
+    pickle.dump({"rsa_corr": method_results}, f)
 
 logger.info("Saved group statistics artifacts (RSA)")
 log_script_end(logger)
