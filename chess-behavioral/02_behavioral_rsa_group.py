@@ -19,15 +19,15 @@ subjects by expertise group from ``participants.tsv``, sums counts per
 All outputs land under the unified repo results tree at
 ``results/behavioral/data/``.
 
-The group-level statistics are byte-identical to the pre-refactor
-monolithic ``01_behavioral_rsa.py`` because summing already-aggregated
-per-subject counts is mathematically equivalent to aggregating the raw
-per-trial rows in one pass.
+The group-level statistics are mathematically equivalent to aggregating
+the raw per-trial rows in one pass: summing already-aggregated
+per-subject counts and re-normalising yields the same group RDMs as
+walking the events TSVs subject-by-subject.
 """
 
 from __future__ import annotations
 
-import pickle  # nosec B403 - matching pre-refactor output format for regression diff
+import pickle
 from pathlib import Path
 
 import numpy as np

@@ -15,8 +15,8 @@ pipeline's ``dataset_description.json`` is created on first run.
 
 The aggregation is mathematically identical to counting the concatenated
 raw-trial rows (addition is associative), so the downstream group stage
-``02_behavioral_rsa_group.py`` produces byte-identical numerical results
-to the pre-refactor monolithic ``01_behavioral_rsa.py``.
+``02_behavioral_rsa_group.py`` produces numerical results identical to
+walking the events TSVs in a single pass.
 
 Outputs (under BIDS derivatives, NOT the repo):
     BIDS/derivatives/behavioral-rsa/

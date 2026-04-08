@@ -32,7 +32,7 @@ Panel 3: PR vs ROI Size
 
 Inputs
 ------
-- pr_results.pkl (from 01_manifold_analysis.py), containing at minimum:
+- pr_results.pkl (from 02_manifold_group.py), containing at minimum:
   - summary_stats: per-ROI, per-group PR summary with CIs
   - stats_results: ROI-level group comparisons with FDR-corrected p-values
   - roi_info: ROI metadata with pretty names and colors
@@ -142,7 +142,7 @@ pr_matrix_pack = results.get('pr_matrix')      # Dict: PR matrix (subjects×ROIs
 
 # Fail fast if critical data is missing
 if pca2d is None or pr_matrix_pack is None:
-    raise RuntimeError("Missing pca2d or pr_matrix in results. Re-run 01_manifold_analysis.py.")
+    raise RuntimeError("Missing pca2d or pr_matrix in results. Re-run 02_manifold_group.py.")
 
 logger.info("Data loaded successfully")
 
@@ -470,7 +470,7 @@ logger.info("✓ Panel 2: Matrix, loadings, PCA projection, feature importance c
 # Each point = one ROI, colored by ROI group
 
 # Data preparation specific to this panel
-# Extract voxel correlation data (computed in 01_manifold_analysis.py)
+# Extract voxel correlation data (computed in 02_manifold_group.py)
 # - group_avg: per-ROI, per-group average PR and voxel counts
 # - diff_data: per-ROI differences (Expert - Novice PR) and average voxel counts
 # - stats: correlation statistics (slope, intercept, r, p) for each group

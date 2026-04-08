@@ -21,7 +21,7 @@ Outputs (unchanged from the pre-refactor monolith for regression diff):
 
 from __future__ import annotations
 
-import pickle  # nosec B403 - matching pre-refactor output format for regression diff
+import pickle
 from pathlib import Path
 
 import pandas as pd
