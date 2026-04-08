@@ -11,8 +11,8 @@
 %% Output
 %% - Subject-level TSV files saved under:
 %%     <BIDS_DERIVATIVES>/
-%%       ├── mvpa-decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv
-%%       └── mvpa-rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv
+%%       ├── fmriprep_spm-unsmoothed_decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv
+%%       └── fmriprep_spm-unsmoothed_rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv
 %% - Each file contains multiple target rows (one row per target dimension)
 %% - Fine-grained targets (from supplementary/mvpa-finer) appear as additional rows
 %%   with "_half" suffix (using only 20 checkmate boards)

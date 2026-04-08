@@ -13,8 +13,8 @@
 %% Output
 %% - Subject-level TSV files saved to THE SAME files as main MVPA:
 %%     <BIDS_DERIVATIVES>/
-%%       ├── mvpa-decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_accuracy.tsv
-%%       └── mvpa-rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_rdm.tsv
+%%       ├── fmriprep_spm-unsmoothed_decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv
+%%       └── fmriprep_spm-unsmoothed_rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv
 %% - Fine-grained dimensions (strategy_cm, motif, pieces_total, legal_moves, moves_to_mate)
 %%   appear as additional ROWS in the same file (only checkmate boards, N=20)
 %%

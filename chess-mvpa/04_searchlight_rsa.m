@@ -105,7 +105,8 @@ derivativesDir = cfg.derivatives;
 % Searchlight RSA uses unsmoothed data to preserve spatial specificity
 glmRoot = cfg.spmUnsmoothed;
 
-% Output root: BIDS-curated rsa_searchlight derivative folder
+% Output root: BIDS searchlight RSA derivative folder
+% (derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/)
 outRoot = cfg.rsaSearchlight;
 mkdir_p(outRoot);
 
@@ -260,7 +261,7 @@ fprintf('[INFO] Searchlight RSA finished at: %s\n', datestr(now));
 fprintf('[INFO] Results saved to: %s\n', outRoot);
 
 %% ========================================================================
-%  HELPER FUNCTIONS (consistent with 01_roi_mvpa_main.m)
+%  HELPER FUNCTIONS (consistent with 01_roi_mvpa_subject.m)
 %% ========================================================================
 
 function out = getenv_default(name, default)
@@ -288,7 +289,7 @@ end
 
 function [checkmateVec, categoriesVec, stimVec, visStimVec] = parse_label_regressors(ds)
     % Parse label strings to extract regressors
-    % Matches logic from 01_roi_mvpa_main.m for consistency
+    % Matches logic from 01_roi_mvpa_subject.m for consistency
     %
     % Returns:
     %   checkmateVec  : binary (2=checkmate 'C', 1=non-checkmate 'NC')

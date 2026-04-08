@@ -12,8 +12,8 @@
 %%
 %% Data
 %% - Inputs: first-level subject GLM directories containing `con_*.nii` files
-%%   produced by 01_spm_glm_autocontrast.m under:
-%%     <DERIVATIVES>/fmriprep-SPM_smoothed-<MM>_GS-FD-HMP_brainmasked/<SPACE>/fmriprep-SPM-<SPACE>/GLM/sub-XX/exp/
+%%   produced by 01_spm_glm_firstlevel.m under:
+%%     <DERIVATIVES>/fmriprep_spm-smoothed/sub-XX/exp/
 %% - Group membership: parsed from `<BIDS_ROOT>/participants.tsv` (column `group`).
 %%
 %% Procedure

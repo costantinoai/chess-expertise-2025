@@ -12,7 +12,7 @@
 %%
 %% Data
 %% - Inputs: first-level subject GLM directories containing `con_*.nii` files
-%%   under the GLM root produced by 01_spm_glm_autocontrast.m.
+%%   under the GLM root produced by 01_spm_glm_firstlevel.m.
 %% - Group membership: parsed from `<BIDS_ROOT>/participants.tsv` (column `group`).
 %%
 %% Procedure
