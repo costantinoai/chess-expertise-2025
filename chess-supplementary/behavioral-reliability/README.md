@@ -6,8 +6,38 @@ This analysis assesses the internal consistency of behavioral representational d
 
 ## Required bundles
 
-- `01_behavioral_split_half_reliability.py` reads BIDS events directly → needs **A** (core).
-- `81_table_split_half_reliability.py` only consumes the outputs of 01 from the repo `results/` tree (no extra bundle).
+- `01_behavioral_split_half_reliability.py` and `02_marginal_split_half.py` read BIDS events, stimuli, and participants directly → needs **A** (core) only.
+- `81_table_split_half_reliability.py` and `91_plot_reliability_panels.py` only consume the outputs of 01/02 from the repo `results/` tree (no extra bundle).
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  EV["sub-*/func/ (events)"]:::in
+
+  S01["01_behavioral_split_half_reliability.py"]:::sc
+  S02["02_marginal_split_half.py"]:::sc
+  S81["81_table_split_half_reliability.py"]:::sc
+  S91["91_plot_reliability_panels.py"]:::sc
+  DATA["results/supplementary/behavioral-reliability/data/"]:::rl
+  TABLES["results/supplementary/behavioral-reliability/tables/"]:::rl
+  FIGURES["results/supplementary/behavioral-reliability/figures/"]:::rl
+
+  EV --> S01 --> DATA
+  PT --> S01
+  EV --> S02 --> DATA
+  ST --> S02
+  PT --> S02
+
+  DATA --> S81 --> TABLES
+  DATA --> S91 --> FIGURES
+```
 
 ## Methods
 

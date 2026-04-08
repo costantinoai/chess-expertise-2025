@@ -9,6 +9,45 @@ This analysis examines behavioral similarity judgments from a 1-back preference 
 - `01_behavioral_rsa.py` needs **A** (core: BIDS events, stimuli, participants).
 - `81_table_behavioral_correlations.py` and `91_plot_behavioral_panels.py` only consume the outputs of 01 from the repo `results/` tree (no bundle download required beyond A).
 
+In a future commit `01_behavioral_rsa.py` will be split into a subject-level stage that writes per-subject RDMs to `derivatives/behavioral-rsa/` (bundle E) and a group-level stage that aggregates them into the repo results tree.
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef out fill:#fff5b1,stroke:#b08800,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  EV["sub-*/func/ (events)"]:::in
+
+  B01["01_behavioral_rsa_subject.py"]:::sc
+  B02["02_behavioral_rsa_group.py"]:::sc
+  B81["81_table_behavioral_correlations.py"]:::sc
+  B91["91_plot_behavioral_panels.py"]:::sc
+  BRSA[derivatives/behavioral-rsa/]:::out
+  DATA["results/behavioral/data/"]:::rl
+  TABLES["results/behavioral/tables/"]:::rl
+  FIGURES["results/behavioral/figures/"]:::rl
+
+  EV --> B01
+  PT --> B01
+  ST --> B01
+  B01 --> BRSA
+
+  BRSA --> B02
+  PT --> B02
+  B02 --> DATA
+
+  DATA --> B81 --> TABLES
+  PT --> B81
+  DATA --> B91 --> FIGURES
+  PT --> B91
+```
+
 ## Methods
 
 ### Task and Data

@@ -10,6 +10,44 @@ This analysis places observed expertise-related brain activation differences in 
 - `02_rsa_neurosynth.py` reads per-subject searchlight RSA maps from `derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/` → needs **A** (core) + **E** (analyses).
 - `81/82` (tables) and `91/92` (figures) only consume the outputs of 01/02 from the repo `results/` tree (no extra bundle).
 
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ATLNS["sourcedata/atlases/neurosynth/terms/"]:::in
+  GLMS_GRP["derivatives/fmriprep_spm-smoothed/group/"]:::in
+  SLR[derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/]:::in
+
+  N01["01_univariate_neurosynth.py"]:::sc
+  N02["02_rsa_neurosynth.py"]:::sc
+  N81["81_table_neurosynth_univariate.py"]:::sc
+  N82["82_table_neurosynth_rsa.py"]:::sc
+  N91["91_plot_neurosynth_univariate.py"]:::sc
+  N92["92_plot_neurosynth_rsa.py"]:::sc
+  DATA["results/neurosynth/data/"]:::rl
+  TABLES["results/neurosynth/tables/"]:::rl
+  FIGURES["results/neurosynth/figures/"]:::rl
+
+  ATLNS --> N01
+  GLMS_GRP --> N01
+  N01 --> DATA
+
+  ATLNS --> N02
+  SLR --> N02
+  PT --> N02
+  N02 --> DATA
+
+  DATA --> N81 --> TABLES
+  DATA --> N82 --> TABLES
+  DATA --> N91 --> FIGURES
+  DATA --> N92 --> FIGURES
+```
+
 ## Methods
 
 ### Rationale

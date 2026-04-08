@@ -6,6 +6,67 @@ This supplementary analysis extends the main cortical multivariate pattern analy
 
 This analysis is **exploratory and supplementary**. All existing cortical analyses remain untouched. The analysis replicates the **exact same MVPA pipeline** (both SVM decoding and RSA correlations) used for cortical ROIs, substituting only the atlas. The goal is to test whether the expertise-related effects observed in cortex extend to subcortical structures associated with memory, navigation, and procedural learning.
 
+## Required bundles
+
+- `00_prepare_atlas.py` materialises the CAB-NP subcortical atlas into `sourcedata/atlases/cab-np/`. It only needs the Glasser-22 reference atlas, so **A** (core) is enough.
+- `subcortical_rsa.m` (MATLAB subject script) reads SPM unsmoothed betas from `derivatives/fmriprep_spm-unsmoothed/` and the CAB-NP atlas → needs **A** (core) + **D** (spm).
+- `02_subcortical_group_rsa.py` and `03_subcortical_group_decoding.py` read the per-subject TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/` and `derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/` → need **A** (core) + **E** (analyses).
+- `91/92/93` plot scripts only consume the outputs of `02`/`03` from the repo `results/` tree (no extra bundle).
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef out fill:#fff5b1,stroke:#b08800,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+  A22[sourcedata/atlases/glasser22/]:::in
+
+  SC00["00_prepare_atlas.py"]:::sc
+  SCM["subcortical_rsa.m"]:::sc
+  SC02["02_subcortical_group_rsa.py"]:::sc
+  SC03["03_subcortical_group_decoding.py"]:::sc
+  SC91["91_plot_subcortical_rsa.py"]:::sc
+  SC92["92_plot_atlas_on_mni.py"]:::sc
+  SC93["93_plot_subcortical_decoding.py"]:::sc
+
+  ACAB[sourcedata/atlases/cab-np/]:::out
+  SR[derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/]:::out
+  SD[derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/]:::out
+  DATA["results/supplementary/subcortical-rois/data/"]:::rl
+  FIGURES["results/supplementary/subcortical-rois/figures/"]:::rl
+
+  A22 --> SC00
+  SC00 --> ACAB
+
+  GLMU --> SCM
+  ACAB --> SCM
+  ST --> SCM
+  SCM --> SR
+  SCM --> SD
+
+  SR --> SC02
+  ACAB --> SC02
+  PT --> SC02
+  SC02 --> DATA
+
+  SD --> SC03
+  ACAB --> SC03
+  PT --> SC03
+  SC03 --> DATA
+
+  DATA --> SC91 --> FIGURES
+  PT --> SC91
+  ACAB --> SC92 --> FIGURES
+  DATA --> SC93 --> FIGURES
+  PT --> SC93
+```
+
 ## Methods
 
 ### Rationale
@@ -81,10 +142,11 @@ Expert and novice bars share the same color per ROI (experts = solid fill, novic
 
 **Output files**:
 ```
-BIDS/derivatives/atlases/cab-np/
+BIDS/sourcedata/atlases/cab-np/
   tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii.gz
   tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii
   region_info.tsv
+  atlas-CABNP_description.json
 ```
 
 ### Pipeline: Exact Replication of Cortical MVPA
@@ -93,7 +155,7 @@ The analysis replicates the **exact same MVPA pipeline** used for cortical ROIs 
 
 ### Subject-Level SVM Decoding and RSA (MATLAB / CoSMoMVPA)
 
-**Script**: subcortical_rsa.m (mirrors chess-mvpa/01_roi_mvpa_main.m)
+**Script**: subcortical_rsa.m (mirrors chess-mvpa/01_roi_mvpa_subject.m)
 
 **Identical elements**:
 - Same cosmo_fmri_dataset loading from SPM.mat (beta estimates from unsmoothed GLM)
@@ -108,17 +170,17 @@ The analysis replicates the **exact same MVPA pipeline** used for cortical ROIs 
 **Only differences from cortical script**:
 1. Atlas points to CAB-NP subcortical bilateral NIfTI instead of Glasser-22
 2. Output filenames use roi-cabnp instead of roi-glasser
-3. Output directories are mvpa-rsa-subcortical/ and mvpa-decoding-subcortical/
+3. Output directories are fmriprep_spm-unsmoothed_rsa-subcortical/ and fmriprep_spm-unsmoothed_decoding-subcortical/
 4. Feature-to-ROI mapping uses explicit voxel coordinate lookup (ds.fa.i/j/k -> atlas value) instead of direct 3D mask, because the dataset has a brain-masked feature subset
 5. Beta files (.nii.gz) are decompressed to a temporary directory before CoSMoMVPA loading, then cleaned up after loading
 6. ROIs with fewer than 6 voxels after cosmo_remove_useless_data are skipped (same threshold as cortical)
 
 **Output per subject** (same format as cortical):
 ```
-BIDS/derivatives/mvpa-decoding-subcortical/sub-XX/
-    sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_accuracy.tsv
-BIDS/derivatives/mvpa-rsa-subcortical/sub-XX/
-    sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_rdm.tsv
+BIDS/derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/sub-XX/
+    sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_stat-accuracy_decoding.tsv
+BIDS/derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/sub-XX/
+    sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_stat-r_rsa.tsv
 ```
 
 Each TSV has columns: target, then one column per subcortical ROI name. Rows: checkmate, strategy, visual_similarity. Values: SVM accuracy (0-1) or Spearman correlation (r).
@@ -129,7 +191,7 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 
 **Procedure** (identical to cortical):
 
-1. **Data loading**: Find all subject-level RSA TSV files using find_subject_tsvs(). Consolidate into a group DataFrame using build_group_dataframe() with expert/novice labels from participants.tsv via get_participants_with_expertise().
+1. **Data loading**: Find all subject-level RSA TSV files from `derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/` using find_subject_tsvs(). Consolidate into a group DataFrame using build_group_dataframe() with expert/novice labels from participants.tsv via get_participants_with_expertise().
 
 2. **Statistical tests per target per ROI** (3 targets x 9 ROIs):
 
@@ -151,7 +213,7 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 
 **Procedure** (identical to cortical):
 
-1. Same data loading and group assignment as the RSA step, but reading from mvpa-decoding-subcortical/.
+1. Same data loading and group assignment as the RSA step, but reading from `derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/`.
 
 2. **Chance-level determination**: Target-specific chance levels derived from stimulus design via derive_target_chance_from_stimuli():
    - checkmate: chance = 0.5 (binary: check vs non-check)
@@ -183,11 +245,11 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 
 ### Input Files
 
-- **GLM beta estimates**: `BIDS_ROOT/derivatives/spm-glm/sub-XX/SPM.mat` and associated NIfTI beta images
-- **Cortical atlas** (for overlap removal): `rois/glasser/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser_dseg.nii.gz`
+- **GLM beta estimates**: `BIDS/derivatives/fmriprep_spm-unsmoothed/sub-XX/exp/SPM.mat` and associated NIfTI beta images
+- **Cortical atlas** (for overlap removal): `BIDS/sourcedata/atlases/glasser22/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz`
 - **CAB-NP atlas source**: https://github.com/ColeLab/ColeAnticevicNetPartition (cloned by 00_prepare_atlas.py)
-- **Participant metadata**: `BIDS_ROOT/participants.tsv`
-- **Stimulus metadata**: `BIDS_ROOT/stimuli.tsv`
+- **Participant metadata**: `BIDS/participants.tsv`
+- **Stimulus metadata**: `BIDS/stimuli/stimuli.tsv`
 
 ### Data Location
 
@@ -293,9 +355,10 @@ The cortical pipeline that this analysis replicates:
 
 ```
 chess-mvpa/
-  01_roi_mvpa_main.m           # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
+  01_roi_mvpa_subject.m        # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
   02_mvpa_group_rsa.py         # Group-level RSA statistics (Python)
   03_mvpa_group_decoding.py    # Group-level decoding statistics (Python)
+  04_searchlight_rsa.m         # Whole-brain searchlight RSA (MATLAB/CoSMoMVPA)
   92_plot_mvpa_rsa.py          # RSA bar plots + pial surfaces
   93_plot_mvpa_decoding.py     # SVM + RSA + RDM combined panel
 ```
@@ -319,25 +382,10 @@ chess-supplementary/subcortical-rois/
 ├── 91_plot_subcortical_rsa.py         # RSA bar plots
 ├── 92_plot_atlas_on_mni.py            # Atlas visualization on MNI anatomy
 ├── 93_plot_subcortical_decoding.py    # SVM + RSA combined panel
-├── README.md
-└── results/
-    ├── subcortical_atlas_prep/        # Atlas preparation logs
-    └── subcortical_rois/
-        ├── subcortical_group_stats.pkl
-        ├── ttest_rsa_corr_*.csv       # RSA group statistics (9 files)
-        ├── ttest_svm_*.csv            # SVM group statistics (9 files)
-        └── figures/
-            ├── subcortical_rsa__RSA_*.svg
-            ├── subcortical_svm__SVM_*.svg
-            ├── subcortical_svm__RSA_*.svg
-            ├── atlas_subcortical_axial.pdf
-            ├── atlas_cortical_axial.pdf
-            ├── atlas_combined_axial.pdf
-            ├── atlas_glass_brain.pdf
-            └── panels/
-                ├── subcortical_rsa_panel.pdf
-                └── subcortical_svm_panel.pdf
+└── README.md
 ```
+
+Outputs are written to `results/supplementary/subcortical-rois/{data,figures}/` in the unified repo results tree.
 
 ## References
 

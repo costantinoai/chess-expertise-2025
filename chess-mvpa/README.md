@@ -10,6 +10,65 @@ This analysis examines neural representations of chess positions using two compl
 - `02_mvpa_group_rsa.py` and `03_mvpa_group_decoding.py` read the per-subject RSA / decoding TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa/` and `derivatives/fmriprep_spm-unsmoothed_decoding/` → need **A** (core) + **E** (analyses).
 - `81_table_mvpa_rsa.py`, `82_table_mvpa_decoding.py`, `92_plot_mvpa_rsa.py`, `93_plot_mvpa_decoding.py` only consume the outputs of 02/03 from the repo `results/` tree (no extra bundle).
 
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef out fill:#fff5b1,stroke:#b08800,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+  A22[sourcedata/atlases/glasser22/]:::in
+
+  M01["01_roi_mvpa_subject.m"]:::sc
+  M04["04_searchlight_rsa.m"]:::sc
+  M02["02_mvpa_group_rsa.py"]:::sc
+  M03["03_mvpa_group_decoding.py"]:::sc
+  M81["81_table_mvpa_rsa.py"]:::sc
+  M82["82_table_mvpa_decoding.py"]:::sc
+  M92["92_plot_mvpa_rsa.py"]:::sc
+  M93["93_plot_mvpa_decoding.py"]:::sc
+
+  MR[derivatives/fmriprep_spm-unsmoothed_rsa/]:::out
+  MD[derivatives/fmriprep_spm-unsmoothed_decoding/]:::out
+  SLR[derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/]:::out
+  DATA["results/mvpa/data/"]:::rl
+  TABLES["results/mvpa/tables/"]:::rl
+  FIGURES["results/mvpa/figures/"]:::rl
+
+  GLMU --> M01
+  A22 --> M01
+  ST --> M01
+  M01 --> MR
+  M01 --> MD
+
+  GLMU --> M04
+  ST --> M04
+  M04 --> SLR
+
+  MR --> M02
+  PT --> M02
+  M02 --> DATA
+
+  MD --> M03
+  PT --> M03
+  M03 --> DATA
+
+  DATA --> M81 --> TABLES
+  PT --> M81
+  DATA --> M82 --> TABLES
+  PT --> M82
+  DATA --> M92 --> FIGURES
+  PT --> M92
+  DATA --> M93 --> FIGURES
+  PT --> M93
+  ST --> M93
+```
+
 ## Methods
 
 ### Rationale

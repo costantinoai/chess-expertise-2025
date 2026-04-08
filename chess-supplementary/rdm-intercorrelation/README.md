@@ -4,6 +4,32 @@
 
 This analysis quantifies the relationships among three theoretical model representational dissimilarity matrices (RDMs) derived from chess stimulus features. Through pairwise correlations, partial correlations, and hierarchical variance partitioning, we assess shared and unique variance explained by each model RDM. Understanding RDM intercorrelations is critical for interpreting which aspects of stimulus structure drive behavioral and neural similarity patterns.
 
+## Required bundles
+
+- `01_rdm_intercorrelation.py` reads `BIDS/stimuli/stimuli.tsv` only → needs **A** (core) only.
+- `81_table_rdm_intercorr.py` and `91_plot_rdm_intercorr.py` only consume the outputs of `01` from the repo `results/` tree (no extra bundle).
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  ST[stimuli/]:::in
+  R01["01_rdm_intercorrelation.py"]:::sc
+  R81["81_table_rdm_intercorr.py"]:::sc
+  R91["91_plot_rdm_intercorr.py"]:::sc
+  DATA["results/supplementary/rdm-intercorrelation/data/"]:::rl
+  TABLES["results/supplementary/rdm-intercorrelation/tables/"]:::rl
+  FIGURES["results/supplementary/rdm-intercorrelation/figures/"]:::rl
+
+  ST --> R01 --> DATA
+  DATA --> R81 --> TABLES
+  DATA --> R91 --> FIGURES
+```
+
 ## Methods
 
 ### Rationale
@@ -87,23 +113,23 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 python chess-supplementary/rdm-intercorrelation/01_rdm_intercorrelation.py
 ```
 
-**Outputs** (saved to `chess-supplementary/rdm-intercorrelation/results/rdm_intercorrelation/`):
+**Outputs** (saved to `results/supplementary/rdm-intercorrelation/data/`):
 - `pairwise_correlations.csv`: Spearman correlations between all RDM pairs
 - `partial_correlations.csv`: Partial correlations controlling for other RDMs
 - `variance_partitioning.csv`: Unique, shared, and unexplained variance per target
 - `rdm_intercorr_results.pkl`: Complete results dictionary
-- `01_rdm_intercorrelation.py`: Copy of the analysis script
 
 **Expected runtime**: ~30 seconds
 
-### Step 2: Generate Figures
+### Step 2: Tables and figures
 
 ```bash
+python chess-supplementary/rdm-intercorrelation/81_table_rdm_intercorr.py
 python chess-supplementary/rdm-intercorrelation/91_plot_rdm_intercorr.py
 ```
 
-**Outputs** (saved to `chess-supplementary/rdm-intercorrelation/results/rdm_intercorrelation/figures/`):
-- `rdm_intercorr_panel.pdf`: Combined visualization showing pairwise correlations, partial correlations, and variance partitioning
+- Tables → `results/supplementary/rdm-intercorrelation/tables/`
+- Figures → `results/supplementary/rdm-intercorrelation/figures/` (includes `rdm_intercorr_panel.pdf`, the combined visualization of pairwise correlations, partial correlations, and variance partitioning)
 
 ## Key Results
 
@@ -119,14 +145,12 @@ python chess-supplementary/rdm-intercorrelation/91_plot_rdm_intercorr.py
 chess-supplementary/rdm-intercorrelation/
 ├── README.md                              # This file
 ├── 01_rdm_intercorrelation.py             # Main analysis
+├── 81_table_rdm_intercorr.py              # Summary table
 ├── 91_plot_rdm_intercorr.py               # Figure generation
 ├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-├── analyses/rdm_intercorrelation/         # Shared analysis modules (in repo root analyses/ package)
-│   ├── __init__.py
-│   └── plotting.py                        # Plotting utilities
-└── results/
-    └── rdm_intercorrelation/
-        ├── *.csv                          # Statistical results
-        ├── *.pkl                          # Python objects
-        └── figures/                       # Publication figures
+└── analyses/rdm_intercorrelation/         # Shared analysis modules (in repo root analyses/ package)
+    ├── __init__.py
+    └── plotting.py                        # Plotting utilities
 ```
+
+Outputs are written to `results/supplementary/rdm-intercorrelation/{data,tables,figures}/` in the unified repo results tree.

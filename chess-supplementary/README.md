@@ -25,20 +25,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 2. Dataset Visualization (`dataset-viz/`)
-
-**Purpose**: Generate comprehensive visualizations of the complete chess stimulus set and analysis colorbars.
-
-**Content**:
-- Grid visualization of all 40 chess boards
-
-**Outputs**: Publication-ready SVG/PDF figures for dataset documentation.
-
-**See**: [`dataset-viz/README.md`](dataset-viz/README.md)
-
----
-
-### 3. Eye-Tracking Decoding (`eyetracking/`)
+### 2. Eye-Tracking Decoding (`eyetracking/`)
 
 **Purpose**: Decode expertise group from gaze patterns using eye-tracking data collected during the fMRI task.
 
@@ -55,7 +42,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 4. MVPA Finer Resolution (`mvpa-finer/`)
+### 3. MVPA Finer Resolution (`mvpa-finer/`)
 
 **Purpose**: Test whether within-checkmate representations differentiate expertise using finer strategic dimensions.
 
@@ -72,7 +59,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 5. Neurosynth Term Visualization (`neurosynth-terms/`)
+### 4. Neurosynth Term Visualization (`neurosynth-terms/`)
 
 **Purpose**: Visualize the spatial distribution of Neurosynth cognitive term maps used in meta-analytic correlations.
 
@@ -87,7 +74,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 6. RDM Intercorrelation (`rdm-intercorrelation/`)
+### 5. RDM Intercorrelation (`rdm-intercorrelation/`)
 
 **Purpose**: Quantify relationships between model RDMs to assess representational structure overlap.
 
@@ -104,7 +91,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 7. RSA ROI Summary (`rsa-rois/`)
+### 6. RSA ROI Summary (`rsa-rois/`)
 
 **Purpose**: Summarize whole-brain searchlight RSA results within 180 bilateral Glasser parcellation ROIs.
 
@@ -121,7 +108,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 8. Univariate ROI Summary (`univariate-rois/`)
+### 7. Univariate ROI Summary (`univariate-rois/`)
 
 **Purpose**: Summarize first-level univariate contrast maps within 180 bilateral Glasser parcellation ROIs.
 
@@ -136,7 +123,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 9. Task Engagement and Board Preference (`task-engagement/`)
+### 8. Task Engagement and Board Preference (`task-engagement/`)
 
 **Purpose**: Characterise how experts and novices engage with the fMRI 1-back preference task, and identify which objective board features drive selection preferences.
 
@@ -152,7 +139,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 10. Skill Gradient (`skill-gradient/`)
+### 9. Skill Gradient (`skill-gradient/`)
 
 **Purpose**: Test whether neural measures scale continuously with chess skill rather than differing only as a binary group split.
 
@@ -168,7 +155,7 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ---
 
-### 11. Subcortical ROI Analysis (`subcortical-rois/`)
+### 10. Subcortical ROI Analysis (`subcortical-rois/`)
 
 **Purpose**: Extend the cortical MVPA pipeline to subcortical structures using the CAB-NP atlas (Ji et al., 2019).
 
@@ -187,9 +174,15 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ## Running All Supplementary Analyses
 
-To run all supplementary analyses together, use the top-level pipeline (supplementary folders are included by default):
+To run every group/table/plot script in the supplementary tree, use the top-level pipeline. With no arguments, `run_all_analyses.sh` runs at the `group` level (the Python layer that regenerates `results/supplementary/<name>/{data,tables,figures}/`):
 
 ```bash
 # From repository root
-./run_all_analyses.sh --levels analysis,tables,figures --sequential
+./run_all_analyses.sh            # default: group level
+./run_all_analyses.sh group      # same as above, explicit
 ```
+
+Use `./run_all_analyses.sh subject-level` to re-run the MATLAB subject scripts that write into `BIDS/derivatives/fmriprep_spm-unsmoothed_{rsa,decoding,...}/`; do not do this unless you have the time budget for the full MATLAB re-run.
+
+Outputs land in the unified repo tree at `results/supplementary/<name>/{data,tables,figures}/`.
+

@@ -7,6 +7,48 @@ This analysis characterises how experts and novices engage with the fMRI
 perceptual (visual) or relational (checkmate/strategy) features, and
 provides diagnostic metrics for task compliance.
 
+## Required bundles
+
+- `01_task_engagement.py`, `02_familiarisation_accuracy.py`, and `04_quantify_preference_drivers.py` read BIDS events, stimuli, and participants directly → needs **A** (core) only.
+- `91/92/93` plot scripts only consume the outputs of `01`/`02`/`04` from the repo `results/` tree (no extra bundle).
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  ST[stimuli/]:::in
+  EV["sub-*/func/ (events)"]:::in
+
+  T01["01_task_engagement.py"]:::sc
+  T02["02_familiarisation_accuracy.py"]:::sc
+  T04["04_quantify_preference_drivers.py"]:::sc
+  T91["91_plot_novice_diagnostics.py"]:::sc
+  T92["92_plot_preference_features.py"]:::sc
+  T93["93_plot_gradient_panel.py"]:::sc
+  DATA["results/supplementary/task-engagement/data/"]:::rl
+  FIGURES["results/supplementary/task-engagement/figures/"]:::rl
+
+  EV --> T01 --> DATA
+  PT --> T01
+  EV --> T02 --> DATA
+  PT --> T02
+  ST --> T04 --> DATA
+
+  DATA --> T91 --> FIGURES
+  EV --> T91
+  ST --> T91
+  PT --> T91
+  DATA --> T92 --> FIGURES
+  ST --> T92
+  DATA --> T93 --> FIGURES
+  PT --> T93
+```
+
 ## Methods
 
 ### Rationale
@@ -378,28 +420,10 @@ chess-supplementary/task-engagement/
 ├── 92_plot_preference_features.py     # Diagnostic 5 figure: board images + scatter
 ├── 93_plot_gradient_panel.py          # Diagnostic 5 figure: bivariate vs partial + variance bars
 ├── README.md
-├── analyses/task_engagement/           # Shared analysis modules (in repo root analyses/ package)
-│   ├── __init__.py
-│   └── io.py                          # Familiarisation data loading utilities
-└── results/
-    └── novice_diagnostics/
-        ├── response_rate.csv
-        ├── checkmate_preference.csv
-        ├── transitivity.csv
-        ├── board_preference_profile.csv
-        ├── board_preference_group.csv
-        ├── preference_ranking_expert.csv
-        ├── preference_ranking_novice.csv
-        ├── extreme_boards_summary.csv
-        ├── feature_matrix.csv                       # Diagnostic 5 (8 features)
-        ├── feature_correlations.csv                 # Diagnostic 5 bivariate r + FDR
-        ├── feature_partial_correlations.csv         # Diagnostic 5 partial r + FDR
-        ├── feature_variance_partitioning.csv        # Diagnostic 5 delta-R2 per block
-        └── figures/
-            ├── novice_diagnostics_panel.pdf         # Diagnostics 1-4
-            ├── preference_drivers_panel.pdf         # Diagnostic 5
-            ├── gradient_panel.svg                   # Diagnostic 6
-            └── panels/
-                ├── preference_features_panel.pdf    # Diagnostic 5
-                └── gradient_panel.pdf               # Diagnostic 6
+└── analyses/task_engagement/          # Shared analysis modules (in repo root analyses/ package)
+    ├── __init__.py
+    └── io.py                          # Familiarisation data loading utilities
 ```
+
+Outputs are written to `results/supplementary/task-engagement/{data,figures}/` in the unified repo results tree (no per-analysis `results/` folder under `chess-supplementary/task-engagement/` anymore).
+

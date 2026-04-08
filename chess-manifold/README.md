@@ -9,6 +9,45 @@ This analysis quantifies the effective dimensionality of neural representations 
 - `01_manifold_analysis.py` reads SPM unsmoothed beta images and the Glasser-22 atlas → needs **A** (core) + **D** (spm).
 - `81_table_manifold_pr.py` and `91_plot_manifold_panels.py` only consume the outputs of 01 from the repo `results/` tree (no extra bundle).
 
+In a future commit `01_manifold_analysis.py` will be split into a subject-level stage that writes per-subject PR values to `derivatives/fmriprep_spm-unsmoothed_manifold/` (bundle E) and a group-level stage that aggregates them into the repo results tree.
+
+## Data flow
+
+```mermaid
+flowchart LR
+  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+  classDef out fill:#fff5b1,stroke:#b08800,color:#000
+  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
+  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+
+  PT[participants.tsv]:::in
+  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+  A22[sourcedata/atlases/glasser22/]:::in
+
+  MAN01["01_manifold_subject.py"]:::sc
+  MAN02["02_manifold_group.py"]:::sc
+  MAN81["81_table_manifold_pr.py"]:::sc
+  MAN91["91_plot_manifold_panels.py"]:::sc
+  MAN[derivatives/fmriprep_spm-unsmoothed_manifold/]:::out
+  DATA["results/manifold/data/"]:::rl
+  TABLES["results/manifold/tables/"]:::rl
+  FIGURES["results/manifold/figures/"]:::rl
+
+  GLMU --> MAN01
+  A22 --> MAN01
+  PT --> MAN01
+  MAN01 --> MAN
+
+  MAN --> MAN02
+  PT --> MAN02
+  MAN02 --> DATA
+
+  DATA --> MAN81 --> TABLES
+  PT --> MAN81
+  DATA --> MAN91 --> FIGURES
+  PT --> MAN91
+```
+
 ## Methods
 
 ### Rationale
