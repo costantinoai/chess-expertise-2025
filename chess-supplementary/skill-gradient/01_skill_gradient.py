@@ -23,10 +23,10 @@ each measure.
 Data
 ----
 - Participants: BIDS participants.tsv (Elo in 'rating' column)
-- PR: chess-manifold/results/manifold/pr_results.pkl
-- RSA: BIDS/derivatives/mvpa-rsa per-subject TSVs
-- Decoding: BIDS/derivatives/mvpa-decoding per-subject TSVs
-- Familiarisation: task-engagement/results/familiarisation_accuracy/
+- PR: results/manifold/data/pr_results.pkl
+- RSA: BIDS/derivatives/fmriprep_spm-unsmoothed_rsa per-subject TSVs
+- Decoding: BIDS/derivatives/fmriprep_spm-unsmoothed_decoding per-subject TSVs
+- Familiarisation: results/supplementary/task-engagement/data/
   familiarisation_subject_accuracy.csv (behavioural only; neural enrichment
   is computed within this script)
 
@@ -39,7 +39,7 @@ Outputs
 - familiarisation_neural_correlations.csv: Familiarisation accuracy x neural metrics
 """
 
-import pickle  # nosec B403 — trusted internal analysis outputs
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -91,9 +91,10 @@ logger.info(
     f"range: {min(elo_map.values()):.0f}-{max(elo_map.values()):.0f}"
 )
 
-# PR data (trusted internal analysis output)
-pr_pkl = Path(config['REPO_ROOT']) / 'chess-manifold/results/manifold/pr_results.pkl'
-with open(pr_pkl, 'rb') as f:  # nosec B301 — trusted internal pkl
+# PR data (trusted internal analysis output) — written by
+# chess-manifold/02_manifold_group.py into the unified results/ tree.
+pr_pkl = Path(config['RESULTS_ROOT']) / 'manifold' / 'data' / 'pr_results.pkl'
+with open(pr_pkl, 'rb') as f:
     pr_data = pickle.load(f)
 pr_long = pr_data['pr_long_format']
 roi_info = pr_data['roi_info']
