@@ -29,6 +29,9 @@ flowchart LR
 
   PT[participants.tsv]:::in
   MR[derivatives/fmriprep_spm-unsmoothed_rsa/]:::in
+  MD[derivatives/fmriprep_spm-unsmoothed_decoding/]:::in
+  MANDATA["results/manifold/data/"]:::rl
+  TASKDATA["results/supplementary/task-engagement/data/"]:::rl
 
   SG01["01_skill_gradient.py"]:::sc
   SG91["91_plot_skill_gradient.py"]:::sc
@@ -36,10 +39,14 @@ flowchart LR
   FIGURES["results/supplementary/skill-gradient/figures/"]:::rl
 
   MR --> SG01
+  MD --> SG01
+  MANDATA --> SG01
+  TASKDATA --> SG01
   PT --> SG01
   SG01 --> DATA
 
   DATA --> SG91 --> FIGURES
+  MANDATA --> SG91
   PT --> SG91
 ```
 

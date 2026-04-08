@@ -6,10 +6,9 @@ This analysis quantifies the effective dimensionality of neural representations 
 
 ## Required bundles
 
-- `01_manifold_analysis.py` reads SPM unsmoothed beta images and the Glasser-22 atlas → needs **A** (core) + **D** (spm).
-- `81_table_manifold_pr.py` and `91_plot_manifold_panels.py` only consume the outputs of 01 from the repo `results/` tree (no extra bundle).
-
-In a future commit `01_manifold_analysis.py` will be split into a subject-level stage that writes per-subject PR values to `derivatives/fmriprep_spm-unsmoothed_manifold/` (bundle E) and a group-level stage that aggregates them into the repo results tree.
+- `01_manifold_subject.py` reads SPM unsmoothed beta images and the Glasser-22 atlas → needs **A** (core) + **D** (spm). Writes per-subject PR values into `derivatives/fmriprep_spm-unsmoothed_manifold/` (bundle E).
+- `02_manifold_group.py` reads those per-subject PR values from bundle E and writes group aggregates into `results/manifold/data/`.
+- `81_table_manifold_pr.py` and `91_plot_manifold_panels.py` only consume the outputs of `02_manifold_group.py` from the repo `results/` tree.
 
 ## Data flow
 
@@ -144,12 +143,22 @@ Additional paths (derived from the external data root) used here:
 
 ## Running the Analysis
 
-### Step 1: Run Main Analysis
+### Step 1: Per-subject PR values
 
 ```bash
 # From repository root
 cd chess-manifold
-python 01_manifold_analysis.py
+python 01_manifold_subject.py
+```
+
+**Outputs** (saved to `BIDS/derivatives/fmriprep_spm-unsmoothed_manifold/sub-*/`):
+- `sub-XX_space-MNI152NLin2009cAsym_roi-glasser_desc-pr_values.tsv`: Per-ROI PR values for the subject.
+- Matching sidecar JSON describing the statistic, atlas, and source.
+
+### Step 2: Group aggregation
+
+```bash
+python 02_manifold_group.py
 ```
 
 **Outputs** (saved to `results/manifold/data/`):
@@ -157,13 +166,8 @@ python 01_manifold_analysis.py
 - `pr_summary_stats.csv`: Group means, standard errors, and 95% CIs per ROI
 - `pr_statistical_tests.csv`: Welch t-tests, FDR-corrected q-values, Cohen's d per ROI
 - `pr_classification_tests.csv`: Classification accuracy and permutation p-values for ROI and PCA-2D spaces
-- `01_manifold_analysis.py`: Copy of the analysis script
 
-Note: in a future commit this script will be split into `01_*_subject.py` (writes per-subject derivatives to BIDS) and `02_*_group.py` (reads those derivatives and writes to the repo `results/` tree).
-
-**Expected runtime**: ~10-15 minutes (depends on number of voxels per ROI)
-
-### Step 2: Generate Tables
+### Step 3: Generate Tables
 
 ```bash
 python chess-manifold/81_table_manifold_pr.py
@@ -173,7 +177,7 @@ python chess-manifold/81_table_manifold_pr.py
 - `manifold_pr_results.tex`: LaTeX table with group statistics and t-test results
 - `manifold_pr_results.csv`: CSV version of the table
 
-### Step 3: Generate Figures
+### Step 4: Generate Figures
 
 ```bash
 python chess-manifold/91_plot_manifold_panels.py
@@ -219,7 +223,8 @@ python chess-manifold/91_plot_manifold_panels.py
 ```
 chess-manifold/
 ├── README.md                        # This file
-├── 01_manifold_analysis.py          # Main PR analysis script
+├── 01_manifold_subject.py           # Per-subject PR → BIDS derivatives
+├── 02_manifold_group.py             # Group aggregate + stats → results/manifold/data/
 ├── 81_table_manifold_pr.py          # LaTeX/CSV table generation
 ├── 91_plot_manifold_panels.py       # Figure generation
 ├── METHODS.md                       # Detailed methods from manuscript

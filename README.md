@@ -100,10 +100,10 @@ If running subject-level GLM and/or MVPA analyses:
 2. Install [CoSMoMVPA](http://www.cosmomvpa.org/)
 3. Add both to your MATLAB path
 
-**Important**: MATLAB does not allow running scripts whose filenames start with a number. The MATLAB scripts in this repository are named with numeric prefixes (e.g., `01_roi_mvpa_main.m`) for ordering consistency with the Python scripts. To run them, either:
+**Important**: MATLAB does not allow running scripts whose filenames start with a number. The MATLAB scripts in this repository are named with numeric prefixes (e.g., `01_roi_mvpa_subject.m`) for ordering consistency with the Python scripts. To run them, either:
 
-- Rename the file by removing the numeric prefix (e.g., `01_roi_mvpa_main.m` → `roi_mvpa_main.m`), or
-- Call them via `run('01_roi_mvpa_main.m')` from the MATLAB command window
+- Rename the file by removing the numeric prefix (e.g., `01_roi_mvpa_subject.m` → `roi_mvpa_subject.m`), or
+- Call them via `run('01_roi_mvpa_subject.m')` from the MATLAB command window
 
 ## Data Download and Setup
 
@@ -125,22 +125,23 @@ All analyses read their inputs from a **single external data root**. Configure t
 
 ```
 /path/to/manuscript-data/
-└── BIDS/                         # BIDS dataset (raw + derivatives)
+└── BIDS/                                          # BIDS dataset (raw + derivatives)
     ├── participants.tsv
-    ├── stimuli/                  # Stimulus images and metadata
+    ├── stimuli/                                   # Stimulus images and metadata
+    ├── sourcedata/atlases/                        # Reference atlases (Glasser, CAB-NP, Neurosynth)
     └── derivatives/
-        ├── fmriprep/             # fMRIPrep outputs
-        ├── SPM/                  # GLM beta images
-        ├── mvpa-rsa/             # Subject-level RSA matrices
-        ├── mvpa-decoding/        # Subject-level SVM accuracies
-        ├── mvpa-rsa-run-matched/ # Run-matched RSA matrices (supplementary)
-        ├── rsa_searchlight/      # Searchlight maps
-        ├── eye-tracking/         # Eye-tracking data
-        └── atlases/              # ROI atlases and reference data
-            ├── glasser22/        # 22 bilateral cortical ROIs
-            ├── glasser180/       # 180 bilateral cortical ROIs
-            ├── cab-np/           # Subcortical ROIs (CAB-NP)
-            └── neurosynth/       # Meta-analytic term maps
+        ├── fmriprep/                              # fMRIPrep outputs
+        ├── fmriprep_spm-unsmoothed/               # SPM first-level GLM on unsmoothed BOLD
+        ├── fmriprep_spm-smoothed/                 # SPM first-level GLM on 4 mm smoothed BOLD
+        ├── fmriprep_spm-unsmoothed_rsa/           # ROI RSA (Glasser-22)
+        ├── fmriprep_spm-unsmoothed_decoding/      # ROI decoding (Glasser-22)
+        ├── fmriprep_spm-unsmoothed_searchlight-rsa/  # Whole-brain searchlight RSA
+        ├── fmriprep_spm-unsmoothed_manifold/      # Per-ROI neural Participation Ratio
+        ├── fmriprep_spm-unsmoothed_rsa-run-matched/      # Run-matched ROI RSA (supplementary)
+        ├── fmriprep_spm-unsmoothed_rsa-subcortical/      # Subcortical ROI RSA (CAB-NP)
+        ├── fmriprep_spm-unsmoothed_decoding-subcortical/ # Subcortical ROI decoding (CAB-NP)
+        ├── behavioral-rsa/                        # Per-subject behavioural preference RDMs
+        └── bidsmreye/                             # BidsMReye gaze estimates
 ```
 
 2) Point the repository to your local data folder by setting the `CHESS_DATA_ROOT`
@@ -170,6 +171,12 @@ The repository expects the following layout under `_EXTERNAL_DATA_ROOT`. Everyth
     ├── stimuli/
     │   ├── stimuli.tsv                      # Stimulus metadata (stim_id, check, strategy, ...)
     │   └── *.png                            # 40 chess board images
+    ├── sourcedata/atlases/                  # Reference atlases (never consumed
+    │   ├── glasser22/                       #  as derivatives — they are the input
+    │   ├── glasser180/                      #  side of the analysis pipeline).
+    │   ├── glasser180-surface/              # Surface parcellation (.annot)
+    │   ├── cab-np/                          # Subcortical ROIs (CAB-NP)
+    │   └── neurosynth/terms/                # Meta-analytic term maps
     ├── sub-01/
     │   ├── anat/sub-01_T1w.nii.gz
     │   ├── func/sub-01_task-exp_run-{1..6}_bold.nii.gz
@@ -177,24 +184,20 @@ The repository expects the following layout under `_EXTERNAL_DATA_ROOT`. Everyth
     │   └── beh/sub-01_task-familiarisation_beh.tsv
     ├── sub-02/ ... sub-44/
     └── derivatives/
-        ├── fmriprep/                        # fMRIPrep preprocessed data
-        ├── SPM/
-        │   ├── GLM-unsmoothed/sub-*/exp/    # Unsmoothed beta images (for MVPA)
-        │   └── GLM-smooth4/group/           # Group-level smoothed contrasts
-        ├── mvpa-rsa/sub-*/                  # Subject-level RSA correlation matrices
-        ├── mvpa-decoding/sub-*/             # Subject-level SVM accuracy scores
-        ├── mvpa-rsa-subcortical/sub-*/
-        ├── mvpa-decoding-subcortical/sub-*/
-        ├── rsa_searchlight/sub-*/           # Subject-level searchlight maps
-        ├── eye-tracking/sub-*/              # Eye-tracking derivatives
-        └── atlases/                         # ROI atlases and reference data
-            ├── glasser22/                   # 22 bilateral cortical ROIs
-            ├── glasser180/                  # 180 bilateral cortical ROIs
-            ├── glasser180-surface/          # Surface parcellation (.annot)
-            ├── cab-np/                      # Subcortical ROIs (CAB-NP)
-            ├── neurosynth/terms/            # Meta-analytic term maps
-            ├── HCP-MMP1_UniqueRegionList.csv
-            └── dataset_description.json
+        ├── fmriprep/                                     # fMRIPrep preprocessed data
+        ├── fmriprep_spm-unsmoothed/sub-*/exp/            # Unsmoothed SPM betas (for MVPA)
+        ├── fmriprep_spm-smoothed/                        # Smoothed SPM first + group levels
+        │   ├── sub-*/exp/                                # Smoothed SPM betas
+        │   └── group/                                    # Group contrasts (used by neurosynth)
+        ├── fmriprep_spm-unsmoothed_rsa/sub-*/            # ROI RSA Pearson-r TSVs (Glasser-22)
+        ├── fmriprep_spm-unsmoothed_decoding/sub-*/       # ROI SVM accuracy TSVs (Glasser-22)
+        ├── fmriprep_spm-unsmoothed_searchlight-rsa/sub-*/ # Whole-brain searchlight r-maps
+        ├── fmriprep_spm-unsmoothed_manifold/sub-*/       # Per-ROI Participation Ratio TSVs
+        ├── fmriprep_spm-unsmoothed_rsa-run-matched/sub-*/
+        ├── fmriprep_spm-unsmoothed_rsa-subcortical/sub-*/
+        ├── fmriprep_spm-unsmoothed_decoding-subcortical/sub-*/
+        ├── behavioral-rsa/sub-*/                         # Per-subject preference RDMs
+        └── bidsmreye/sub-*/                              # Gaze-position estimates
 ```
 
 ## Running Analyses
@@ -235,10 +238,17 @@ Each analysis directory has detailed instructions in its README. Basic workflow:
 # Always run from the analysis folder
 cd chess-behavioral
 conda activate <your-new-env-name>
-python 01_behavioral_rsa.py                 # Main analysis (~2 min)
-python 81_table_behavioral_correlations.py  # Tables (~10 sec)
-python 91_plot_behavioral_panels.py         # Figures (~30 sec)
+python 01_behavioral_rsa_subject.py         # Per-subject preference RDMs
+python 02_behavioral_rsa_group.py           # Group aggregate + stats
+python 81_table_behavioral_correlations.py  # Tables
+python 91_plot_behavioral_panels.py         # Figures
 ```
+
+Every analysis writes into the shared `results/<analysis>/{data,tables,figures}/`
+tree at the repo root. Subject-level stages that populate BIDS derivatives
+(`chess-behavioral/01_*_subject.py`, `chess-manifold/01_*_subject.py`, MATLAB
+pipelines under `chess-mvpa/`, etc.) should be re-run before the corresponding
+group stages if the derivatives themselves are being rebuilt.
 
 See individual analysis READMEs for details:
 - [`chess-behavioral/README.md`](chess-behavioral/README.md) - Behavioral RSA

@@ -189,11 +189,15 @@ python chess-neurosynth/02_rsa_neurosynth.py
 ```
 
 **Outputs** (saved to `results/neurosynth/data/`):
-- `zmap_<pattern>.nii.gz`: Group z-score maps (Experts > Novices) for each RSA model
-- `<pattern>_term_corr_positive.csv`: Z+ term correlations
-- `<pattern>_term_corr_negative.csv`: Z− term correlations
-- `<pattern>_term_corr_difference.csv`: Correlation differences
-- `02_rsa_neurosynth.py`: Copy of the analysis script
+- `zmap_searchlight_{checkmate,strategy,visual_similarity}.nii.gz`: group z-score maps (Experts > Novices) per RSA model
+- `searchlight_{checkmate,strategy,visual_similarity}_term_corr_positive.csv`: Z+ term correlations
+- `searchlight_{checkmate,strategy,visual_similarity}_term_corr_negative.csv`: Z− term correlations
+- `searchlight_{checkmate,strategy,visual_similarity}_term_corr_difference.csv`: Correlation differences
+
+Per-subject searchlight maps are matched by the `desc-` BIDS entity of the
+filename (`desc-checkmate`, `desc-strategy`, `desc-visualSimilarity`), so the
+output `searchlight_visual_similarity*` stems stay stable even though the
+underlying BIDS entity uses camelCase (`visualSimilarity`).
 
 **Expected runtime**: ~5-10 minutes (includes second-level GLM fitting)
 
