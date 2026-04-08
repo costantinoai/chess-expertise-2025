@@ -129,12 +129,14 @@ FIGURES_DIR = dirs['figures']
 # =============================================================================
 
 
-# Load group-level MVPA statistics from unified directory
-# group_stats['svm'][target_name]['welch_expert_vs_novice'] (decoding)
-# group_stats['rsa_corr'][target_name]['welch_expert_vs_novice'] (RSA)
+# Load group-level MVPA statistics. The RSA and decoding group stages
+# each write their own file under the unified results/ tree so they
+# cannot clobber each other; ``load_mvpa_group_stats`` merges both
+# halves back into the legacy ``{'rsa_corr': ..., 'svm': ...}`` dict
+# that this plotting script expects.
 logger.info("Loading MVPA RSA + SVM group statistics from unified directory...")
-with open(RESULTS_DIR / "mvpa_group_stats.pkl", "rb") as f:
-    group_stats = pickle.load(f)
+from analyses.mvpa.io import load_mvpa_group_stats
+group_stats = load_mvpa_group_stats(RESULTS_DIR)
 
 # Load ROI metadata for Glasser 22-region parcellation
 # Contains: roi_id, pretty_name, color, group/family information

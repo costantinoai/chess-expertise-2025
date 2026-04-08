@@ -220,19 +220,13 @@ for tgt in targets:
 for tgt, blocks in method_results.items():
     write_group_stats_outputs(results_dir, "svm", tgt, blocks)
 
-# Merge with existing artifact index if present (single unified folder)
-artifact_index_path = results_dir / "mvpa_group_stats.pkl"
-if artifact_index_path.exists():
-    try:
-        with open(artifact_index_path, "rb") as f:
-            prev = pickle.load(f)
-    except Exception:
-        prev = {}
-else:
-    prev = {}
-prev["svm"] = method_results
+# Write decoding group stats into its own pickle so the RSA and
+# decoding group stages don't collide in the unified results/ tree.
+# The matching RSA-stage pickle is produced by 02_mvpa_group_rsa.py.
+artifact_index_path = results_dir / "mvpa_group_stats_svm.pkl"
+_out_blob = {"svm": method_results}
 with open(artifact_index_path, "wb") as f:
-    pickle.dump(prev, f)
+    pickle.dump(_out_blob, f)
 
 logger.info("Saved group statistics artifacts (decoding)")
 log_script_end(logger)
