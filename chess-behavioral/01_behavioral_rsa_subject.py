@@ -47,10 +47,9 @@ from analyses.behavioral.rdm_utils import create_pairwise_df, aggregate_pairwise
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-script_dir = Path(__file__).parent
 config, _, logger = setup_analysis(
-    analysis_name="behavioral_rsa_subject",
-    results_base=script_dir / "results",
+    analysis_name="01_behavioral_rsa_subject",
+    results_base=CONFIG["RESULTS_ROOT"] / "behavioral" / "logs",
     script_file=__file__,
 )
 

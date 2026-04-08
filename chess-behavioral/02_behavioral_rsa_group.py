@@ -55,10 +55,9 @@ from analyses.behavioral.rdm_utils import (
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-script_dir = Path(__file__).parent
 config, _, logger = setup_analysis(
-    analysis_name="behavioral_rsa_group",
-    results_base=script_dir / "results",
+    analysis_name="02_behavioral_rsa_group",
+    results_base=CONFIG["RESULTS_ROOT"] / "behavioral" / "logs",
     script_file=__file__,
 )
 

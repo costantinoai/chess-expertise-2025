@@ -44,10 +44,9 @@ from analyses.manifold.pr_computation import compute_subject_roi_prs
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-script_dir = Path(__file__).parent
 config, _, logger = setup_analysis(
-    analysis_name="manifold_subject",
-    results_base=script_dir / "results",
+    analysis_name="01_manifold_subject",
+    results_base=CONFIG["RESULTS_ROOT"] / "manifold" / "logs",
     script_file=__file__,
 )
 

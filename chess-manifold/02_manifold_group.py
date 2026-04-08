@@ -53,10 +53,9 @@ from analyses.manifold.analysis import (
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-script_dir = Path(__file__).parent
 config, _, logger = setup_analysis(
-    analysis_name="manifold_group",
-    results_base=script_dir / "results",
+    analysis_name="02_manifold_group",
+    results_base=CONFIG["RESULTS_ROOT"] / "manifold" / "logs",
     script_file=__file__,
 )
 
