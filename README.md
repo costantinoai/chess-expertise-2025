@@ -109,9 +109,28 @@ If running subject-level GLM and/or MVPA analyses:
 
 ### Download Data
 
-**Download link**: [PLACEHOLDER - Data will be available on KU Leuven RDR upon publication]
+The BIDS dataset is deposited in the KU Leuven Research Data Repository (RDR):
+**DOI: [10.48804/VVCEWP](https://doi.org/10.48804/VVCEWP)**. The repository
+entry hosts raw MRI, preprocessed data, all subject-level analysis derivatives
+and a mirror of this repo's group-level `results/` snapshot, split into six
+layered bundles so you only have to download what your workflow needs:
 
-The dataset is organized according to the Brain Imaging Data Structure (BIDS) specification (v1.10.0).
+| Bundle | Approx. size | Contents | When to download |
+|:--:|---|---|---|
+| **A** `core` | ~20 MB | Sidecars, `participants.tsv`, `stimuli/`, `sourcedata/atlases/` | **Mandatory** for every user. |
+| **B** `raw` | ~39 GB | `sub-*/anat/`, `sub-*/func/*_bold.nii.gz`, `sub-*/beh/` | Re-running fMRIPrep from scratch. |
+| **C** `fmriprep` | ~187 GB | `derivatives/fmriprep/` | Re-running the SPM first-level GLM. |
+| **D** `spm` | ~30 GB | `derivatives/fmriprep_spm-{un,}smoothed/` (subject betas + group contrasts) | Re-running any subject-level MVPA / manifold / searchlight; also neurosynth univariate and univariate-rois. |
+| **E** `analyses` | ~260 MB | `derivatives/fmriprep_spm-unsmoothed_{rsa,decoding,searchlight-rsa,manifold,rsa-run-matched,rsa-subcortical,decoding-subcortical}/`, `derivatives/behavioral-rsa/`, `derivatives/bidsmreye/` | **Most users** — enough to regenerate every group stat, table, and figure together with this code repo. |
+| **F** `code-results` | ~170 MB | Snapshot of this repo's `results/<analysis>/{data,tables,figures}/` at the published tag. Also attached as a release asset on GitHub. | Users who only want to view the paper's numbers / figures without cloning the code. |
+
+The typical **"reproduce the paper's group stats and figures"** path is bundles
+**A + E + F** (~450 MB total), pointing `CHESS_DATA_ROOT` at the extracted BIDS
+root. See the dataset-side `README` on RDR for the exact extraction steps and
+the full dependency chain (`B → fmriprep → C → SPM → D → group code → E → F`).
+
+The dataset is organised according to the Brain Imaging Data Structure (BIDS)
+specification (v1.10.0).
 
 ### Data Organization
 
@@ -353,9 +372,17 @@ The pipeline was validated on Ubuntu 24.04 with Python 3.11.6 (numpy 1.26.4, sci
 
 If you use this code or data in your research, please cite:
 
-> Costantino, A.I. et al. (2025). Chess expertise shapes neural representations of strategic board positions. *Under review*.
+> Costantino, A.I. et al. (2026). Low-Dimensional and Optimised Representations of High-Level Information in the Expert Brain. *Under review*.
 
-Code: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392283.svg)](https://doi.org/10.5281/zenodo.19392283)
+- **Code** (this repository, any version): [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19392282.svg)](https://doi.org/10.5281/zenodo.19392282) — the concept DOI always resolves to the latest tagged release.
+- **Data** (BIDS dataset on KU Leuven RDR): [10.48804/VVCEWP](https://doi.org/10.48804/VVCEWP)
+
+The code repository contains every analysis pipeline needed to reproduce the
+paper. Group-level statistics, manuscript tables, and publication figures live
+under `results/<analysis>/{data,tables,figures}/` and ship as bundle F of the
+RDR dataset (also attached to each GitHub release as
+`chess-bids_F_code-results.zip`). Raw MRI, preprocessed data, and subject-level
+analysis derivatives live in the RDR repository above.
 
 ## Acknowledgments
 
