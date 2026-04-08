@@ -211,7 +211,7 @@ CONFIG = {
     # ========================================================================
     # Display/Plotting Configuration
     # ========================================================================
-    'ENABLE_PYLUSTRATOR': _read_env_bool('CHESS_ENABLE_PYLUSTRATOR', True),  # Interactive layout editing; batch runs disable via env override
+    'ENABLE_PYLUSTRATOR': _read_env_bool('CHESS_ENABLE_PYLUSTRATOR', False),  # Interactive layout editing; batch runs keep this off (export CHESS_ENABLE_PYLUSTRATOR=1 to re-enable interactively)
     'NEUROSYNTH_TERM_ORDER': [                                  # Term ordering for plots
         'working memory',
         'navigation',

@@ -758,6 +758,8 @@ def create_standalone_colorbar(
     output_path: Optional[Path] = None,
     params: dict | None = None,
     tick_position: Optional[str] = None,
+    label_pad: Optional[float] = None,
+    drop_leading_zero: bool = False,
 ) -> plt.Figure:
     """
     Create a standalone colorbar figure with 3 ticks (vmin, center, vmax).
@@ -781,6 +783,15 @@ def create_standalone_colorbar(
     tick_position : str, optional
         Position of ticks and labels. For vertical: 'left' or 'right' (default: 'right').
         For horizontal: 'top' or 'bottom' (default: 'bottom').
+    label_pad : float, optional
+        Override the label padding (in points). If omitted, sensible defaults
+        are used for each tick position. Pass an explicit value when two
+        colorbars need to share the same label-to-tick spacing.
+    drop_leading_zero : bool, default=False
+        When True, format tick values in ``(-1, 1)`` without the leading zero
+        (e.g. ``.50`` instead of ``0.50``). Useful for normalised colorbars
+        where every tick is bounded above by 1 and the leading zero adds
+        noise without information.
 
     Returns
     -------
@@ -868,7 +879,22 @@ def create_standalone_colorbar(
         else:
             return f"{val:.2f}"
 
-    cbar.set_ticklabels([format_tick(t) for t in ticks])
+    def strip_leading_zero(s):
+        # ".50" instead of "0.50", "-.50" instead of "-0.50". Untouched
+        # for values where dropping the zero would be ambiguous (>= 1 in
+        # absolute value, or already empty/integer).
+        if not s or '.' not in s:
+            return s
+        if s.startswith('0.'):
+            return s[1:]
+        if s.startswith('-0.'):
+            return '-' + s[2:]
+        return s
+
+    formatted_ticks = [format_tick(t) for t in ticks]
+    if drop_leading_zero:
+        formatted_ticks = [strip_leading_zero(s) for s in formatted_ticks]
+    cbar.set_ticklabels(formatted_ticks)
 
     # Position ticks and labels
     if tick_position:
@@ -895,9 +921,11 @@ def create_standalone_colorbar(
             cbar.set_label(label, fontsize=params['font_size_title'] * 2)  # Use 2x title size for label
         else:
             if tick_position == 'left':
-                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=90, labelpad=5)
+                pad = label_pad if label_pad is not None else 5
+                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=90, labelpad=pad)
             else:
-                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=270, labelpad=12)
+                pad = label_pad if label_pad is not None else 12
+                cbar.set_label(label, fontsize=params['font_size_title'] * 2, rotation=270, labelpad=pad)
 
     # Set colorbar outline width
     cbar.outline.set_linewidth(params['plot_linewidth'])

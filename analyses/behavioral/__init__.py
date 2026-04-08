@@ -17,8 +17,10 @@ from .data_loading import (
 from .rdm_utils import (
     create_pairwise_df,
     compute_symmetric_rdm,
+    compute_normalized_rdm,
     compute_directional_dsm,
-    correlate_with_all_models
+    compute_normalized_dsm,
+    correlate_with_all_models,
 )
 
 # Plotting helpers are provided centrally via common.plotting.
@@ -30,7 +32,9 @@ __all__ = [
     # RDM utilities
     'create_pairwise_df',
     'compute_symmetric_rdm',
+    'compute_normalized_rdm',
     'compute_directional_dsm',
+    'compute_normalized_dsm',
     'correlate_with_all_models',
     # Plotting helpers live in common.plotting
 ]

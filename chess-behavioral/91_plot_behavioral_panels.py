@@ -11,37 +11,38 @@ behavioral results directory.
 Figures Produced
 ----------------
 
-Panel: Behavioral RSA Multi-Panel Figure
+Behavioral RSA Multi-Panel Figure
 - File: figures/panels/behavioral_rsa_panel.svg (and .pdf)
 - Axes saved to figures/: behavioral_*.svg and behavioral_*.pdf
+- The directional preference (DSM) panels show RAW signed pairwise
+  counts -- the group-level result -- while the behavioral RDM panels
+  show those same counts normalized by the per-pair total to control
+  for unequal pair exposure (some pairs are sampled more often than
+  others by the 1-back design). Two dedicated colorbars so neither
+  matrix type looks faint next to the other's wider range.
 - Content:
-  - A1: Directional preference matrix (Experts) - shows behavioral preference dissimilarity
-  - A2: Directional preference matrix (Novices) - shows behavioral preference dissimilarity
-  - A3: Behavioral RDM (Experts) - representational dissimilarity matrix
-  - A4: Behavioral RDM (Novices) - representational dissimilarity matrix
-  - B1: MDS embedding (Experts) - 2D projection of behavioral RDM
-  - B2: MDS embedding (Novices) - 2D projection of behavioral RDM
+  - A1: Behavioral RDM (Experts) - count-normalized in [0, 1]
+  - A2: Behavioral RDM (Novices) - count-normalized in [0, 1]
+  - A3: Directional preference matrix (Experts) - raw signed counts
+  - A4: Directional preference matrix (Novices) - raw signed counts
+  - B1: MDS embedding (Experts) - 2D projection of count-normalized behavioral RDM
+  - B2: MDS embedding (Novices) - 2D projection of count-normalized behavioral RDM
   - C1: Stimulus selection frequency (Experts) - choice histogram
   - C2: Stimulus selection frequency (Novices) - choice histogram
   - D: Behavioral-model RSA correlations - barplot comparing model fits
-  - E: Symmetric colorbar for RDM/DSM panels
+  - E: Symmetric diverging colorbar for the directional DSMs (A3, A4) in raw counts
+  - F: Non-negative colorbar for the behavioral RDMs (A1, A2) in [0, 1]
 
 Inputs
 ------
-- expert_behavioral_rdm.npy: Expert group behavioral RDM (40x40)
-- novice_behavioral_rdm.npy: Novice group behavioral RDM (40x40)
-- expert_directional_dsm.npy: Expert directional preference matrix (40x40)
-- novice_directional_dsm.npy: Novice directional preference matrix (40x40)
+- expert_behavioral_rdm.npy: Expert count-normalized behavioral RDM (40x40, [0, 1])
+- novice_behavioral_rdm.npy: Novice count-normalized behavioral RDM (40x40, [0, 1])
+- expert_directional_dsm_raw.npy: Expert raw signed pairwise preference counts
+- novice_directional_dsm_raw.npy: Novice raw signed pairwise preference counts
 - expert_mds_coords.npy: Expert MDS 2D coordinates (40x2)
 - novice_mds_coords.npy: Novice MDS 2D coordinates (40x2)
 - pairwise_data.pkl: Pairwise comparison data (expert_pairwise, novice_pairwise DataFrames)
 - correlation_results.pkl: RSA model correlation results with FDR correction
-
-Panel 2: Normalized Behavioral RSA (count-normalized RDMs)
-- File: figures/panels/behavioral_rsa_normalized_panel.pdf
-- Replicates Panel 1 using count-normalized RDMs where each cell is
-  divided by the total number of comparisons for that pair
-- Layout and content identical to Panel 1
 
 Dependencies
 ------------
@@ -67,6 +68,7 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 from common import load_stimulus_metadata, MODEL_ORDER, MODEL_LABELS_PRETTY
 from common import setup_script, log_script_end
@@ -88,12 +90,6 @@ from common.plotting import (
     create_standalone_colorbar,
     embed_figure_on_ax,
 )
-from common.rsa_utils import correlate_rdm_with_models
-from common.stats_utils import apply_fdr_correction
-from sklearn.manifold import MDS
-from analyses.behavioral.rdm_utils import normalize_matrix_by_frequency
-
-
 # =============================================================================
 # Configuration and results
 # =============================================================================
@@ -120,13 +116,19 @@ RESULTS_DIR = results_dir  # maintain variable name used below
 
 logger.info("Loading behavioral results...")
 
-# Load representational dissimilarity matrices (RDMs) and directional preference matrices (DSMs)
-# - RDMs: 40x40 matrices showing behavioral dissimilarity between all stimulus pairs
-# - DSMs: 40x40 matrices showing directional preference (which stimulus preferred over which)
-expert_rdm = np.load(RESULTS_DIR / "expert_behavioral_rdm.npy")      # Expert behavioral RDM
-novice_rdm = np.load(RESULTS_DIR / "novice_behavioral_rdm.npy")      # Novice behavioral RDM
-expert_dsm = np.load(RESULTS_DIR / "expert_directional_dsm.npy")     # Expert directional preferences
-novice_dsm = np.load(RESULTS_DIR / "novice_directional_dsm.npy")     # Novice directional preferences
+# Figure 1 mixes two scales: directional DSMs are shown as RAW signed
+# counts (their natural unit), while behavioral RDMs are shown on the
+# count-normalized [0, 1] fraction scale. Each gets its own colorbar so
+# the RDM panels do not look flat next to the wider DSM range.
+#
+# Figure 2 (further down) replaces the raw DSMs with the count-normalized
+# DSMs so every matrix sits on the per-pair fraction scale.
+expert_rdm = np.load(RESULTS_DIR / "expert_behavioral_rdm.npy")               # Expert count-normalized behavioral RDM (values in [0, 1])
+novice_rdm = np.load(RESULTS_DIR / "novice_behavioral_rdm.npy")               # Novice count-normalized behavioral RDM (values in [0, 1])
+expert_dsm = np.load(RESULTS_DIR / "expert_directional_dsm.npy")              # Expert count-normalized directional DSM (values in [-1, 1])
+novice_dsm = np.load(RESULTS_DIR / "novice_directional_dsm.npy")              # Novice count-normalized directional DSM (values in [-1, 1])
+expert_dsm_raw = np.load(RESULTS_DIR / "expert_directional_dsm_raw.npy")      # Expert raw signed pairwise preference counts
+novice_dsm_raw = np.load(RESULTS_DIR / "novice_directional_dsm_raw.npy")      # Novice raw signed pairwise preference counts
 
 # Load MDS embeddings (2D projections of behavioral RDMs)
 # Shape: (40, 2) - each stimulus has (x, y) coordinates in 2D space
@@ -158,17 +160,22 @@ nov_p_fdr_map = correlation_results.get("novice_p_fdr")            # Novice FDR-
 stimuli_df = load_stimulus_metadata()
 strat_colors, strat_alphas = compute_stimulus_palette(stimuli_df)
 
-# Compute global symmetric color scale for RDM/DSM panels
-# Use same vmin/vmax across all matrices for consistent color interpretation
-# Centered at 0 with symmetric range (diverging colormap)
-global_max_abs = max(
-    np.abs(expert_rdm).max(),    # Maximum absolute value in expert RDM
-    np.abs(novice_rdm).max(),    # Maximum absolute value in novice RDM
-    np.abs(expert_dsm).max(),    # Maximum absolute value in expert DSM
-    np.abs(novice_dsm).max()     # Maximum absolute value in novice DSM
-)
-behavioral_vmin = -global_max_abs  # Symmetric minimum
-behavioral_vmax = global_max_abs   # Symmetric maximum
+# --- Two color scales for Figure 1 ----------------------------------
+# Behavioral RDMs (A1, A2): count-normalized fractions. We pin the
+# colorbar at the full theoretical range [0, 1] (the user-facing
+# interpretation of "fraction of comparisons that disagreed") and use
+# the sequential colormap, since the RDM is non-negative.
+rdm_vmin = 0.0
+rdm_vmax = 1.0
+# Directional DSMs (A3, A4): RAW signed pairwise preference counts.
+# Plotted on a symmetric diverging scale.
+dsm_vmax = max(np.abs(expert_dsm_raw).max(), np.abs(novice_dsm_raw).max())
+dsm_vmin = -dsm_vmax
+# Retained aliases (the pylustrator layout code further down still refers
+# to ``behavioral_vmin / behavioral_vmax`` for the dominant colorbar);
+# point them at the DSM scale.
+behavioral_vmin = dsm_vmin
+behavioral_vmax = dsm_vmax
 
 logger.info("Behavioral data loaded successfully\n")
 
@@ -193,36 +200,35 @@ apply_nature_rc()
 fig = plt.figure(1)
 
 # -----------------------------------------------------------------------------
-# Panel A3: Directional Preference Matrix (Experts)
+# Panel A3: Directional Preference Matrix (Experts) - raw signed counts
 # -----------------------------------------------------------------------------
-# Shows directional preference dissimilarity: which stimuli are preferred over which
-# Matrix is 40x40, with positive values indicating preference asymmetry
-# Colors represent strategy types; uses symmetric diverging colormap
+# Shows raw signed pairwise preference counts: positive entries mean stimulus i
+# was preferred over j more often than the reverse. Symmetric diverging colormap.
 ax_A3 = plt.axes(); ax_A3.set_label('A3_DirPref_Experts')
 plot_rdm_on_ax(
     ax=ax_A3,
-    rdm=expert_dsm,                  # Expert directional preference matrix (40x40)
+    rdm=expert_dsm_raw,              # Expert raw directional preference matrix (40x40)
     colors=strat_colors,             # Strategy-based colors for matrix borders
     alphas=strat_alphas,             # Alpha values for each stimulus
-    vmin=behavioral_vmin,            # Symmetric minimum (for diverging colormap)
-    vmax=behavioral_vmax,            # Symmetric maximum
+    vmin=dsm_vmin,                   # Symmetric minimum (raw counts)
+    vmax=dsm_vmax,                   # Symmetric maximum
     show_colorbar=False,             # Colorbar shown separately in Panel E
 )
 set_axis_title(ax_A3, title="Directional preference", subtitle="Experts")
 ax_A3.set_xticks([]); ax_A3.set_yticks([])  # Hide tick labels (too many stimuli)
 
 # -----------------------------------------------------------------------------
-# Panel A4: Directional Preference Matrix (Novices)
+# Panel A4: Directional Preference Matrix (Novices) - raw signed counts
 # -----------------------------------------------------------------------------
 # Same as Panel A3, but for novices
 ax_A4 = plt.axes(); ax_A4.set_label('A4_DirPref_Novices')
 plot_rdm_on_ax(
     ax=ax_A4,
-    rdm=novice_dsm,                  # Novice directional preference matrix (40x40)
+    rdm=novice_dsm_raw,              # Novice raw directional preference matrix (40x40)
     colors=strat_colors,             # Strategy-based colors for matrix borders
     alphas=strat_alphas,             # Alpha values for each stimulus
-    vmin=behavioral_vmin,            # Symmetric minimum (for diverging colormap)
-    vmax=behavioral_vmax,            # Symmetric maximum
+    vmin=dsm_vmin,                   # Symmetric minimum (raw counts)
+    vmax=dsm_vmax,                   # Symmetric maximum
     show_colorbar=False,             # Colorbar shown separately in Panel E
 )
 set_axis_title(ax_A4, title="Directional preference", subtitle="Novices")
@@ -231,17 +237,18 @@ ax_A4.set_xticks([]); ax_A4.set_yticks([])  # Hide tick labels (too many stimuli
 # -----------------------------------------------------------------------------
 # Panel A1: Behavioral RDM (Experts)
 # -----------------------------------------------------------------------------
-# Shows behavioral representational dissimilarity matrix
-# Matrix is 40x40, with higher values indicating more dissimilar behavioral responses
+# Shows count-normalized behavioral representational dissimilarity matrix.
+# Values lie in [0, 1]; the colorbar (Panel F) is pinned to that range and
+# uses the positive half of CMAP_BRAIN.
 ax_A1 = plt.axes(); ax_A1.set_label('A1_RDM_Experts')
 plot_rdm_on_ax(
     ax=ax_A1,
-    rdm=expert_rdm,                  # Expert behavioral RDM (40x40)
+    rdm=expert_rdm,                  # Expert count-normalized behavioral RDM (40x40)
     colors=strat_colors,             # Strategy-based colors for matrix borders
     alphas=strat_alphas,             # Alpha values for each stimulus
-    vmin=behavioral_vmin,            # Symmetric minimum (for diverging colormap)
-    vmax=behavioral_vmax,            # Symmetric maximum
-    show_colorbar=False,             # Colorbar shown separately in Panel E
+    vmin=rdm_vmin,                   # 0 (RDM lower bound)
+    vmax=rdm_vmax,                   # 1 (RDM upper bound)
+    show_colorbar=False,             # Dedicated RDM colorbar in Panel F
 )
 set_axis_title(ax_A1, title="Behavioral RDM", subtitle="Experts")
 ax_A1.set_xticks([]); ax_A1.set_yticks([])  # Hide tick labels (too many stimuli)
@@ -253,12 +260,12 @@ ax_A1.set_xticks([]); ax_A1.set_yticks([])  # Hide tick labels (too many stimuli
 ax_A2 = plt.axes(); ax_A2.set_label('A2_RDM_Novices')
 plot_rdm_on_ax(
     ax=ax_A2,
-    rdm=novice_rdm,                  # Novice behavioral RDM (40x40)
+    rdm=novice_rdm,                  # Novice count-normalized behavioral RDM (40x40)
     colors=strat_colors,             # Strategy-based colors for matrix borders
     alphas=strat_alphas,             # Alpha values for each stimulus
-    vmin=behavioral_vmin,            # Symmetric minimum (for diverging colormap)
-    vmax=behavioral_vmax,            # Symmetric maximum
-    show_colorbar=False,             # Colorbar shown separately in Panel E
+    vmin=rdm_vmin,                   # 0 (RDM lower bound)
+    vmax=rdm_vmax,                   # 1 (RDM upper bound)
+    show_colorbar=False,             # Dedicated RDM colorbar in Panel F
 )
 set_axis_title(ax_A2, title="Behavioral RDM", subtitle="Novices")
 ax_A2.set_xticks([]); ax_A2.set_yticks([])  # Hide tick labels (too many stimuli)
@@ -441,22 +448,56 @@ plot_grouped_bars_on_ax(
 # Apply centralized axis limits BEFORE Pylustrator adjustments (DRY principle)
 ax_D.set_ylim(*PLOT_YLIMITS['behavioral_rsa_models'])  # Centralized RSA model correlation limits
 
+# Independent label-to-tick paddings (in points): the rotation flip
+# between left-side (rotation=90) and right-side (rotation=270) labels
+# means the same labelpad value does NOT give the same visual gap, so
+# the two colorbars use different values that produce equal spacing.
+_CBAR_LABEL_PAD_LEFT = 5    # Panel E (DSM, ticks "−22 / 0 / 22")
+_CBAR_LABEL_PAD_RIGHT = 32  # Panel F (RDM, ticks "0 / .50 / 1")
+
 # -----------------------------------------------------------------------------
-# Panel E: Symmetric Colorbar for RDM/DSM Panels
+# Panel E: Symmetric colorbar for the Directional Preference matrices (A3, A4)
 # -----------------------------------------------------------------------------
-# Standalone colorbar showing the symmetric color scale used in Panels A1-A4
-# Centered at 0 with diverging colormap (blue-white-red)
+# Symmetric diverging scale in raw signed counts.
 ax_E = plt.axes(); ax_E.set_label('E_RDM_Colorbar')
 cbar_fig = create_standalone_colorbar(
-    cmap=CMAP_BRAIN,                 # Diverging colormap (blue-white-red)
-    vmin=behavioral_vmin,            # Symmetric minimum
-    vmax=behavioral_vmax,            # Symmetric maximum
+    cmap=CMAP_BRAIN,                 # Diverging colormap (cyan-white-purple)
+    vmin=dsm_vmin,                   # -max |dsm_raw|
+    vmax=dsm_vmax,                   # +max |dsm_raw|
     orientation='vertical',          # Vertical colorbar
-    label='Preference',              # Colorbar label
+    label='Directional preference\n(raw counts)',
     params=PLOT_PARAMS,
-    tick_position='left'             # Ticks on left side
+    tick_position='left',            # Ticks on left side
+    label_pad=_CBAR_LABEL_PAD_LEFT,
 )
 embed_figure_on_ax(ax_E, cbar_fig, title='')  # Embed colorbar figure on axis
+
+# -----------------------------------------------------------------------------
+# Panel F: Non-negative colorbar for the Behavioral RDMs (A1, A2)
+# -----------------------------------------------------------------------------
+# The RDMs are count-normalized fractions in ``[0, 1]``. ``plot_rdm_on_ax``
+# delegates to ``sns.heatmap`` with ``center=0``, which auto-slices
+# CMAP_BRAIN to its upper half whenever the data sit on one side of the
+# center -- so the matrix panels show only the white -> purple half of
+# the diverging colormap. ``create_standalone_colorbar`` does not do that
+# trick on its own, so we explicitly truncate CMAP_BRAIN to its upper
+# half before handing it to the colorbar; otherwise the colorbar would
+# show the full diverging map stretched into ``[0, 1]`` and the visual
+# language would not match the heatmaps.
+_CMAP_BRAIN_POS = mcolors.ListedColormap(CMAP_BRAIN(np.linspace(0.5, 1.0, 256)))
+ax_F = plt.axes(); ax_F.set_label('F_RDM_Colorbar_Normalized')
+cbar_fig_rdm = create_standalone_colorbar(
+    cmap=_CMAP_BRAIN_POS,
+    vmin=rdm_vmin,                   # 0 (RDM lower bound)
+    vmax=rdm_vmax,                   # 1 (RDM upper bound)
+    orientation='vertical',
+    label='Behavioral RDM\n(normalized by pair count)',
+    params=PLOT_PARAMS,
+    tick_position='right',           # Mirror Panel E so the label sits to the right
+    label_pad=_CBAR_LABEL_PAD_RIGHT,
+    drop_leading_zero=True,          # Show ".50" instead of "0.50"
+)
+embed_figure_on_ax(ax_F, cbar_fig_rdm, title='')
 
 
 # =============================================================================
@@ -477,24 +518,25 @@ fig.ax_dict = {ax.get_label(): ax for ax in fig.axes}
 
 #% start: automatic generated code from pylustrator
 plt.figure(1).ax_dict = {ax.get_label(): ax for ax in plt.figure(1).axes}
+import matplotlib as mpl
 getattr(plt.figure(1), '_pylustrator_init', lambda: ...)()
 plt.figure(1).set_size_inches(cm_to_inches(16.82), cm_to_inches(15.61), forward=True)
-plt.figure(1).ax_dict["A1_RDM_Experts"].set(position=[0.3841, 0.6819, 0.2196, 0.2361])
+plt.figure(1).ax_dict["A1_RDM_Experts"].set(position=[0.3632, 0.6819, 0.2183, 0.2361])
 plt.figure(1).ax_dict["A1_RDM_Experts"].texts[0].set(position=(0.5, 1.064))
 plt.figure(1).ax_dict["A1_RDM_Experts"].texts[1].set(position=(0.5, 1.016))
-plt.figure(1).ax_dict["A2_RDM_Novices"].set(position=[0.3841, 0.3773, 0.2196, 0.2361])
+plt.figure(1).ax_dict["A2_RDM_Novices"].set(position=[0.3632, 0.3773, 0.2183, 0.2361])
 plt.figure(1).ax_dict["A2_RDM_Novices"].texts[0].set(position=(0.5, 1.067))
 plt.figure(1).ax_dict["A2_RDM_Novices"].texts[1].set(position=(0.5, 1.016))
-plt.figure(1).ax_dict["A3_DirPref_Experts"].set(position=[0.1125, 0.6819, 0.2196, 0.2361])
+plt.figure(1).ax_dict["A3_DirPref_Experts"].set(position=[0.1009, 0.6819, 0.2183, 0.2361])
 plt.figure(1).ax_dict["A3_DirPref_Experts"].texts[0].set(position=(0.5, 1.065))
 plt.figure(1).ax_dict["A3_DirPref_Experts"].texts[1].set(position=(0.5, 1.016))
-plt.figure(1).ax_dict["A4_DirPref_Novices"].set(position=[0.1125, 0.3773, 0.2196, 0.2361])
+plt.figure(1).ax_dict["A4_DirPref_Novices"].set(position=[0.1009, 0.3773, 0.2183, 0.2361])
 plt.figure(1).ax_dict["A4_DirPref_Novices"].texts[0].set(position=(0.5, 1.067))
 plt.figure(1).ax_dict["A4_DirPref_Novices"].texts[1].set(position=(0.5, 1.016))
-plt.figure(1).ax_dict["B1_MDS_Experts"].set(position=[0.6689, 0.6854, 0.2815, 0.2327])
+plt.figure(1).ax_dict["B1_MDS_Experts"].set(position=[0.7035, 0.6853, 0.2815, 0.2327])
 plt.figure(1).ax_dict["B1_MDS_Experts"].texts[0].set(position=(0.5, 1.069))
-plt.figure(1).ax_dict["B1_MDS_Experts"].texts[1].set(position=(0.5, 1.018))
-plt.figure(1).ax_dict["B2_MDS_Novices"].set(position=[0.6689, 0.3807, 0.2815, 0.2327])
+plt.figure(1).ax_dict["B1_MDS_Experts"].texts[1].set(position=(0.5, 1.022))
+plt.figure(1).ax_dict["B2_MDS_Novices"].set(position=[0.7035, 0.3806, 0.2815, 0.2327])
 plt.figure(1).ax_dict["B2_MDS_Novices"].texts[0].set(position=(0.5, 1.071))
 plt.figure(1).ax_dict["B2_MDS_Novices"].texts[1].set(position=(0.5, 1.018))
 plt.figure(1).ax_dict["C1_Choice_Experts"].set(position=[0.04475, 0.2642, 0.204, 0.1883], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], yticks=[0., 100., 200., 300., 400.], yticklabels=['0', '100', '200', '300', '400'])
@@ -515,6 +557,7 @@ plt.figure(1).ax_dict["D_RSA_Models"].yaxis.labelpad = -0.262108
 plt.figure(1).ax_dict["D_RSA_Models"].texts[3].set(position=(0.5, 1.046))
 plt.figure(1).ax_dict["D_RSA_Models"].texts[4].set(position=(0.5, 0.9879))
 plt.figure(1).ax_dict["E_RDM_Colorbar"].set(position=[-0.00199, 0.4756, 0.08187, 0.3358])
+plt.figure(1).ax_dict["F_RDM_Colorbar_Normalized"].set(position=[0.5902, 0.5216, 0.07953, 0.2439])
 plt.figure(1).text(0.0959, 0.9421, 'a', transform=plt.figure(1).transFigure, fontsize=8., weight='bold')  # id=plt.figure(1).texts[0].new
 plt.figure(1).text(0.6620, 0.9421, 'b', transform=plt.figure(1).transFigure, fontsize=8., weight='bold')  # id=plt.figure(1).texts[1].new
 plt.figure(1).text(0.0340, 0.3347, 'c', transform=plt.figure(1).transFigure, fontsize=8., weight='bold')  # id=plt.figure(1).texts[2].new
@@ -541,225 +584,5 @@ save_axes_svgs(fig, FIGURES_DIR, 'behavioral')  # e.g., behavioral_A1_RDM_Expert
 save_panel_pdf(fig, FIGURES_DIR / 'panels' / 'behavioral_rsa_panel.pdf')
 
 logger.info("✓ Panel: behavioral RSA panels complete")
-
-
-# =============================================================================
-# Figure 2: Normalized RDM Panel (identical layout, count-normalized RDMs)
-# =============================================================================
-# This panel replicates the standard behavioral RSA figure above, but uses
-# count-normalized RDMs where each cell is divided by the total number of
-# comparisons for that pair:
-#   RDM_norm[i,j] = |count(i>j) - count(j>i)| / (count(i>j) + count(j>i))
-# This removes the exposure confound (pairs compared more often no longer
-# have mechanically higher dissimilarity). Values range from 0 (perfectly
-# tied) to 1 (perfectly consistent preference).
-#
-# The directional DSM is similarly normalized:
-#   DSM_norm[i,j] = (count(i>j) - count(j>i)) / (count(i>j) + count(j>i))
-
-logger.info("\nBuilding normalized RDM panel...")
-
-# Compute normalized RDMs and DSMs
-expert_rdm_norm = normalize_matrix_by_frequency(expert_pairwise, expert_rdm)
-novice_rdm_norm = normalize_matrix_by_frequency(novice_pairwise, novice_rdm)
-expert_dsm_norm = normalize_matrix_by_frequency(expert_pairwise, expert_dsm)
-novice_dsm_norm = normalize_matrix_by_frequency(novice_pairwise, novice_dsm)
-
-# Symmetric color scale for normalized matrices
-norm_max = max(
-    np.abs(expert_rdm_norm).max(), np.abs(novice_rdm_norm).max(),
-    np.abs(expert_dsm_norm).max(), np.abs(novice_dsm_norm).max(),
-)
-norm_vmin, norm_vmax = -norm_max, norm_max
-
-# MDS on normalized RDMs
-mds_norm = MDS(n_components=2, dissimilarity="precomputed", random_state=CONFIG['RANDOM_SEED'])
-expert_mds_norm = mds_norm.fit_transform(expert_rdm_norm)
-novice_mds_norm = mds_norm.fit_transform(novice_rdm_norm)
-
-# Correlate normalized RDMs with models
-model_columns = CONFIG['MODEL_COLUMNS']
-norm_exp_corrs, _ = correlate_rdm_with_models(
-    expert_rdm_norm, {col: stimuli_df[col].values for col in model_columns},
-    categorical_features=model_columns, continuous_features=[])
-norm_nov_corrs, _ = correlate_rdm_with_models(
-    novice_rdm_norm, {col: stimuli_df[col].values for col in model_columns},
-    categorical_features=model_columns, continuous_features=[])
-
-# FDR correction
-norm_exp_p_raw = np.array([p for (_, _, p, _, _) in norm_exp_corrs])
-norm_nov_p_raw = np.array([p for (_, _, p, _, _) in norm_nov_corrs])
-_, norm_exp_fdr = apply_fdr_correction(norm_exp_p_raw)
-_, norm_nov_fdr = apply_fdr_correction(norm_nov_p_raw)
-norm_exp_fdr_map = {name: float(pf) for (name, _, _, _, _), pf in zip(norm_exp_corrs, norm_exp_fdr)}
-norm_nov_fdr_map = {name: float(pf) for (name, _, _, _, _), pf in zip(norm_nov_corrs, norm_nov_fdr)}
-
-# --- Build figure 2 using same plt.axes() pattern as figure 1 ---
-# This allows pylustrator to manage the layout interactively.
-
-fig2 = plt.figure(2)
-
-# Normalized DSM Experts
-ax_nA3 = plt.axes(); ax_nA3.set_label('nA3_NormDirPref_Experts')
-plot_rdm_on_ax(ax=ax_nA3, rdm=expert_dsm_norm, colors=strat_colors, alphas=strat_alphas,
-               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
-set_axis_title(ax_nA3, title="Directional preference", subtitle="Experts")
-ax_nA3.set_xticks([]); ax_nA3.set_yticks([])
-
-# Normalized DSM Novices
-ax_nA4 = plt.axes(); ax_nA4.set_label('nA4_NormDirPref_Novices')
-plot_rdm_on_ax(ax=ax_nA4, rdm=novice_dsm_norm, colors=strat_colors, alphas=strat_alphas,
-               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
-set_axis_title(ax_nA4, title="Directional preference", subtitle="Novices")
-ax_nA4.set_xticks([]); ax_nA4.set_yticks([])
-
-# Normalized RDM Experts
-ax_nA1 = plt.axes(); ax_nA1.set_label('nA1_NormRDM_Experts')
-plot_rdm_on_ax(ax=ax_nA1, rdm=expert_rdm_norm, colors=strat_colors, alphas=strat_alphas,
-               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
-set_axis_title(ax_nA1, title="Behavioral RDM", subtitle="Experts")
-ax_nA1.set_xticks([]); ax_nA1.set_yticks([])
-
-# Normalized RDM Novices
-ax_nA2 = plt.axes(); ax_nA2.set_label('nA2_NormRDM_Novices')
-plot_rdm_on_ax(ax=ax_nA2, rdm=novice_rdm_norm, colors=strat_colors, alphas=strat_alphas,
-               vmin=norm_vmin, vmax=norm_vmax, show_colorbar=False)
-set_axis_title(ax_nA2, title="Behavioral RDM", subtitle="Novices")
-ax_nA2.set_xticks([]); ax_nA2.set_yticks([])
-
-# MDS Experts (normalized)
-ax_nB1 = plt.axes(); ax_nB1.set_label('nB1_NormMDS_Experts')
-plot_2d_embedding_on_ax(ax=ax_nB1, coords=expert_mds_norm, point_colors=strat_colors,
-                         point_alphas=strat_alphas, params=PLOT_PARAMS,
-                         hide_tick_marks=True, x_label='Dimension 1', y_label='Dimension 2')
-set_axis_title(ax_nB1, title="MDS embedding", subtitle="Experts")
-
-# MDS Novices (normalized)
-ax_nB2 = plt.axes(); ax_nB2.set_label('nB2_NormMDS_Novices')
-plot_2d_embedding_on_ax(ax=ax_nB2, coords=novice_mds_norm, point_colors=strat_colors,
-                         point_alphas=strat_alphas, params=PLOT_PARAMS,
-                         hide_tick_marks=True, x_label='Dimension 1', y_label='Dimension 2')
-set_axis_title(ax_nB2, title="MDS embedding", subtitle="Novices")
-
-# Selection frequency (same data — not affected by normalization)
-ax_nC1 = plt.axes(); ax_nC1.set_label('nC1_NormChoice_Experts')
-plot_counts_on_ax(ax=ax_nC1, x_values=frequency_exp.index, counts=frequency_exp.values,
-                   colors=strat_colors[:len(frequency_exp)], alphas=strat_alphas[:len(frequency_exp)],
-                   xlabel='Stimulus ID', ylabel='Selection count',
-                   title='Stimulus selection frequency', subtitle='Experts',
-                   legend=legend_items, params=PLOT_PARAMS)
-ax_nC1.set_xlim(-1, 41); ax_nC1.set_ylim(*PLOT_YLIMITS['behavioral_choice_counts'])
-
-ax_nC2 = plt.axes(); ax_nC2.set_label('nC2_NormChoice_Novices')
-plot_counts_on_ax(ax=ax_nC2, x_values=frequency_nov.index, counts=frequency_nov.values,
-                   colors=strat_colors[:len(frequency_nov)], alphas=strat_alphas[:len(frequency_nov)],
-                   xlabel='Stimulus ID', ylabel='Selection count',
-                   title='Stimulus selection frequency', subtitle='Novices',
-                   legend=legend_items, params=PLOT_PARAMS)
-ax_nC2.set_xlim(-1, 41); ax_nC2.set_ylim(*PLOT_YLIMITS['behavioral_choice_counts'])
-
-# RSA correlations for normalized RDMs
-ax_nD = plt.axes(); ax_nD.set_label('nD_NormRSA_Models')
-
-nr_exp = [res[1] for res in norm_exp_corrs]
-nci_exp = [(res[3], res[4]) for res in norm_exp_corrs]
-np_exp = [norm_exp_fdr_map.get(res[0], res[2]) for res in norm_exp_corrs]
-nr_nov = [res[1] for res in norm_nov_corrs]
-nci_nov = [(res[3], res[4]) for res in norm_nov_corrs]
-np_nov = [norm_nov_fdr_map.get(res[0], res[2]) for res in norm_nov_corrs]
-
-column_labels_n = [res[0] for res in norm_exp_corrs]
-idx_order_n = [column_labels_n.index(lbl) for lbl in MODEL_ORDER]
-
-plot_grouped_bars_on_ax(
-    ax=ax_nD, x_positions=np.arange(len(MODEL_LABELS_PRETTY)),
-    group1_values=[nr_exp[i] for i in idx_order_n],
-    group1_cis=[nci_exp[i] for i in idx_order_n],
-    group1_color=COLORS_EXPERT_NOVICE['expert'],
-    group2_values=[nr_nov[i] for i in idx_order_n],
-    group2_cis=[nci_nov[i] for i in idx_order_n],
-    group2_color=COLORS_EXPERT_NOVICE['novice'],
-    group1_label="Experts", group2_label="Novices",
-    group1_pvals=[np_exp[i] for i in idx_order_n],
-    group2_pvals=[np_nov[i] for i in idx_order_n],
-    ylim=PLOT_YLIMITS['behavioral_rsa_models'],
-    y_label=PLOT_PARAMS['ylabel_correlation_r'],
-    title="Behavioral-model RSA", subtitle="FDR corrected",
-    xtick_labels=MODEL_LABELS_PRETTY, x_tick_rotation=0, x_tick_align='center',
-    show_legend=True, legend_loc='upper left',
-    visible_spines=['left', 'bottom'], params=PLOT_PARAMS,
-)
-ax_nD.set_ylim(*PLOT_YLIMITS['behavioral_rsa_models'])
-
-# Colorbar
-ax_nE = plt.axes(); ax_nE.set_label('nE_NormColorbar')
-cbar_fig2 = create_standalone_colorbar(cmap=CMAP_BRAIN, vmin=norm_vmin, vmax=norm_vmax,
-                                        orientation='vertical', label='Preference\n(normalized by pair count)',
-                                        params=PLOT_PARAMS, tick_position='left')
-embed_figure_on_ax(ax_nE, cbar_fig2, title='')
-
-# Enable pylustrator layout for figure 2
-fig2.ax_dict = {ax.get_label(): ax for ax in fig2.axes}
-
-#% start: automatic generated code from pylustrator
-plt.figure(2).ax_dict = {ax.get_label(): ax for ax in plt.figure(2).axes}
-getattr(plt.figure(2), '_pylustrator_init', lambda: ...)()
-plt.figure(2).set_size_inches(cm_to_inches(16.82), cm_to_inches(15.61), forward=True)
-plt.figure(2).ax_dict["nA1_NormRDM_Experts"].set(position=[0.3841, 0.6819, 0.2196, 0.2361])
-plt.figure(2).ax_dict["nA1_NormRDM_Experts"].texts[0].set(position=(0.5, 1.064))
-plt.figure(2).ax_dict["nA1_NormRDM_Experts"].texts[1].set(position=(0.5, 1.016))
-plt.figure(2).ax_dict["nA2_NormRDM_Novices"].set(position=[0.3841, 0.3773, 0.2196, 0.2361])
-plt.figure(2).ax_dict["nA2_NormRDM_Novices"].texts[0].set(position=(0.5, 1.067))
-plt.figure(2).ax_dict["nA2_NormRDM_Novices"].texts[1].set(position=(0.5, 1.016))
-plt.figure(2).ax_dict["nA3_NormDirPref_Experts"].set(position=[0.1125, 0.6819, 0.2196, 0.2361])
-plt.figure(2).ax_dict["nA3_NormDirPref_Experts"].texts[0].set(position=(0.5, 1.065))
-plt.figure(2).ax_dict["nA3_NormDirPref_Experts"].texts[1].set(position=(0.5, 1.016))
-plt.figure(2).ax_dict["nA4_NormDirPref_Novices"].set(position=[0.1125, 0.3773, 0.2196, 0.2361])
-plt.figure(2).ax_dict["nA4_NormDirPref_Novices"].texts[0].set(position=(0.5, 1.067))
-plt.figure(2).ax_dict["nA4_NormDirPref_Novices"].texts[1].set(position=(0.5, 1.016))
-plt.figure(2).ax_dict["nB1_NormMDS_Experts"].set(position=[0.6689, 0.6854, 0.2815, 0.2327])
-plt.figure(2).ax_dict["nB1_NormMDS_Experts"].texts[0].set(position=(0.5, 1.069))
-plt.figure(2).ax_dict["nB1_NormMDS_Experts"].texts[1].set(position=(0.5, 1.018))
-plt.figure(2).ax_dict["nB2_NormMDS_Novices"].set(position=[0.6689, 0.3807, 0.2815, 0.2327])
-plt.figure(2).ax_dict["nB2_NormMDS_Novices"].texts[0].set(position=(0.5, 1.071))
-plt.figure(2).ax_dict["nB2_NormMDS_Novices"].texts[1].set(position=(0.5, 1.018))
-plt.figure(2).ax_dict["nC1_NormChoice_Experts"].set(position=[0.04475, 0.2642, 0.204, 0.1883], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], yticks=[0., 100., 200., 300., 400., 500.], yticklabels=['0', '100', '200', '300', '400', '500'])
-plt.figure(2).ax_dict["nC1_NormChoice_Experts"].set_position([0.065104, 0.073662, 0.296728, 0.237033])
-plt.figure(2).ax_dict["nC1_NormChoice_Experts"].get_legend().set(visible=True)
-plt.figure(2).ax_dict["nC1_NormChoice_Experts"].texts[0].set(position=(0.5, 1.046))
-plt.figure(2).ax_dict["nC1_NormChoice_Experts"].texts[1].set(position=(0.5, 0.9879))
-plt.figure(2).ax_dict["nC2_NormChoice_Novices"].set(position=[0.2739, 0.2642, 0.204, 0.186], xticks=[0., 19., 39.], xticklabels=['1', '20', ' 40'], ylabel='', yticks=[0., 100., 200., 300., 400., 500.], yticklabels=['0', '100', '200', '300', '400', '500'])
-plt.figure(2).ax_dict["nC2_NormChoice_Novices"].set_position([0.398501, 0.073662, 0.296728, 0.234166])
-plt.figure(2).ax_dict["nC2_NormChoice_Novices"].get_legend().set(visible=False)
-plt.figure(2).ax_dict["nC2_NormChoice_Novices"].texts[0].set(position=(0.5, 1.059))
-plt.figure(2).ax_dict["nC2_NormChoice_Novices"].texts[1].set(position=(0.5, 1.))
-plt.figure(2).ax_dict["nC2_NormChoice_Novices"].get_yaxis().get_label().set(text='')
-plt.figure(2).ax_dict["nD_NormRSA_Models"].set(position=[0.5179, 0.2653, 0.1387, 0.1871], xticks=[0., 1., 2.])
-plt.figure(2).ax_dict["nD_NormRSA_Models"].set_position([0.753374, 0.075104, 0.201763, 0.235536])
-plt.figure(2).ax_dict["nD_NormRSA_Models"].spines[['right', 'top']].set_visible(False)
-plt.figure(2).ax_dict["nD_NormRSA_Models"].yaxis.labelpad = -0.262108
-plt.figure(2).ax_dict["nD_NormRSA_Models"].texts[3].set(position=(0.5, 1.046))
-plt.figure(2).ax_dict["nD_NormRSA_Models"].texts[4].set(position=(0.5, 0.9879))
-plt.figure(2).ax_dict["nE_NormColorbar"].set(position=[-0.00199, 0.4756, 0.08187, 0.3358])
-plt.figure(2).text(0.0959, 0.9421, 'a', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
-plt.figure(2).text(0.6620, 0.9421, 'b', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
-plt.figure(2).text(0.0340, 0.3347, 'c', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
-plt.figure(2).text(0.7288, 0.3347, 'd', transform=plt.figure(2).transFigure, fontsize=8., weight='bold')
-#% end: automatic generated code from pylustrator
-
-# Save normalized panel
-save_axes_svgs(fig2, FIGURES_DIR, 'behavioral_normalized')
-save_panel_pdf(fig2, FIGURES_DIR / 'panels' / 'behavioral_rsa_normalized_panel.pdf')
-
-# Log normalized correlation results
-logger.info("\n  Normalized RSA correlations:")
-for (name, r, p, ci_l, ci_u) in norm_exp_corrs:
-    fdr_p = norm_exp_fdr_map.get(name, p)
-    logger.info(f"    Expert {name}: r={r:.3f}, pFDR={fdr_p:.4e}, CI=[{ci_l:.3f}, {ci_u:.3f}]")
-for (name, r, p, ci_l, ci_u) in norm_nov_corrs:
-    fdr_p = norm_nov_fdr_map.get(name, p)
-    logger.info(f"    Novice {name}: r={r:.3f}, pFDR={fdr_p:.4e}, CI=[{ci_l:.3f}, {ci_u:.3f}]")
-
-logger.info("✓ Panel: normalized behavioral RSA panels complete")
 
 log_script_end(logger)

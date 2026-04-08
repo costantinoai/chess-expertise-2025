@@ -48,6 +48,7 @@ from analyses.behavioral.rdm_utils import (
     compute_symmetric_rdm,
     compute_normalized_rdm,
     compute_directional_dsm,
+    compute_normalized_dsm,
     correlate_with_all_models,
 )
 
@@ -99,7 +100,7 @@ def analyze_group(
     category_df: pd.DataFrame,
     expertise_label: str,
 ):
-    """Compute RDMs, DSM, and model correlations for one group."""
+    """Compute RDMs, DSMs (raw + normalized), and model correlations for one group."""
     logger.info(f"Analyzing {expertise_label} group...")
     logger.info(f"  {len(group_pairs)} unique pairwise comparisons")
 
@@ -109,8 +110,11 @@ def analyze_group(
     group_rdm = compute_normalized_rdm(group_pairs)
     logger.info("  Computed count-normalized behavioral RDM (primary)")
 
-    group_dsm = compute_directional_dsm(group_pairs)
-    logger.info("  Computed directional DSM")
+    group_dsm_raw = compute_directional_dsm(group_pairs)
+    logger.info("  Computed raw-count directional DSM")
+
+    group_dsm = compute_normalized_dsm(group_pairs)
+    logger.info("  Computed count-normalized directional DSM (primary)")
 
     correlation_results, model_rdms = correlate_with_all_models(
         group_rdm, category_df, CONFIG["MODEL_COLUMNS"]
@@ -122,7 +126,14 @@ def analyze_group(
             f"    {col}: r={r:.3f}, p={p:.3e}, 95%CI=[{ci_l:.3f}, {ci_u:.3f}]"
         )
 
-    return group_rdm, group_rdm_raw, group_dsm, correlation_results, model_rdms
+    return (
+        group_rdm,
+        group_rdm_raw,
+        group_dsm,
+        group_dsm_raw,
+        correlation_results,
+        model_rdms,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -155,25 +166,40 @@ logger.info("Loading stimulus categories for model RDMs...")
 category_df = load_stimulus_metadata()
 logger.info(f"Loaded categories for {len(category_df)} stimuli")
 
-expert_rdm, expert_rdm_raw, expert_dsm, expert_correlations, expert_model_rdms = analyze_group(
-    expert_pairwise, category_df, "Experts"
-)
-novice_rdm, novice_rdm_raw, novice_dsm, novice_correlations, novice_model_rdms = analyze_group(
-    novice_pairwise, category_df, "Novices"
-)
+(
+    expert_rdm,
+    expert_rdm_raw,
+    expert_dsm,
+    expert_dsm_raw,
+    expert_correlations,
+    expert_model_rdms,
+) = analyze_group(expert_pairwise, category_df, "Experts")
+(
+    novice_rdm,
+    novice_rdm_raw,
+    novice_dsm,
+    novice_dsm_raw,
+    novice_correlations,
+    novice_model_rdms,
+) = analyze_group(novice_pairwise, category_df, "Novices")
 
 # ---------------------------------------------------------------------------
 # Save results
 # ---------------------------------------------------------------------------
 logger.info(f"Saving results under {OUTPUT_DIR}...")
 
-np.save(OUTPUT_DIR / "expert_behavioral_rdm.npy", expert_rdm)
-np.save(OUTPUT_DIR / "novice_behavioral_rdm.npy", novice_rdm)
-np.save(OUTPUT_DIR / "expert_behavioral_rdm_raw.npy", expert_rdm_raw)
-np.save(OUTPUT_DIR / "novice_behavioral_rdm_raw.npy", novice_rdm_raw)
-np.save(OUTPUT_DIR / "expert_directional_dsm.npy", expert_dsm)
-np.save(OUTPUT_DIR / "novice_directional_dsm.npy", novice_dsm)
-logger.info("  Saved behavioral RDMs (normalized + raw) and DSMs")
+# Behavioral RDMs (symmetric, |count(i>j) - count(j>i)| / total)
+np.save(OUTPUT_DIR / "expert_behavioral_rdm.npy", expert_rdm)            # normalized (primary)
+np.save(OUTPUT_DIR / "novice_behavioral_rdm.npy", novice_rdm)            # normalized (primary)
+np.save(OUTPUT_DIR / "expert_behavioral_rdm_raw.npy", expert_rdm_raw)    # raw signed counts
+np.save(OUTPUT_DIR / "novice_behavioral_rdm_raw.npy", novice_rdm_raw)    # raw signed counts
+
+# Directional DSMs (antisymmetric, (count(i>j) - count(j>i)) / total)
+np.save(OUTPUT_DIR / "expert_directional_dsm.npy", expert_dsm)           # normalized (primary)
+np.save(OUTPUT_DIR / "novice_directional_dsm.npy", novice_dsm)           # normalized (primary)
+np.save(OUTPUT_DIR / "expert_directional_dsm_raw.npy", expert_dsm_raw)   # raw signed counts
+np.save(OUTPUT_DIR / "novice_directional_dsm_raw.npy", novice_dsm_raw)   # raw signed counts
+logger.info("  Saved behavioral RDMs and directional DSMs (normalized + raw)")
 
 logger.info("Computing 2D MDS embeddings for Experts and Novices...")
 mds = MDS(
