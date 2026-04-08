@@ -4,11 +4,22 @@ from pathlib import Path
 from typing import Dict, List
 
 
-# Canonical RSA targets (keys → display labels)
+# Canonical RSA targets (keys → display labels). The dict KEY is the
+# label used in repo-side code; the matching BIDS ``desc-`` entity may
+# differ because BIDS entity values cannot contain underscores
+# (so ``visual_similarity`` becomes ``visualSimilarity`` in filenames).
 RSA_TARGETS: Dict[str, str] = {
     'visual_similarity': 'Visual Similarity',
     'strategy': 'Strategy',
     'checkmate': 'Checkmate',
+}
+
+# Map an internal target key onto the BIDS ``desc-`` entity value used
+# inside the per-subject searchlight filenames.
+_BIDS_DESC_FOR_TARGET: Dict[str, str] = {
+    'visual_similarity': 'visualSimilarity',
+    'strategy':          'strategy',
+    'checkmate':         'checkmate',
 }
 
 
@@ -16,10 +27,15 @@ def _candidates_for_target(subject_id: str, target_key: str, base_dir: Path) -> 
     """
     Build strict candidate paths for a subject RSA r-map.
 
-    Files are expected like: sub-XX/sub-XX_desc-searchlight_<target>_stat-r_map.(nii|nii.gz)
+    Files live at:
+    ``sub-XX/sub-XX_space-MNI152NLin2009cAsym_desc-<bids_desc>_stat-r_searchlight.nii.gz``
     """
     subject_dir = Path(base_dir) / subject_id
-    stem = f"{subject_id}_desc-searchlight_{target_key}_stat-r_map"
+    bids_desc = _BIDS_DESC_FOR_TARGET[target_key]
+    stem = (
+        f"{subject_id}_space-MNI152NLin2009cAsym"
+        f"_desc-{bids_desc}_stat-r_searchlight"
+    )
     pats = [
         subject_dir / f"{stem}.nii.gz",
     ]
