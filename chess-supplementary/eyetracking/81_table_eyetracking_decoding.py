@@ -99,8 +99,9 @@ results_dir, logger, dirs = setup_script(
 )
 RESULTS_DIR = results_dir
 
-# Output directory for tables (created by find_latest_results_directory)
-tables_dir = RESULTS_DIR / 'tables'
+# Output directory for tables (lives at results/<analysis>/tables/, not
+# results/<analysis>/data/tables/ — setup_script already resolved it).
+tables_dir = dirs['tables']
 
 # ============================================================================
 # Helper Function: Build Metric Rows
