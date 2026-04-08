@@ -4,9 +4,10 @@
 %% Purpose
 %% - Per-subject ROI decoding (SVM) and RSA correlations for subcortical
 %%   ROIs using the Cole-Anticevic Brain-wide Network Partition (CAB-NP).
-%% - Mirrors chess-mvpa/01_roi_mvpa_main.m exactly, with only:
+%% - Mirrors chess-mvpa/01_roi_mvpa_subject.m exactly, with only:
 %%     1) CAB-NP subcortical bilateral atlas instead of Glasser-22
-%%     2) Outputs to mvpa-rsa-subcortical/ and mvpa-decoding-subcortical/
+%%     2) Outputs to fmriprep_spm-unsmoothed_rsa-subcortical/ and
+%%        fmriprep_spm-unsmoothed_decoding-subcortical/
 %%
 %% Dimensions tested (all 40 boards):
 %%   1) checkmate (binary: checkmate vs non-checkmate)
@@ -16,8 +17,10 @@
 %% Output
 %% - Subject-level TSV files saved under:
 %%     <BIDS_DERIVATIVES>/
-%%       mvpa-decoding-subcortical/sub-XX/sub-XX_..._roi-cabnp_accuracy.tsv
-%%       mvpa-rsa-subcortical/sub-XX/sub-XX_..._roi-cabnp_rdm.tsv
+%%       fmriprep_spm-unsmoothed_decoding-subcortical/sub-XX/
+%%         sub-XX_..._roi-cabnp_stat-accuracy_decoding.tsv
+%%       fmriprep_spm-unsmoothed_rsa-subcortical/sub-XX/
+%%         sub-XX_..._roi-cabnp_stat-r_rsa.tsv
 %% - Each file contains multiple target rows (one row per target dimension)
 %%
 %% Dependencies
@@ -41,8 +44,10 @@ roiAtlas = cfg.roiCabnpAtlas;
 roiTSV   = cfg.roiCabnpTSV;
 
 % Output roots: subcortical SVM and RSA results
-outRootSVM = fullfile(derivativesDir, 'mvpa-decoding-subcortical');
-outRootRSACorr = fullfile(derivativesDir, 'mvpa-rsa-subcortical');
+% (derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/ and
+%  derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/)
+outRootSVM = cfg.mvpaDecodingSubcortical;
+outRootRSACorr = cfg.mvpaRsaSubcortical;
 mkdir_p(outRootSVM); mkdir_p(outRootRSACorr);
 
 fprintf('[INFO] ROI atlas: %s\n', roiAtlas);
