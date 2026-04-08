@@ -229,6 +229,24 @@ def log_script_end(logger):
     logger.info("=" * 80)
 
 
+def _resolve_unified_analysis_folder(script_file: str) -> str | None:
+    """Map a script path to its unified-tree analysis folder name.
+
+    Returns e.g. ``'behavioral'`` for ``chess-behavioral/foo.py`` or
+    ``'supplementary/eyetracking'`` for
+    ``chess-supplementary/eyetracking/foo.py``. Returns ``None`` for
+    scripts outside the chess-*/ or chess-supplementary/ layout.
+    """
+    script_path = Path(script_file).resolve()
+    parent = script_path.parent
+    grandparent = parent.parent
+    if grandparent.name == "chess-supplementary":
+        return f"supplementary/{parent.name}"
+    if parent.name.startswith("chess-"):
+        return parent.name[len("chess-"):]
+    return None
+
+
 def setup_analysis(
     analysis_name: str,
     results_base: Path,
@@ -239,70 +257,54 @@ def setup_analysis(
     """
     All-in-one setup for analysis scripts.
 
-    This function handles all common initialization tasks:
-    1. Creates or reuses a stable output directory results/<analysis_name>
-    2. Sets up logging (file + console)
-    3. Suppresses warnings
-    4. Sets random seed
-    5. Copies script to output directory
-    6. Builds complete configuration dictionary
-    7. Logs script start with configuration
+    Unified-tree behaviour
+    ----------------------
+    If ``script_file`` lives inside a ``chess-<name>/`` or
+    ``chess-supplementary/<name>/`` folder (i.e. one of the project's
+    analysis directories), this helper ignores ``results_base`` and
+    instead routes all outputs into the canonical
+
+        <repo>/results/<analysis>/data/   (returned as output_dir)
+        <repo>/results/<analysis>/logs/<analysis_name>/   (log file + script copy)
+
+    so scripts that write their numerical outputs via ``output_dir / 'foo.csv'``
+    land under ``results/<analysis>/data/`` automatically, while the log
+    file and script-copy artefacts stay inside ``results/<analysis>/logs/``.
+
+    For callers outside the chess-* layout (e.g. ``analyses/`` or
+    ``common/``), the legacy behaviour is preserved: ``results_base`` is
+    honoured literally and ``output_dir`` is ``results_base / analysis_name``.
 
     Parameters
     ----------
     analysis_name : str
-        Name of the analysis (e.g., "behavioral_rsa", "mvpa_checkmate")
-        Used for directory naming: {timestamp}_{analysis_name}
+        Name of the analysis stage (e.g., "behavioral_rsa",
+        "01_behavioral_rsa_subject"). Used only as the log-subdirectory
+        label under ``results/<analysis>/logs/``.
     results_base : Path
-        Base directory for results (e.g., Path("results"))
-        Will be created if it doesn't exist
+        Legacy parameter. Kept for backwards compatibility but ignored
+        when the script resolves to a chess-* analysis folder. Most new
+        call sites can pass any dummy path here.
     script_file : str
-        Path to the script being run (use __file__)
+        Path to the script being run (use ``__file__``).
     extra_config : dict, optional
-        Additional configuration parameters specific to this analysis
-        Will be merged with standard constants
+        Additional configuration parameters specific to this analysis;
+        merged with standard constants.
     suppress_warnings : bool, default=True
-        Whether to suppress FutureWarning and UserWarning
+        Whether to suppress FutureWarning and UserWarning.
 
     Returns
     -------
     config : dict
-        Complete configuration dictionary (all constants + extra_config)
+        Complete configuration dictionary (all constants + extra_config
+        + DATA_DIR / TABLES_DIR / FIGURES_DIR / ANALYSIS_FOLDER when the
+        unified-tree branch is taken).
     output_dir : Path
-        Timestamped output directory path
+        For unified-tree scripts, the ``results/<analysis>/data/`` path
+        (safe to use as the default sink for ``.csv``, ``.npy``, ``.pkl``
+        etc.). For legacy scripts, ``results_base / analysis_name``.
     logger : logging.Logger
-        Configured logger instance
-
-    Notes
-    -----
-    - Creates directory: {results_base}/{analysis_name}/ (no timestamp)
-    - Sets random seed from RANDOM_SEED constant
-    - Logs all configuration parameters from constants.py
-    - Suppresses warnings by default (FutureWarning, UserWarning)
-    - Copies the script file to output directory for reproducibility
-
-    Example
-    -------
-    >>> from pathlib import Path
-    >>> from common.logging_utils import setup_analysis
-    >>> from common import RANDOM_SEED
-    >>>
-    >>> # Minimal usage
-    >>> config, output_dir, logger = setup_analysis(
-    ...     analysis_name="behavioral_rsa",
-    ...     results_base=Path("results"),
-    ...     script_file=__file__
-    ... )
-    >>> logger.info("Starting analysis...")
-    >>>
-    >>> # With extra configuration
-    >>> extra = {'MODEL_COLUMNS': ['check', 'visual', 'strategy']}
-    >>> config, output_dir, logger = setup_analysis(
-    ...     analysis_name="behavioral_rsa",
-    ...     results_base=Path("results"),
-    ...     script_file=__file__,
-    ...     extra_config=extra
-    ... )
+        Configured logger writing into the analysis log directory.
     """
     # Import CONFIG dictionary from constants
     from .constants import CONFIG
@@ -314,16 +316,34 @@ def setup_analysis(
     if script_parent not in sys.path:
         sys.path.insert(0, script_parent)
 
-    # 1. Create timestamped output directory
-    results_base = Path(results_base)
-    results_base.mkdir(parents=True, exist_ok=True)
+    analysis_folder = _resolve_unified_analysis_folder(script_file)
 
-    # Stable directory without timestamp; overwrite on reruns is allowed
-    output_dir = results_base / analysis_name
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if analysis_folder is not None:
+        # Unified-tree branch: ignore results_base; route everything into
+        # <repo>/results/<analysis_folder>/{data,tables,figures,logs}/.
+        results_root = Path(CONFIG["RESULTS_ROOT"])
+        data_dir = results_root / analysis_folder / "data"
+        tables_dir = results_root / analysis_folder / "tables"
+        figures_dir = results_root / analysis_folder / "figures"
+        logs_dir = results_root / analysis_folder / "logs" / analysis_name
+        for p in (data_dir, tables_dir, figures_dir, logs_dir):
+            p.mkdir(parents=True, exist_ok=True)
+        output_dir = data_dir
+        log_file = logs_dir / "analysis.log"
+        script_copy_target = logs_dir
+    else:
+        # Legacy branch: honour results_base literally.
+        results_base = Path(results_base)
+        results_base.mkdir(parents=True, exist_ok=True)
+        output_dir = results_base / analysis_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+        data_dir = tables_dir = figures_dir = output_dir
+        logs_dir = output_dir
+        log_file = output_dir / "analysis.log"
+        script_copy_target = output_dir
 
     # 2. Set up logging
-    logger = setup_logging(output_dir / "analysis.log")
+    logger = setup_logging(log_file)
 
     # 3. Suppress warnings if requested
     if suppress_warnings:
@@ -334,9 +354,10 @@ def setup_analysis(
     # Note: random seeding is handled by individual scripts via
     # np.random.default_rng(CONFIG['RANDOM_SEED']) for isolated reproducibility.
 
-    # 5. Copy script to output directory (centralized helper)
+    # 5. Copy script to the log/setup directory (keeps data/tables/figures
+    #    clean of script-copy noise when running under the unified tree).
     script_path = Path(script_file)
-    copy_script_to_results(script_path, output_dir, logger)
+    copy_script_to_results(script_path, script_copy_target, logger)
 
     # 6. Build configuration dictionary from CONFIG
     # Start with a copy of the global CONFIG dictionary
@@ -349,8 +370,14 @@ def setup_analysis(
         else:
             config[key] = value
 
-    # Add output directory
+    # Add output/logs directories
     config['OUTPUT_DIR'] = str(output_dir)
+    config['DATA_DIR'] = str(data_dir)
+    config['TABLES_DIR'] = str(tables_dir)
+    config['FIGURES_DIR'] = str(figures_dir)
+    config['LOGS_DIR'] = str(logs_dir)
+    if analysis_folder is not None:
+        config['ANALYSIS_FOLDER'] = analysis_folder
 
     # Merge with extra configuration (analysis-specific parameters)
     if extra_config is not None:

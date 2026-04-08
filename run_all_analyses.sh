@@ -1,866 +1,348 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ################################################################################
-# run_all_analyses.sh - Automated Analysis Pipeline Runner
-################################################################################
-#
-# Purpose:
-#   1. Backup all existing results folders to ./backup/<timestamp>_full-results.zip
-#   2. Delete backed-up results folders
-#   3. Disable pylustrator for this shell session (always off during runs)
-#   4. Run all analysis scripts (01_*, 81_*, 91_*, etc.) in parallel by folder
-#   5. Clear the temporary pylustrator override after the run
-#   6. Generate summary report
+# run_all_analyses.sh -- pipeline runner for chess-expertise-2025
 #
 # Usage:
-#   ./run_all_analyses.sh [--levels LEVELS]
+#   ./run_all_analyses.sh [LEVEL]
+#
+# LEVEL (default: group)
+#   all           - run every stage in order: fmriprep -> spm -> subject-level -> group
+#   fmriprep      - invoke the external fMRIPrep pipeline (not implemented here; stub)
+#   spm           - invoke chess-glm MATLAB first-/second-level GLM scripts (stub;
+#                   prints the MATLAB commands to run)
+#   subject-level - run every subject-level script that writes into BIDS/derivatives/
+#                   (MATLAB stubs + the two Python subject scripts: behavioral and
+#                   manifold)
+#   group         - run every Python group/table/plot script that writes into
+#                   results/<analysis>/{data,tables,figures}/ (the default and the
+#                   only path that does NOT re-run MATLAB or external pipelines)
+#
+# The `group` level is what you normally want after the BIDS derivatives
+# (bundles C + D + E) are in place. It regenerates the entire `results/`
+# tree locally from the per-subject derivatives.
 #
 # Options:
-#   -l, --levels LEVELS   Comma-separated list selecting which stages to run.
-#                         Valid values: analysis, tables, figures
-#                         Examples:
-#                           --levels analysis
-#                           --levels tables,figures
-#                           --levels analysis,tables,figures
-#
-# Environment & Requirements:
-#   - Set the conda environment name at the top (CONDA_ENV). Ensure all required
-#     packages for this repo are installed in that environment (see environment.yml
-#     or requirements.txt).
-#   - zip utility
-#
-# Quick start (examples):
-#   cd ./GitHub/chess-expertise-2025
-#   # Recommended (conda-forge):
-#   mamba env create -f environment.yml   # or: conda env create -f environment.yml
-#   conda activate chess-expertise
-#   pip install -e .                      # install common + analyses packages
-#   # Alternative (requirements.txt):
-#   conda create -n chess-expertise python=3.11
-#   conda activate chess-expertise && pip install -r requirements.txt && pip install -e .
-#   # Run everything
-#   ./run_all_analyses.sh --levels analysis,tables,figures
-#
+#   -p, --python PATH  Explicit Python interpreter (overrides conda env discovery)
+#   -d, --debug        Enable CHESS_LOG_LEVEL=DEBUG for verbose logs
+#   -h, --help         Show this help and exit
 ################################################################################
 
-set -euo pipefail  # Exit on error, undefined vars, pipe failures
+set -euo pipefail
 
 # ==============================================================================
 # Configuration
 # ==============================================================================
-
-CONDA_ENV="chess-expertise"  # Must match environment.yml name
+CONDA_ENV="chess-expertise"
 PYTHON_BIN=""
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_DIR="./backup"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${REPO_ROOT}/common/constants.py"
-LOG_DIR="${REPO_ROOT}/results-bundle/logs/${TIMESTAMP}"
+LEVEL="group"
+DEBUG_MODE=false
 
-# Color codes for output
+# Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Default stage selection (run everything unless --levels is provided)
-RUN_ANALYSIS=true
-RUN_TABLES=true
-RUN_FIGURES=true
-# Sequential mode: when true, do NOT launch background jobs and tee logs to console
-SEQUENTIAL=false
-# Debug mode: when true, set CHESS_LOG_LEVEL=DEBUG for verbose logging
-DEBUG_MODE=false
-
-# Note: No thread env tuning; keep runtime simple and predictable.
+print_info()    { echo -e "${BLUE}[INFO]${NC} $*"; }
+print_ok()      { echo -e "${GREEN}[OK]${NC} $*"; }
+print_warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
+print_err()     { echo -e "${RED}[ERROR]${NC} $*"; }
 
 # ==============================================================================
-# Argument Parsing
+# Argument parsing
 # ==============================================================================
-
 show_usage() {
-  cat <<EOF
-Usage: $0 [--levels LEVELS] [--sequential] [--debug] [--python PATH]
-
-Options:
-  -l, --levels LEVELS   Comma-separated list selecting which stages to run.
-                        Valid values: analysis, tables, figures
-                        Examples:
-                          --levels analysis
-                          --levels tables,figures
-                          --levels analysis,tables,figures
-  -s, --sequential      Run jobs sequentially and stream logs to console
-  -d, --debug           Enable verbose logging (CHESS_LOG_LEVEL=DEBUG)
-  -p, --python PATH     Use explicit Python interpreter (overrides conda env)
-  -h, --help            Show this help and exit
-EOF
+  sed -n '3,30p' "${BASH_SOURCE[0]}" | sed 's|^# \?||'
 }
 
-if [[ $# -gt 0 ]]; then
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -l|--levels)
-        if [[ $# -lt 2 ]]; then
-          echo "Error: --levels requires an argument" >&2
-          show_usage
-          exit 2
-        fi
-        # Reset defaults when explicitly selecting levels
-        RUN_ANALYSIS=false
-        RUN_TABLES=false
-        RUN_FIGURES=false
-        IFS=',' read -r -a _levels <<< "$2"
-        for _lv in "${_levels[@]}"; do
-          # Normalize token: lowercase and strip whitespace
-          _tok=${_lv,,}
-          _tok=${_tok//[[:space:]]/}
-          case "$_tok" in
-            analysis)
-              RUN_ANALYSIS=true
-              ;;
-            tables)
-              RUN_TABLES=true
-              ;;
-            figures)
-              RUN_FIGURES=true
-              ;;
-            "")
-              ;;
-            *)
-              echo "Error: invalid level '$_lv'. Valid: analysis, tables, figures" >&2
-              exit 2
-              ;;
-          esac
-        done
-        shift 2
-        ;;
-      -p|--python)
-        if [[ $# -lt 2 ]]; then
-          echo "Error: --python requires a path argument" >&2
-          show_usage
-          exit 2
-        fi
-        PYTHON_BIN="$2"
-        shift 2
-        ;;
-      -s|--sequential)
-        SEQUENTIAL=true
-        shift 1
-        ;;
-      -d|--debug)
-        DEBUG_MODE=true
-        shift 1
-        ;;
-      -h|--help)
-        show_usage
-        exit 0
-        ;;
-      *)
-        echo "Error: unknown argument '$1'" >&2
-        show_usage
-        exit 2
-        ;;
-    esac
-  done
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--python)
+      PYTHON_BIN="$2"
+      shift 2
+      ;;
+    -d|--debug)
+      DEBUG_MODE=true
+      shift
+      ;;
+    -h|--help)
+      show_usage
+      exit 0
+      ;;
+    all|fmriprep|spm|subject-level|group)
+      LEVEL="$1"
+      shift
+      ;;
+    *)
+      print_err "Unknown argument: $1"
+      show_usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$DEBUG_MODE" == "true" ]]; then
+  export CHESS_LOG_LEVEL=DEBUG
+  print_info "Debug logging enabled"
 fi
 
-# Set logging level based on debug mode
-if $DEBUG_MODE; then
-  export CHESS_LOG_LEVEL="DEBUG"
-else
-  export CHESS_LOG_LEVEL="INFO"
-fi
+# ==============================================================================
+# Python interpreter discovery
+# ==============================================================================
+resolve_python() {
+  if [[ -n "$PYTHON_BIN" ]]; then
+    echo "$PYTHON_BIN"
+    return
+  fi
+  # Prefer mamba/conda env by name
+  local candidate=""
+  if command -v mamba >/dev/null 2>&1; then
+    candidate="$(mamba env list 2>/dev/null | awk -v env="$CONDA_ENV" '$1==env {print $NF}' || true)"
+  fi
+  if [[ -z "$candidate" ]] && command -v conda >/dev/null 2>&1; then
+    candidate="$(conda env list 2>/dev/null | awk -v env="$CONDA_ENV" '$1==env {print $NF}' || true)"
+  fi
+  if [[ -n "$candidate" && -x "$candidate/bin/python" ]]; then
+    echo "$candidate/bin/python"
+    return
+  fi
+  # Fall back to system python
+  command -v python || command -v python3
+}
 
-# Analysis folders (in logical order)
-ANALYSIS_FOLDERS=(
-  "chess-behavioral"
-  "chess-manifold"
-  "chess-mvpa"
-  "chess-neurosynth"
-  "chess-supplementary/behavioral-reliability"
-  "chess-supplementary/dataset-viz"
-  "chess-supplementary/eyetracking"
-  "chess-supplementary/mvpa-finer"
-  "chess-supplementary/neurosynth-terms"
-  "chess-supplementary/rdm-intercorrelation"
-  "chess-supplementary/rsa-rois"
-  "chess-supplementary/univariate-rois"
-  "chess-supplementary/task-engagement"
-  "chess-supplementary/skill-gradient"
-  # Note: chess-supplementary/run-matching requires MATLAB for subject-level
-  # analysis (01_roi_rsa_run_matched.m). The Python group stats and table scripts
-  # (02_*–06_*) can run after MATLAB outputs are available.
-  "chess-supplementary/run-matching"
-  # Note: chess-supplementary/subcortical-rois requires MATLAB for subject-level
-  # analysis (subcortical_rsa.m). The Python group stats and plotting scripts
-  # (02_*, 03_*, 91_*, 92_*, 93_*) can run after MATLAB outputs are available.
-  "chess-supplementary/subcortical-rois"
+PY="$(resolve_python)"
+if [[ -z "$PY" ]]; then
+  print_err "No Python interpreter found. Pass --python or activate the conda env."
+  exit 1
+fi
+print_info "Using Python: $PY"
+
+# Ensure the repo is importable
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+
+# ==============================================================================
+# Stage definitions
+# ==============================================================================
+# Python group-level scripts: everything that reads from BIDS derivatives
+# (or the unified results/ tree) and writes into
+# results/<analysis>/{data,tables,figures}/.
+#
+# Order within each analysis is deterministic so plotting scripts always see
+# the latest table outputs.
+declare -a GROUP_SCRIPTS=(
+  # chess-behavioral (subject-level preference derivative -> group stats -> figures)
+  "chess-behavioral/01_behavioral_rsa_subject.py"
+  "chess-behavioral/02_behavioral_rsa_group.py"
+  "chess-behavioral/81_table_behavioral_correlations.py"
+  "chess-behavioral/91_plot_behavioral_panels.py"
+
+  # chess-manifold (subject-level PR derivative -> group stats -> figures)
+  "chess-manifold/01_manifold_subject.py"
+  "chess-manifold/02_manifold_group.py"
+  "chess-manifold/81_table_manifold_pr.py"
+  "chess-manifold/91_plot_manifold_panels.py"
+
+  # chess-mvpa (group over MATLAB-produced per-subject TSVs)
+  "chess-mvpa/02_mvpa_group_rsa.py"
+  "chess-mvpa/03_mvpa_group_decoding.py"
+  "chess-mvpa/81_table_mvpa_rsa.py"
+  "chess-mvpa/82_table_mvpa_decoding.py"
+  "chess-mvpa/92_plot_mvpa_rsa.py"
+  "chess-mvpa/93_plot_mvpa_decoding.py"
+
+  # chess-neurosynth (group-only reads of searchlight + SPM smoothed group maps)
+  "chess-neurosynth/01_univariate_neurosynth.py"
+  "chess-neurosynth/02_rsa_neurosynth.py"
+  "chess-neurosynth/81_table_neurosynth_univariate.py"
+  "chess-neurosynth/82_table_neurosynth_rsa.py"
+  "chess-neurosynth/91_plot_neurosynth_univariate.py"
+  "chess-neurosynth/92_plot_neurosynth_rsa.py"
+
+  # chess-supplementary/behavioral-reliability
+  "chess-supplementary/behavioral-reliability/01_behavioral_split_half_reliability.py"
+  "chess-supplementary/behavioral-reliability/02_marginal_split_half.py"
+  "chess-supplementary/behavioral-reliability/81_table_split_half_reliability.py"
+  "chess-supplementary/behavioral-reliability/91_plot_reliability_panels.py"
+
+  # chess-supplementary/eyetracking
+  "chess-supplementary/eyetracking/01_eye_decoding.py"
+  "chess-supplementary/eyetracking/81_table_eyetracking_decoding.py"
+  "chess-supplementary/eyetracking/91_plot_eyetracking_decoding.py"
+
+  # chess-supplementary/mvpa-finer (Python group over MATLAB-appended TSVs)
+  "chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py"
+  "chess-supplementary/mvpa-finer/03_mvpa_finer_group_decoding.py"
+  "chess-supplementary/mvpa-finer/81_table_mvpa_finer_rsa.py"
+  "chess-supplementary/mvpa-finer/82_table_mvpa_finer_decoding.py"
+  "chess-supplementary/mvpa-finer/82_table_mvpa_extended_dimensions.py"
+  "chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py"
+
+  # chess-supplementary/neurosynth-terms (single figure over atlas terms)
+  "chess-supplementary/neurosynth-terms/91_plot_neurosynth_terms.py"
+
+  # chess-supplementary/rdm-intercorrelation
+  "chess-supplementary/rdm-intercorrelation/01_rdm_intercorrelation.py"
+  "chess-supplementary/rdm-intercorrelation/81_table_rdm_intercorr.py"
+  "chess-supplementary/rdm-intercorrelation/91_plot_rdm_intercorr.py"
+
+  # chess-supplementary/rsa-rois
+  "chess-supplementary/rsa-rois/01_rsa_roi_summary.py"
+  "chess-supplementary/rsa-rois/81_table_rsa_rois.py"
+  "chess-supplementary/rsa-rois/82_table_roi_maps_rsa.py"
+  "chess-supplementary/rsa-rois/91_plot_rsa_rois.py"
+
+  # chess-supplementary/run-matching (Python group over MATLAB-produced TSVs)
+  "chess-supplementary/run-matching/02_pr_run_matched.py"
+  "chess-supplementary/run-matching/03_group_rsa_run_matched.py"
+  "chess-supplementary/run-matching/04_compare_run_matched.py"
+  "chess-supplementary/run-matching/05_table_rsa_run_matched.py"
+  "chess-supplementary/run-matching/06_table_pr_run_matched.py"
+
+  # chess-supplementary/skill-gradient
+  "chess-supplementary/skill-gradient/01_skill_gradient.py"
+  "chess-supplementary/skill-gradient/91_plot_skill_gradient.py"
+
+  # chess-supplementary/subcortical-rois (Python group over MATLAB TSVs)
+  "chess-supplementary/subcortical-rois/02_subcortical_group_rsa.py"
+  "chess-supplementary/subcortical-rois/03_subcortical_group_decoding.py"
+  "chess-supplementary/subcortical-rois/91_plot_subcortical_rsa.py"
+  "chess-supplementary/subcortical-rois/92_plot_atlas_on_mni.py"
+  "chess-supplementary/subcortical-rois/93_plot_subcortical_decoding.py"
+
+  # chess-supplementary/task-engagement
+  "chess-supplementary/task-engagement/01_task_engagement.py"
+  "chess-supplementary/task-engagement/02_familiarisation_accuracy.py"
+  "chess-supplementary/task-engagement/04_quantify_preference_drivers.py"
+  "chess-supplementary/task-engagement/91_plot_novice_diagnostics.py"
+  "chess-supplementary/task-engagement/92_plot_preference_features.py"
+  "chess-supplementary/task-engagement/93_plot_gradient_panel.py"
+
+  # chess-supplementary/univariate-rois
+  "chess-supplementary/univariate-rois/01_univariate_roi_summary.py"
+  "chess-supplementary/univariate-rois/81_table_univariate_rois.py"
+  "chess-supplementary/univariate-rois/82_table_roi_maps_univ.py"
+  "chess-supplementary/univariate-rois/91_plot_univariate_rois.py"
+)
+
+# Subject-level scripts that WRITE into BIDS/derivatives/. Running these will
+# re-compute derivative pipelines. MATLAB entries are intentionally left as
+# comments: the task-12 refactor freezes MATLAB subject pipelines, and the
+# group scripts above already consume the existing derivatives on disk.
+declare -a SUBJECT_LEVEL_SCRIPTS_PY=(
+  "chess-behavioral/01_behavioral_rsa_subject.py"
+  "chess-manifold/01_manifold_subject.py"
+  "chess-supplementary/subcortical-rois/00_prepare_atlas.py"
+)
+
+declare -a SUBJECT_LEVEL_SCRIPTS_MATLAB=(
+  "chess-mvpa/01_roi_mvpa_subject.m"
+  "chess-mvpa/04_searchlight_rsa.m"
+  "chess-supplementary/mvpa-finer/01_roi_decoding_fine.m"
+  "chess-supplementary/run-matching/01_roi_rsa_run_matched.m"
+  "chess-supplementary/subcortical-rois/subcortical_rsa.m"
+)
+
+declare -a SPM_SCRIPTS_MATLAB=(
+  "chess-glm/01_spm_glm_firstlevel.m"
+  "chess-glm/02_spm_second_level_within.m"
+  "chess-glm/03_spm_second_level_two_sample.m"
 )
 
 # ==============================================================================
-# Helper Functions
+# Runners
 # ==============================================================================
-
-print_header() {
-  echo -e "\n${BLUE}========================================${NC}"
-  echo -e "${BLUE}$1${NC}"
-  echo -e "${BLUE}========================================${NC}\n"
-}
-
-print_success() {
-  echo -e "${GREEN}✓${NC} $1"
-}
-
-print_warning() {
-  echo -e "${YELLOW}⚠${NC} $1"
-}
-
-print_error() {
-  echo -e "${RED}✗${NC} $1"
-}
-
-print_info() {
-  echo -e "${BLUE}→${NC} $1"
-}
-
-# Function to selectively clean results based on selected levels
-clean_results_selective() {
-  local results_dir=$1
-
-  # If running everything (default without --levels), delete entire results directory
-  if $RUN_ANALYSIS && $RUN_TABLES && $RUN_FIGURES; then
-    rm -rf "$results_dir"
-    print_info "Deleted (all levels): $results_dir"
-    return 0
-  fi
-
-  # Otherwise, selectively clean based on levels
-  if [ ! -d "$results_dir" ]; then
-    return 0
-  fi
-
-  # Clean tables subfolder
-  if $RUN_TABLES && [ -d "$results_dir/tables" ]; then
-    rm -rf "$results_dir/tables"
-    print_info "Deleted tables: $results_dir/tables"
-  fi
-
-  # Clean figures subfolder
-  if $RUN_FIGURES && [ -d "$results_dir/figures" ]; then
-    rm -rf "$results_dir/figures"
-    print_info "Deleted figures: $results_dir/figures"
-  fi
-
-  # Clean analysis artifacts (files in results root, excluding subfolders and .log/.py files)
-  if $RUN_ANALYSIS; then
-    find "$results_dir" -maxdepth 1 -type f ! -name "*.log" ! -name "*.py" -delete 2>/dev/null || true
-    print_info "Deleted analysis artifacts: $results_dir/* (except tables/, figures/, *.log, *.py)"
-  fi
-}
-
-# ==============================================================================
-# Phase 1: Setup & Validation
-# ==============================================================================
-
-print_header "PHASE 1: SETUP & VALIDATION"
-
-# Change to repo root
-cd "$REPO_ROOT"
-print_info "Working directory: $REPO_ROOT"
-
-# Check conda/miniforge
-if ! command -v conda &> /dev/null; then
-  print_error "conda not found. Please install miniforge/conda."
-  exit 1
-fi
-print_success "conda found"
-
-# Resolve Python interpreter
-if [[ -n "$PYTHON_BIN" ]]; then
-  print_info "Using explicit Python interpreter: $PYTHON_BIN"
-else
-  # Derive conda root from conda executable without invoking conda subcommands
-  CONDA_BIN=$(command -v conda)
-  CONDA_ROOT=$(dirname "$(dirname "$CONDA_BIN")")
-  PYTHON_BIN="${CONDA_ROOT}/envs/${CONDA_ENV}/bin/python"
-  print_info "Resolved conda root: $CONDA_ROOT"
-  print_info "Using env '${CONDA_ENV}' Python: $PYTHON_BIN"
-fi
-
-# Validate Python interpreter
-if [[ ! -x "$PYTHON_BIN" ]]; then
-  print_error "Python interpreter not found or not executable: $PYTHON_BIN"
-  echo "Hint: Ensure conda env '${CONDA_ENV}' exists under miniforge, or pass --python /path/to/python"
-  exit 1
-fi
-print_success "Python interpreter is available"
-
-# Check project packages are installed (common + analyses)
-if ! "$PYTHON_BIN" -c "import common; import analyses" 2>/dev/null; then
-  print_error "Project packages not installed. Run: pip install -e ."
-  exit 1
-fi
-print_success "Project packages (common, analyses) installed"
-
-# Check CONFIG file
-if [ ! -f "$CONFIG_FILE" ]; then
-  print_error "CONFIG file not found: $CONFIG_FILE"
-  exit 1
-fi
-print_success "CONFIG file found"
-
-# Check zip utility
-if ! command -v zip &> /dev/null; then
-  print_error "zip utility not found. Please install it (apt install zip)."
-  exit 1
-fi
-print_success "zip utility found"
-
-# Constrain threading to avoid OpenMP shared memory errors in CI/sandboxed envs
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
-export NUMEXPR_NUM_THREADS=1
-export OMP_DYNAMIC=FALSE
-export KMP_AFFINITY=disabled
-export KMP_INIT_AT_FORK=FALSE
-export MKL_THREADING_LAYER=SEQUENTIAL
-export VECLIB_MAXIMUM_THREADS=1
-export BLIS_NUM_THREADS=1
-export ACCELERATE_NUM_THREADS=1
-export NUMBA_NUM_THREADS=1
-print_info "Threading pinned (OMP/MKL/OPENBLAS/NUMEXPR = 1)"
-
-# Optional LaTeX environment check (for table compilation)
-if command -v pdflatex >/dev/null 2>&1; then
-  if command -v kpsewhich >/dev/null 2>&1; then
-    MISSING_PKGS=()
-    for sty in booktabs.sty multirow.sty siunitx.sty; do
-      if ! kpsewhich "$sty" >/dev/null 2>&1; then
-        MISSING_PKGS+=("$sty")
-      fi
-    done
-    if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
-      print_warning "Missing LaTeX packages: ${MISSING_PKGS[*]}"
-      print_warning "Install TeX packages, e.g. on Debian/Ubuntu:"
-      echo "  sudo apt-get update && sudo apt-get install -y texlive-latex-extra texlive-latex-recommended texlive-fonts-recommended"
-    else
-      print_success "LaTeX packages found (booktabs, multirow, siunitx)"
+run_python_scripts() {
+  local label="$1"
+  shift
+  local -a scripts=("$@")
+  local n=${#scripts[@]}
+  local i=0
+  local failed=0
+  print_info "[$label] running $n Python scripts sequentially"
+  for script in "${scripts[@]}"; do
+    i=$((i+1))
+    local path="${REPO_ROOT}/${script}"
+    if [[ ! -f "$path" ]]; then
+      print_warn "[$label] ($i/$n) missing: $script"
+      continue
     fi
-  else
-    print_warning "kpsewhich not found; cannot verify LaTeX packages. pdflatex present."
+    print_info "[$label] ($i/$n) $script"
+    if "$PY" "$path"; then
+      print_ok "[$label] ($i/$n) $script"
+    else
+      print_err "[$label] ($i/$n) FAILED: $script"
+      failed=$((failed+1))
+    fi
+  done
+  if (( failed > 0 )); then
+    print_err "[$label] $failed / $n scripts failed"
+    return 1
   fi
-else
-  print_warning "pdflatex not found; skipping LaTeX compilation checks for tables."
-fi
+  print_ok "[$label] all $n Python scripts completed"
+}
 
-print_header "STAGE SELECTION"
-print_info "Run analysis scripts:  ${RUN_ANALYSIS}"
-print_info "Run table scripts:     ${RUN_TABLES}"
-print_info "Run figure scripts:    ${RUN_FIGURES}"
-print_info "Sequential mode:       ${SEQUENTIAL}"
-print_info "Log level:             ${CHESS_LOG_LEVEL}"
-print_info "Python:                ${PYTHON_BIN}"
-if [[ "$RUN_ANALYSIS$RUN_TABLES$RUN_FIGURES" == "falsefalsefalse" ]]; then
-  print_error "No stages selected. Use --levels with one or more of: analysis,tables,figures"
-  exit 2
-fi
+run_fmriprep_stub() {
+  print_warn "[fmriprep] fMRIPrep is an external pipeline and must be invoked directly;"
+  print_warn "           there is no in-repo driver. Expected command (adjust to your setup):"
+  echo "  fmriprep <BIDS_ROOT> <BIDS_DERIVATIVES>/fmriprep participant \\"
+  echo "           --participant-label ... --output-spaces MNI152NLin2009cAsym:res-2 T1w \\"
+  echo "           --nprocs ... --omp-nthreads ..."
+  print_warn "[fmriprep] skipping in this run."
+}
 
-START_TIME=$(date +%s)
+run_spm_stub() {
+  print_warn "[spm] SPM first-/second-level GLMs run in MATLAB. The chess-glm scripts"
+  print_warn "      live at these paths and must be invoked from MATLAB:"
+  for s in "${SPM_SCRIPTS_MATLAB[@]}"; do
+    echo "  matlab -batch \"run('${REPO_ROOT}/${s}'); exit\""
+  done
+  print_warn "[spm] skipping in this run (refactor policy: no MATLAB recomputation)."
+}
+
+run_subject_level_stub() {
+  print_warn "[subject-level] MATLAB subject-level scripts are FROZEN in the task-12"
+  print_warn "                refactor. Python subject-level scripts are safe to run."
+  print_info "[subject-level] Python subject scripts:"
+  run_python_scripts "subject-level/python" "${SUBJECT_LEVEL_SCRIPTS_PY[@]}"
+  print_info "[subject-level] MATLAB subject scripts (invoke manually if needed):"
+  for s in "${SUBJECT_LEVEL_SCRIPTS_MATLAB[@]}"; do
+    echo "  matlab -batch \"run('${REPO_ROOT}/${s}'); exit\""
+  done
+}
 
 # ==============================================================================
-# Phase 2: Backup Results
+# Main
 # ==============================================================================
+print_info "Level: $LEVEL"
+print_info "Repo:  $REPO_ROOT"
+print_info "Python path set so 'common' and 'analyses' packages are importable."
 
-print_header "PHASE 2: BACKUP RESULTS"
-
-# Clean results-bundle directory from previous runs
-RESULTS_BUNDLE_DIR="${REPO_ROOT}/results-bundle"
-if [ -d "$RESULTS_BUNDLE_DIR" ]; then
-  print_info "Removing previous results-bundle directory..."
-  rm -rf "$RESULTS_BUNDLE_DIR"
-  print_success "Previous results-bundle directory removed"
-fi
-
-# Create log directory (saved under results-bundle)
-mkdir -p "$LOG_DIR"
-print_success "Log directory created: $LOG_DIR"
-
-# Create backup directory
-mkdir -p "$BACKUP_DIR"
-print_success "Backup directory ready: $BACKUP_DIR"
-
-# Find all results directories (exclude backup folder itself)
-print_info "Searching for results directories..."
-RESULTS_DIRS=$(find . -type d -name "results" -not -path "*/backup/*" -not -path "*/.git/*" | sort)
-
-if [ -z "$RESULTS_DIRS" ]; then
-  print_warning "No results directories found. Nothing to backup."
-  SKIP_BACKUP=true
-else
-  RESULTS_COUNT=$(echo "$RESULTS_DIRS" | wc -l)
-  print_info "Found $RESULTS_COUNT results directories:"
-  echo "$RESULTS_DIRS" | sed 's/^/  - /'
-
-  # Create archive
-  BACKUP_FILE="${BACKUP_DIR}/${TIMESTAMP}_full-results.zip"
-  print_info "Creating backup archive: $BACKUP_FILE"
-
-  # Use zip with relative paths (suppress verbose output)
-  echo "$RESULTS_DIRS" | xargs zip -r -q "$BACKUP_FILE"
-
-  # Verify archive was created and has content
-  if [ ! -f "$BACKUP_FILE" ]; then
-    print_error "Backup archive was not created!"
+case "$LEVEL" in
+  all)
+    run_fmriprep_stub
+    run_spm_stub
+    run_subject_level_stub
+    run_python_scripts "group" "${GROUP_SCRIPTS[@]}"
+    ;;
+  fmriprep)
+    run_fmriprep_stub
+    ;;
+  spm)
+    run_spm_stub
+    ;;
+  subject-level)
+    run_subject_level_stub
+    ;;
+  group)
+    run_python_scripts "group" "${GROUP_SCRIPTS[@]}"
+    ;;
+  *)
+    print_err "Unknown LEVEL: $LEVEL"
+    show_usage
     exit 1
-  fi
+    ;;
+esac
 
-  BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-  if [ ! -s "$BACKUP_FILE" ]; then
-    print_error "Backup archive is empty!"
-    exit 1
-  fi
-
-  print_success "Backup created successfully (size: $BACKUP_SIZE)"
-
-  # Selectively clean results directories based on selected levels
-  print_info "Cleaning results directories based on selected levels..."
-  echo "$RESULTS_DIRS" | while read -r dir; do
-    if [ -d "$dir" ]; then
-      clean_results_selective "$dir"
-    fi
-  done
-  print_success "Results directories cleaned based on selected levels"
-
-  SKIP_BACKUP=false
-fi
-
-# ==============================================================================
-# Phase 3: Update .gitignore
-# ==============================================================================
-
-print_header "PHASE 3: UPDATE .gitignore"
-
-GITIGNORE_FILE="${REPO_ROOT}/.gitignore"
-
-if grep -q "^backup/" "$GITIGNORE_FILE" 2>/dev/null; then
-  print_success "backup/ already in .gitignore"
-else
-  echo "backup/" >> "$GITIGNORE_FILE"
-  print_success "Added backup/ to .gitignore"
-fi
-
-# ==============================================================================
-# Phase 3.5: Prepare Manuscript Output Dirs
-# ==============================================================================
-
-# (Removed) Manuscript dir preparation is handled by saving utilities
-
-# ==============================================================================
-# Phase 4: Disable Pylustrator
-# ==============================================================================
-
-print_header "PHASE 4: DISABLE PYLUSTRATOR"
-
-# Disable interactive layout editing for child processes without mutating source.
-export CHESS_ENABLE_PYLUSTRATOR=false
-print_success "Pylustrator disabled for this run via CHESS_ENABLE_PYLUSTRATOR=false"
-
-# Always clear the override at the end, even on failure/interrupt.
-PYLU_RESTORED=false
-restore_pylustrator() {
-  if [ "$PYLU_RESTORED" = true ]; then return 0; fi
-  unset CHESS_ENABLE_PYLUSTRATOR
-  print_info "Cleared CHESS_ENABLE_PYLUSTRATOR override"
-  PYLU_RESTORED=true
-}
-trap restore_pylustrator EXIT INT TERM
-
-# ==============================================================================
-# Phase 5: Run Analyses (Parallel)
-# ==============================================================================
-
-print_header "PHASE 5: RUN ANALYSES (PARALLEL)"
-
-# Function to run all scripts in a single analysis folder
-run_analysis_folder() {
-  local folder=$1
-  local folder_name=$(echo "$folder" | tr '/' '_')
-  local logfile="${LOG_DIR}/${folder_name}.log"
-
-  # Helper local logger: tee to console in sequential mode, else only to logfile
-  local _tee_cmd="cat >> \"$logfile\""
-  if $SEQUENTIAL; then
-    # shellcheck disable=SC2016
-    _tee_cmd='tee -a "$logfile"'
-  fi
-  eval "echo \"========================================\" | $_tee_cmd"
-  eval "echo \"Analysis: $folder\" | $_tee_cmd"
-  eval "echo \"Started: $(date)\" | $_tee_cmd"
-  eval "echo \"========================================\" | $_tee_cmd"
-  eval "echo \"\" | $_tee_cmd"
-
-  # Find all Python scripts matching pattern [0-9][0-9]_*.py (only .py files!)
-  mapfile -t scripts_array < <(find "$folder" -maxdepth 1 -type f -name "[0-9][0-9]_*.py" 2>/dev/null | sort)
-
-  if [ ${#scripts_array[@]} -eq 0 ]; then
-    eval "echo \"No analysis scripts found in $folder\" | $_tee_cmd"
-    return 0
-  fi
-
-  # Filter by selected stages
-  local selected_scripts=()
-  for script in "${scripts_array[@]}"; do
-    local base
-    base=$(basename "$script")
-    local nn
-    nn=${base:0:2}
-    # Interpret as decimal ignoring leading zeros
-    local n
-    n=$((10#$nn))
-    local category="other"
-    if (( n >= 90 && n <= 99 )); then
-      category="figures"
-    elif (( n >= 80 && n <= 89 )); then
-      category="tables"
-    elif (( n >= 0 && n <= 79 )); then
-      category="analysis"
-    fi
-
-    case "$category" in
-      analysis)
-        $RUN_ANALYSIS && selected_scripts+=("$script")
-        ;;
-      tables)
-        $RUN_TABLES && selected_scripts+=("$script")
-        ;;
-      figures)
-        $RUN_FIGURES && selected_scripts+=("$script")
-        ;;
-    esac
-  done
-
-  if [ ${#selected_scripts[@]} -eq 0 ]; then
-    eval "echo \"No scripts match selected levels in $folder\" | $_tee_cmd"
-    return 0
-  fi
-
-  local script_count=${#selected_scripts[@]}
-  eval "echo \"Found $script_count Python script(s) to run after level filtering\" | $_tee_cmd"
-  eval "echo \"\" | $_tee_cmd"
-
-  # Track failures for this folder
-  local failed_count=0
-  local failed_scripts=()
-
-  # Run each script in order
-  local script_num=0
-  for script in "${selected_scripts[@]}"; do
-    script_num=$((script_num + 1))
-    local script_name=$(basename "$script")
-    # Determine script category by numeric prefix (for table compilation later)
-    local script_prefix=${script_name:0:2}
-    local script_n=$((10#$script_prefix))
-    local script_category="other"
-    if (( script_n >= 80 && script_n <= 89 )); then
-      script_category="tables"
-    elif (( script_n >= 90 && script_n <= 99 )); then
-      script_category="figures"
-    else
-      script_category="analysis"
-    fi
-
-    eval "echo \"----------------------------------------\" | $_tee_cmd"
-    eval "echo \"[$script_num/$script_count] Running: $script_name\" | $_tee_cmd"
-    eval "echo \"Started: $(date)\" | $_tee_cmd"
-    eval "echo \"----------------------------------------\" | $_tee_cmd"
-
-    # Run with conda, stream to console in sequential mode while logging
-    local exit_code=0
-    # Record timestamp before running the script to detect new .tex files
-    local script_start_ts=$(date +%s)
-    if $SEQUENTIAL; then
-      # In sequential mode, the pipeline to tee masks the original exit code.
-      # With 'set -o pipefail' enabled, the 'if !' branch is entered on failure.
-      # Explicitly mark failure with exit_code=1 to avoid misreporting success.
-      if ! "$PYTHON_BIN" "$script" 2>&1 | tee -a "$logfile"; then
-        exit_code=1
-      fi
-    else
-      if ! "$PYTHON_BIN" "$script" >> "$logfile" 2>&1; then
-        exit_code=$?
-      fi
-    fi
-
-    # Log result with prominent error markers
-    if [ $exit_code -eq 0 ]; then
-      eval "echo \"✓ SUCCESS: $script_name\" | $_tee_cmd"
-    else
-      eval "echo \"\" | $_tee_cmd"
-      eval "echo \"╔═══════════════════════════════════════════════════════════════╗\" | $_tee_cmd"
-      eval "echo \"║ ERROR: SCRIPT FAILED                                          ║\" | $_tee_cmd"
-      eval "echo \"╚═══════════════════════════════════════════════════════════════╝\" | $_tee_cmd"
-      eval "echo \"✗ FAILED: $script_name (exit code: $exit_code)\" | $_tee_cmd"
-      eval "echo \"  Folder: $folder\" | $_tee_cmd"
-      eval "echo \"  Script: $script\" | $_tee_cmd"
-      eval "echo \"  Logfile: $logfile\" | $_tee_cmd"
-      eval "echo \"╚═══════════════════════════════════════════════════════════════╝\" | $_tee_cmd"
-      eval "echo \"\" | $_tee_cmd"
-
-      # Track failure
-      failed_count=$((failed_count + 1))
-      failed_scripts+=("$script")
-
-      # Write to global error log for summary
-      echo "ERROR|$folder|$script_name|$exit_code|$logfile" >> "${LOG_DIR}/ERRORS.log"
-    fi
-
-    eval "echo \"Finished: $(date)\" | $_tee_cmd"
-    eval "echo \"\" | $_tee_cmd"
-
-    # --------------------------------------------------------------
-    # Post-step: If this was a table script, optionally compile new .tex
-    # --------------------------------------------------------------
-    if [ $exit_code -eq 0 ] && [ "$script_category" = "tables" ]; then
-      # Check for pdflatex availability
-      if command -v pdflatex >/dev/null 2>&1; then
-        eval "echo \"Validating LaTeX tables via pdflatex...\" | $_tee_cmd"
-        # Find .tex files created or modified after this script started
-        mapfile -t _new_tex < <(find "$folder" -type f -name "*.tex" -newermt "@${script_start_ts}" 2>/dev/null | sort)
-        if [ ${#_new_tex[@]} -eq 0 ]; then
-          eval "echo \"No new .tex tables detected after $script_name\" | $_tee_cmd"
-        else
-          for _tf in "${_new_tex[@]}"; do
-            eval "echo \"  • Compiling: $_tf\" | $_tee_cmd"
-            # Use the central Python validator/compilation helper
-            if $SEQUENTIAL; then
-              "$PYTHON_BIN" - "$REPO_ROOT" "$_tf" <<'PY' | tee -a "$logfile"
-import sys, os
-repo_root, tex_file = sys.argv[1], sys.argv[2]
-sys.path.insert(0, repo_root)
-from pathlib import Path
-from common.report_utils import compile_latex_table
-s = Path(tex_file).read_text(encoding='utf-8')
-ok, log = compile_latex_table(s)
-print(f"    result: {'OK' if ok else 'FAIL'}")
-if not ok:
-    print("    ---- pdflatex log ----\n" + log)
-PY
-            else
-              "$PYTHON_BIN" - "$REPO_ROOT" "$_tf" >> "$logfile" 2>&1 <<'PY'
-import sys, os
-repo_root, tex_file = sys.argv[1], sys.argv[2]
-sys.path.insert(0, repo_root)
-from pathlib import Path
-from common.report_utils import compile_latex_table
-s = Path(tex_file).read_text(encoding='utf-8')
-ok, log = compile_latex_table(s)
-print(f"    result: {'OK' if ok else 'FAIL'}")
-if not ok:
-    print("    ---- pdflatex log ----\n" + log)
-PY
-            fi
-          done
-        fi
-      else
-        eval "echo \"pdflatex not found; skipping LaTeX compilation checks for tables.\" | $_tee_cmd"
-      fi
-    fi
-  done
-
-  eval "echo \"========================================\" | $_tee_cmd"
-  eval "echo \"Analysis complete: $folder\" | $_tee_cmd"
-  if [ $failed_count -gt 0 ]; then
-    eval "echo \"FAILED: $failed_count of $script_count script(s) failed\" | $_tee_cmd"
-  else
-    eval "echo \"SUCCESS: All $script_count script(s) completed successfully\" | $_tee_cmd"
-  fi
-  eval "echo \"Finished: $(date)\" | $_tee_cmd"
-  eval "echo \"========================================\" | $_tee_cmd"
-
-  # Return non-zero exit code if any script failed
-  return $failed_count
-}
-
-# Export function and variables for subshells
-export -f run_analysis_folder
-export PYTHON_BIN
-export CONDA_ENV
-export LOG_DIR
-export RUN_ANALYSIS
-export RUN_TABLES
-export RUN_FIGURES
-export SEQUENTIAL
-export DEBUG_MODE
-
-# Launch all analyses in parallel
-if $SEQUENTIAL; then
-  print_info "Launching ${#ANALYSIS_FOLDERS[@]} analysis jobs sequentially..."
-  echo ""
-  FAILED_JOBS=0
-  JOB_NUM=0
-  for folder in "${ANALYSIS_FOLDERS[@]}"; do
-    if [ -d "$folder" ]; then
-      folder_name=$(echo "$folder" | tr '/' '_')
-      print_info "Starting: $folder → ${LOG_DIR}/${folder_name}.log"
-      if run_analysis_folder "$folder"; then
-        JOB_NUM=$((JOB_NUM + 1))
-        print_success "Job $JOB_NUM completed"
-      else
-        JOB_NUM=$((JOB_NUM + 1))
-        print_error "Job $JOB_NUM failed"
-        FAILED_JOBS=$((FAILED_JOBS + 1))
-      fi
-    else
-      print_warning "Folder not found, skipping: $folder"
-    fi
-  done
-  echo ""
-  if [ $FAILED_JOBS -eq 0 ]; then
-    print_success "All analysis jobs completed successfully"
-  else
-    print_warning "$FAILED_JOBS job(s) failed. Check logs in $LOG_DIR"
-  fi
-  PARALLEL_JOBS_LAUNCHED=0
-else
-  print_info "Launching ${#ANALYSIS_FOLDERS[@]} parallel analysis jobs..."
-  echo ""
-
-  PIDS=()
-  for folder in "${ANALYSIS_FOLDERS[@]}"; do
-    if [ -d "$folder" ]; then
-      folder_name=$(echo "$folder" | tr '/' '_')
-      print_info "Starting: $folder → ${LOG_DIR}/${folder_name}.log"
-      run_analysis_folder "$folder" &
-      PIDS+=($!)
-    else
-      print_warning "Folder not found, skipping: $folder"
-    fi
-  done
-
-  echo ""
-  print_info "Waiting for ${#PIDS[@]} analysis jobs to complete..."
-  print_info "Monitor progress: tail -f ${LOG_DIR}/*.log"
-  echo ""
-
-  # Wait for all background jobs and track failures
-  FAILED_JOBS=0
-  JOB_NUM=0
-  for pid in "${PIDS[@]}"; do
-    JOB_NUM=$((JOB_NUM + 1))
-    if wait $pid; then
-      print_success "Job $JOB_NUM (PID $pid) completed successfully"
-    else
-      print_error "Job $JOB_NUM (PID $pid) failed"
-      FAILED_JOBS=$((FAILED_JOBS + 1))
-    fi
-  done
-
-  echo ""
-  if [ $FAILED_JOBS -eq 0 ]; then
-    print_success "All analysis jobs completed successfully"
-  else
-    print_warning "$FAILED_JOBS job(s) failed. Check logs in $LOG_DIR"
-  fi
-  PARALLEL_JOBS_LAUNCHED=${#PIDS[@]}
-fi
-
-# ==============================================================================
-# Phase 6: Restore Pylustrator
-# ==============================================================================
-
-print_header "PHASE 6: RESTORE PYLUSTRATOR"
-restore_pylustrator
-
-# ==============================================================================
-# Phase 7: Summary Report
-# ==============================================================================
-
-print_header "PHASE 7: SUMMARY REPORT"
-
-END_TIME=$(date +%s)
-ELAPSED=$((END_TIME - START_TIME))
-ELAPSED_MIN=$((ELAPSED / 60))
-ELAPSED_SEC=$((ELAPSED % 60))
-
-echo ""
-echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║                    PIPELINE EXECUTION SUMMARY                  ║"
-echo "╚════════════════════════════════════════════════════════════════╝"
-echo ""
-
-if [ "$SKIP_BACKUP" = false ]; then
-  echo "  Backup Archive:    $BACKUP_FILE"
-  echo "  Backup Size:       $BACKUP_SIZE"
-  echo "  Folders Backed Up: $RESULTS_COUNT"
-else
-  echo "  Backup:            Skipped (no results found)"
-fi
-
-echo ""
-echo "  Analysis Jobs:     ${#ANALYSIS_FOLDERS[@]} folders processed"
-echo "  Parallel Jobs:     ${PARALLEL_JOBS_LAUNCHED} launched"
-echo "  Failed Jobs:       $FAILED_JOBS"
-echo ""
-echo "  Log Directory:     $LOG_DIR"
-echo "  Total Runtime:     ${ELAPSED_MIN}m ${ELAPSED_SEC}s"
-echo ""
-PYLU_FLAG="${CHESS_ENABLE_PYLUSTRATOR:-CONFIG_DEFAULT}"
-echo "  Pylustrator:       $PYLU_FLAG"
-echo "  Levels Run:        analysis=${RUN_ANALYSIS}, tables=${RUN_TABLES}, figures=${RUN_FIGURES}"
-echo ""
-
-# Display detailed error summary if any scripts failed
-if [ -f "${LOG_DIR}/ERRORS.log" ]; then
-  TOTAL_FAILED_SCRIPTS=$(wc -l < "${LOG_DIR}/ERRORS.log")
-  echo "╔════════════════════════════════════════════════════════════════╗"
-  echo "║                        ERROR SUMMARY                           ║"
-  echo "╚════════════════════════════════════════════════════════════════╝"
-  echo ""
-  echo -e "${RED}  Total Failed Scripts: $TOTAL_FAILED_SCRIPTS${NC}"
-  echo ""
-  echo "  Failed Scripts Details:"
-  echo "  ─────────────────────────────────────────────────────────────"
-
-  # Parse and display each error in a readable format
-  while IFS='|' read -r folder script_name exit_code logfile; do
-    echo ""
-    echo -e "  ${RED}✗${NC} $script_name (exit code: $exit_code)"
-    echo "    Folder:  $folder"
-    echo "    Logfile: $logfile"
-  done < "${LOG_DIR}/ERRORS.log"
-
-  echo ""
-  echo "  ─────────────────────────────────────────────────────────────"
-  echo ""
-  echo "  To investigate errors:"
-  echo "    • View specific log:  cat $LOG_DIR/<folder_name>.log"
-  echo "    • Search for errors:  grep -n 'ERROR:' $LOG_DIR/*.log"
-  echo "    • View all errors:    cat ${LOG_DIR}/ERRORS.log"
-  echo ""
-fi
-
-if [ $FAILED_JOBS -eq 0 ]; then
-  print_success "Pipeline completed successfully!"
-else
-  print_warning "Pipeline completed with errors. Review logs for details."
-fi
-
-echo ""
-echo "Next steps:"
-echo "  1. Review logs:     ls -lh ${LOG_DIR}/"
-echo "  2. Check results:   ls -lh chess-*/results/"
-echo "  3. View outputs:    ls -lh ${REPO_ROOT}/results-bundle/figures/"
-echo ""
-
-# Exit with failure code if any jobs failed
-# ==============================================================================
-# Phase 8: Export Manuscript Bundle (timestamped)
-# ==============================================================================
-
-# Exit code based on job results
-if [ $FAILED_JOBS -gt 0 ]; then
-  exit 1
-else
-  exit 0
-fi
+print_ok "run_all_analyses.sh ($LEVEL) finished."
