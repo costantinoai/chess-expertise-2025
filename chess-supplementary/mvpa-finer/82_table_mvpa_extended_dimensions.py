@@ -3,49 +3,42 @@
 import sys
 from pathlib import Path
 import pandas as pd
-import pickle
 
-
-from common import CONFIG
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import CONFIG, setup_script, log_script_end
 from common.bids_utils import load_roi_metadata
 from common.report_utils import save_table_with_manuscript_copy
 from common.formatters import format_ci, format_p_cell, shorten_roi_name
+from analyses.mvpa.io import load_mvpa_group_stats
 
-# Find RSA and decoding results directories
-try:
-    rsa_dir = find_latest_results_directory(Path(__file__).parent / 'results', pattern='*_rsa', require_exists=True, verbose=True)
-    dec_dir = find_latest_results_directory(Path(__file__).parent / 'results', pattern='*_decoding', require_exists=True, verbose=True)
-except Exception as e:
-    logger = None
-    # If setup_analysis_in_dir below depends on rsa_dir, create a minimal logger via setup once we can
-    print(f"[WARN] Skipping MVPA Extended Dimensions tables: {e}")
+# Read RSA + decoding finer group stats from the unified results/ tree.
+# 02_mvpa_finer_group_rsa.py and 03_mvpa_finer_group_decoding.py each
+# write their own half (mvpa_finer_group_stats_rsa.pkl / _svm.pkl);
+# load_mvpa_group_stats merges them back into
+# {'rsa_corr': ..., 'svm': ...} for this script.
+results_dir, logger, dirs = setup_script(
+    __file__,
+    results_pattern='mvpa_finer_group_rsa',
+    output_subdirs=['tables'],
+    log_name='tables_mvpa_extended.log',
+)
+tables_dir = dirs['tables']
+
+logger.info("Loading MVPA finer RSA and decoding group statistics...")
+merged_stats = load_mvpa_group_stats(results_dir, prefix='mvpa_finer_group_stats')
+if 'rsa_corr' not in merged_stats or 'svm' not in merged_stats:
+    logger.warning(
+        "Skipping MVPA Extended Dimensions tables: missing %s half under %s",
+        'RSA' if 'rsa_corr' not in merged_stats else 'decoding',
+        results_dir,
+    )
     sys.exit(0)
-
-# Use RSA dir for logging/output
-_, _, logger = setup_analysis_in_dir(rsa_dir, script_file=__file__,
-                                      extra_config={"RESULTS_DIR": str(rsa_dir)},
-                                      suppress_warnings=True, log_name='tables_mvpa_extended.log')
-tables_dir = rsa_dir.parent / 'tables'
-tables_dir.mkdir(exist_ok=True)
-
-# Load data
-logger.info("Loading MVPA RSA and decoding statistics...")
-rsa_pkl = rsa_dir / 'mvpa_group_stats.pkl'
-dec_pkl = dec_dir / 'mvpa_group_stats.pkl'
-if not rsa_pkl.exists() or not dec_pkl.exists():
-    print(f"[WARN] Skipping MVPA Extended Dimensions tables: missing results files {rsa_pkl} or {dec_pkl}")
-    sys.exit(0)
-with open(rsa_pkl, 'rb') as f:
-    rsa_stats = pickle.load(f)
-with open(dec_pkl, 'rb') as f:
-    dec_stats = pickle.load(f)
+rsa_stats = {'rsa_corr': merged_stats['rsa_corr']}
+dec_stats = {'svm': merged_stats['svm']}
 
 # Load ROI metadata (22 bilateral regions)
 roi_dir = CONFIG['ROI_GLASSER_22']
 if not Path(roi_dir).exists():
-    print(f"[WARN] Skipping MVPA Extended Dimensions tables: ROI directory not found: {roi_dir}")
+    logger.warning("Skipping MVPA Extended Dimensions tables: ROI directory not found: %s", roi_dir)
     sys.exit(0)
 roi_info = load_roi_metadata(roi_dir)
 logger.info(f"Loaded {len(roi_info)} ROIs")

@@ -74,8 +74,7 @@ if CONFIG['ENABLE_PYLUSTRATOR']:
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from common.logging_utils import setup_analysis_in_dir, log_script_end
-from common.io_utils import find_latest_results_directory
+from common import setup_script, log_script_end
 from common.bids_utils import load_roi_metadata, load_stimulus_metadata
 from common.rsa_utils import create_model_rdm
 from common.plotting import (
@@ -91,6 +90,7 @@ from common.plotting import (
     save_panel_pdf,
 )
 from analyses.mvpa.plot_utils import extract_mvpa_bar_data
+from analyses.mvpa.io import load_mvpa_group_stats
 
 
 # =============================================================================
@@ -98,8 +98,6 @@ from analyses.mvpa.plot_utils import extract_mvpa_bar_data
 
 # =============================================================================
 # Define fine-grained dimensions to analyze (all on checkmate boards only)
-
-RESULTS_BASE = script_dir / "results"
 
 # Fine-grained targets to plot (those analyzed on checkmate boards)
 # All targets end with "_half" suffix indicating checkmate-only analysis
@@ -217,48 +215,23 @@ def compute_model_rdm_for_target(stim_tsv: Path, target: str) -> np.ndarray:
 
 apply_nature_rc()  # Apply Nature journal style to all figures
 
-# Find latest RSA and SVM decoding results directories (separate analyses)
-RESULTS_DIR_RSA = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern='mvpa_finer_group_rsa',
-    create_subdirs=['figures'],
-    require_exists=True,
-    verbose=True
+# Route into the unified results/ tree. The RSA and decoding group
+# stages each write a split artefact (mvpa_finer_group_stats_rsa.pkl /
+# mvpa_finer_group_stats_svm.pkl) into this analysis's data/ dir;
+# load_mvpa_group_stats merges them back into the legacy
+# {'rsa_corr': ..., 'svm': ...} schema this script expects.
+RESULTS_DIR, logger, dirs = setup_script(
+    __file__,
+    results_pattern='mvpa_finer_group_rsa',
+    output_subdirs=['figures'],
+    log_name='pylustrator_mvpa_finer.log',
 )
-RESULTS_DIR_SVM = find_latest_results_directory(
-    RESULTS_BASE,
-    pattern='mvpa_finer_group_decoding',
-    create_subdirs=['figures'],
-    require_exists=True,
-    verbose=True
-)
+FIGURES_DIR = dirs['figures']
 
-FIGURES_DIR = RESULTS_DIR_RSA / "figures"
-
-# Initialize logging in RSA results directory (primary output location)
-extra = {
-    "RESULTS_DIR_RSA": str(RESULTS_DIR_RSA),
-    "RESULTS_DIR_SVM": str(RESULTS_DIR_SVM),
-}
-config, _, logger = setup_analysis_in_dir(
-    results_dir=RESULTS_DIR_RSA,
-    script_file=__file__,
-    extra_config=extra,
-    suppress_warnings=True,
-    log_name="pylustrator_mvpa_finer.log",
-)
-
-logger.info("Loading MVPA finer group statistics...")
-
-# Load RSA correlation statistics (per-ROI, per-target, per-group)
-# Contains: Expert vs Novice RSA correlations, p-values, CIs
-with open(RESULTS_DIR_RSA / "mvpa_group_stats.pkl", "rb") as f:
-    rsa_stats = pickle.load(f)
-
-# Load SVM decoding statistics (per-ROI, per-target, per-group)
-# Contains: Expert vs Novice SVM accuracies, p-values, CIs
-with open(RESULTS_DIR_SVM / "mvpa_group_stats.pkl", "rb") as f:
-    svm_stats = pickle.load(f)
+logger.info("Loading MVPA finer group statistics (RSA + decoding halves)...")
+merged_stats = load_mvpa_group_stats(RESULTS_DIR, prefix='mvpa_finer_group_stats')
+rsa_stats = {'rsa_corr': merged_stats.get('rsa_corr', {})}
+svm_stats = {'svm':       merged_stats.get('svm',      {})}
 
 # Load ROI metadata for Glasser-22 parcellation
 roi_info = load_roi_metadata(CONFIG["ROI_GLASSER_22"])
