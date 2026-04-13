@@ -163,28 +163,29 @@ All analyses read their inputs from a **single external data root**. Configure t
 ```
 /path/to/manuscript-data/
 └── BIDS/ # BIDS dataset (raw + derivatives)
+ ├── sub-xx/{anat,func}
  ├── participants.tsv
  ├── stimuli/ # Stimulus images and metadata
  ├── sourcedata/atlases/ # Reference atlases (Glasser, CAB-NP, Neurosynth)
  └── derivatives/
- ├── fmriprep/ # fMRIPrep outputs
- ├── fmriprep_spm-unsmoothed/ # SPM first-level GLM on unsmoothed BOLD
- ├── fmriprep_spm-smoothed/ # SPM first-level GLM on 4 mm smoothed BOLD
- ├── fmriprep_spm-unsmoothed_rsa/ # ROI RSA (Glasser-22)
- ├── fmriprep_spm-unsmoothed_decoding/ # ROI decoding (Glasser-22)
- ├── fmriprep_spm-unsmoothed_searchlight-rsa/ # Whole-brain searchlight RSA
- ├── fmriprep_spm-unsmoothed_manifold/ # Per-ROI neural Participation Ratio
- ├── fmriprep_spm-unsmoothed_rsa-run-matched/ # Run-matched ROI RSA (supplementary)
- ├── fmriprep_spm-unsmoothed_rsa-subcortical/ # Subcortical ROI RSA (CAB-NP)
- ├── fmriprep_spm-unsmoothed_decoding-subcortical/ # Subcortical ROI decoding (CAB-NP)
- ├── fmriprep_spm-unsmoothed_rsa-rois/ # Glasser-180 ROI means from searchlight
- ├── fmriprep_spm-smoothed_univariate-rois/ # Glasser-180 ROI means from univariate
- ├── behavioral-rsa/ # Per-subject behavioural preference RDMs
- ├── bidsmreye/ # BidsMReye gaze estimates
- ├── bidsmreye_eyetracking-decoding/ # Eyetracking SVM decoding results
- ├── task-engagement/ # Per-subject behavioural diagnostics
- ├── skill-gradient/ # Enriched per-subject skill metrics
- └── group-results/ # Group-level stats, tables, figures
+   ├── fmriprep/ # fMRIPrep outputs
+   ├── fmriprep_spm-unsmoothed/ # SPM first-level GLM on unsmoothed BOLD
+   ├── fmriprep_spm-smoothed/ # SPM first-level GLM on 4 mm smoothed BOLD
+   ├── fmriprep_spm-unsmoothed_rsa/ # ROI RSA (Glasser-22)
+   ├── fmriprep_spm-unsmoothed_decoding/ # ROI decoding (Glasser-22)
+   ├── fmriprep_spm-unsmoothed_searchlight-rsa/ # Whole-brain searchlight RSA
+   ├── fmriprep_spm-unsmoothed_manifold/ # Per-ROI neural Participation Ratio
+   ├── fmriprep_spm-unsmoothed_rsa-run-matched/ # Run-matched ROI RSA (supplementary)
+   ├── fmriprep_spm-unsmoothed_rsa-subcortical/ # Subcortical ROI RSA (CAB-NP)
+   ├── fmriprep_spm-unsmoothed_decoding-subcortical/ # Subcortical ROI decoding (CAB-NP)
+   ├── fmriprep_spm-unsmoothed_rsa-rois/ # Glasser-180 ROI means from searchlight
+   ├── fmriprep_spm-smoothed_univariate-rois/ # Glasser-180 ROI means from univariate
+   ├── behavioral-rsa/ # Per-subject behavioural preference RDMs
+   ├── bidsmreye/ # BidsMReye gaze estimates
+   ├── bidsmreye_eyetracking-decoding/ # Eyetracking SVM decoding results
+   ├── task-engagement/ # Per-subject behavioural diagnostics
+   ├── skill-gradient/ # Enriched per-subject skill metrics
+   └── group-results/ # Group-level stats, tables, figures
 ```
 
 2) Point the repository to your local data folder by setting the `CHESS_DATA_ROOT`
