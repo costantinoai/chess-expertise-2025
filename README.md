@@ -25,7 +25,7 @@ export CHESS_DATA_ROOT=/path/to/extracted/data   # parent of BIDS/
 ./run_all_analyses.sh group
 ```
 
-That's it. All outputs go to `BIDS/derivatives/group-results/`. No source files need editing — `CHESS_DATA_ROOT` is the only configuration.
+That's it. All outputs go to `BIDS/derivatives/`. No source files need editing — `CHESS_DATA_ROOT` is the only configuration.
 
 ## Overview
 
