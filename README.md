@@ -33,7 +33,6 @@ That's it. All outputs go to `BIDS/derivatives/`. No source files need editing â
 **Task**: 1-back preference judgment task with 40 chess board stimuli (20 checkmate, 20 non-checkmate positions)
 **Neuroimaging**: 3T fMRI, whole-brain coverage, 2mm isotropic resolution
 **Behavioral**: Pairwise preference judgments during scanning
-**Eye-tracking**: Gaze coordinates during chess board viewing (supplementary)
 
 ### Key Findings
 
