@@ -6,37 +6,44 @@ This supplementary analysis summarizes subject-level univariate contrast maps wi
 
 ## Required bundles
 
-- `01_univariate_roi_summary.py` reads subject-level SPM contrast images from `derivatives/fmriprep_spm-smoothed/sub-*/exp/` and the Glasser-180 atlas from `sourcedata/atlases/glasser180/` → needs **A** (core) + **D** (spm).
-- `81/82/91` table and plot scripts only consume the outputs of `01` from the repo `results/` tree (no extra bundle).
+- `01_univariate_roi_subject.py` reads subject-level SPM contrast images from `derivatives/fmriprep_spm-smoothed/sub-*/exp/` and the Glasser-180 atlas from `sourcedata/atlases/glasser180/`, and writes per-subject ROI means into `derivatives/univariate-rois/` → needs **A** (core) + **D** (spm).
+- `11_univariate_roi_group.py` reads per-subject ROI means from `derivatives/univariate-rois/` and writes group aggregates into `derivatives/group-results/supplementary/univariate-rois/data/`.
+- `81/82/91` table and plot scripts only consume the outputs of `11` from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  A180[sourcedata/atlases/glasser180/]:::in
-  GLMS["derivatives/fmriprep_spm-smoothed/sub-*/"]:::in
+ PT[participants.tsv]:::in
+ A180[sourcedata/atlases/glasser180/]:::in
+ GLMS["derivatives/fmriprep_spm-smoothed/sub-*/"]:::in
 
-  U01["01_univariate_roi_summary.py"]:::sc
-  U81["81_table_univariate_rois.py"]:::sc
-  U82["82_table_roi_maps_univ.py"]:::sc
-  U91["91_plot_univariate_rois.py"]:::sc
-  DATA["results/supplementary/univariate-rois/data/"]:::rl
-  TABLES["results/supplementary/univariate-rois/tables/"]:::rl
-  FIGURES["results/supplementary/univariate-rois/figures/"]:::rl
+ U01["01_univariate_roi_subject.py"]:::sc
+ U11["11_univariate_roi_group.py"]:::sc
+ U81["81_table_univariate_rois.py"]:::sc
+ U82["82_table_roi_maps_univ.py"]:::sc
+ U91["91_plot_univariate_rois.py"]:::sc
+ DERIV[derivatives/univariate-rois/]:::out
+ DATA["derivatives/group-results/supplementary/univariate-rois/data/"]:::out
+ TABLES["derivatives/group-results/supplementary/univariate-rois/tables/"]:::out
+ FIGURES["derivatives/group-results/supplementary/univariate-rois/figures/"]:::out
 
-  A180 --> U01
-  GLMS --> U01
-  PT --> U01
-  U01 --> DATA
+ A180 --> U01
+ GLMS --> U01
+ PT --> U01
+ U01 --> DERIV
 
-  DATA --> U81 --> TABLES
-  DATA --> U82 --> TABLES
-  DATA --> U91 --> FIGURES
+ DERIV --> U11
+ PT --> U11
+ U11 --> DATA
+
+ DATA --> U81 --> TABLES
+ DATA --> U82 --> TABLES
+ DATA --> U91 --> FIGURES
 ```
 
 ## Methods
@@ -57,13 +64,13 @@ While whole-brain SPM analyses provide voxelwise statistical maps, ROI-level sum
 
 1. Load Glasser-180 bilateral atlas and ROI metadata (180 ROIs)
 2. For each subject and contrast:
-   - Load volumetric contrast image from SPM first-level analysis
-   - Extract mean contrast value across voxels within each of 180 bilateral ROIs using NiftiLabelsMasker
+ - Load volumetric contrast image from SPM first-level analysis
+ - Extract mean contrast value across voxels within each of 180 bilateral ROIs using NiftiLabelsMasker
 3. For each contrast:
-   - Form expert and novice matrices (subjects × 180 ROIs)
-   - Run Welch's t-tests per ROI comparing expert vs novice means
-   - Apply Benjamini-Hochberg FDR correction across 180 tests (α=0.05)
-   - Compute per-group descriptive means and 95% CIs per ROI
+ - Form expert and novice matrices (subjects × 180 ROIs)
+ - Run Welch's t-tests per ROI comparing expert vs novice means
+ - Apply Benjamini-Hochberg FDR correction across 180 tests (α=0.05)
+ - Compute per-group descriptive means and 95% CIs per ROI
 
 ### Statistical Tests
 
@@ -100,18 +107,27 @@ ROI_GLASSER_180_ATLAS = ROI_GLASSER_180 / "tpl-MNI152NLin2009cAsym_res-02_atlas-
 
 ## Running the Analysis
 
-### Step 1: Run ROI Summary Analysis
+### Step 1: Per-subject ROI extraction
 
 ```bash
 # From repository root
-python chess-supplementary/univariate-rois/01_univariate_roi_summary.py
+python chess-supplementary/univariate-rois/01_univariate_roi_subject.py
 ```
 
-**Outputs** (saved to `results/supplementary/univariate-rois/data/`):
-- `univ_subject_roi_means_{contrast}.tsv`: Subject × ROI tables per contrast
+**Outputs** (saved to `BIDS/derivatives/univariate-rois/sub-*/`):
+- Per-subject ROI mean contrast values per contrast
+
+### Step 2: Group-level statistics
+
+```bash
+python chess-supplementary/univariate-rois/11_univariate_roi_group.py
+```
+
+**Outputs** (saved to `derivatives/group-results/supplementary/univariate-rois/data/`):
+- `univ_subject_roi_means_{contrast}.tsv`: Subject x ROI tables per contrast
 - `univ_group_stats.pkl`: Per-contrast Welch statistics and descriptives
 
-### Step 2: Tables and figures
+### Step 3: Tables and figures
 
 ```bash
 python chess-supplementary/univariate-rois/81_table_univariate_rois.py
@@ -119,8 +135,8 @@ python chess-supplementary/univariate-rois/82_table_roi_maps_univ.py
 python chess-supplementary/univariate-rois/91_plot_univariate_rois.py
 ```
 
-- Tables → `results/supplementary/univariate-rois/tables/`
-- Figures → `results/supplementary/univariate-rois/figures/`
+- Tables → `derivatives/group-results/supplementary/univariate-rois/tables/`
+- Figures → `derivatives/group-results/supplementary/univariate-rois/figures/`
 
 **Expected runtime**: ~2-5 minutes
 
@@ -133,15 +149,16 @@ python chess-supplementary/univariate-rois/91_plot_univariate_rois.py
 
 ```
 chess-supplementary/univariate-rois/
-├── README.md                              # This file
-├── 01_univariate_roi_summary.py           # Main ROI summary analysis
-├── 81_table_univariate_rois.py            # Summary table per contrast
-├── 82_table_roi_maps_univ.py              # ROI table annotated with maps
-├── 91_plot_univariate_rois.py             # ROI-level figures
-├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-└── analyses/univariate_rois/              # Shared analysis modules (in repo root analyses/ package)
-    ├── __init__.py
-    └── io.py                              # Contrast map loading utilities
+├── README.md # This file
+├── 01_univariate_roi_subject.py # Subject-level: ROI extraction → derivatives/univariate-rois/
+├── 11_univariate_roi_group.py # Group-level: statistics → derivatives/group-results/
+├── 81_table_univariate_rois.py # Summary table per contrast
+├── 82_table_roi_maps_univ.py # ROI table annotated with maps
+├── 91_plot_univariate_rois.py # ROI-level figures
+├── DISCREPANCIES.md # Notes on analysis discrepancies
+└── analyses/univariate_rois/ # Shared analysis modules (in repo root analyses/ package)
+ ├── __init__.py
+ └── io.py # Contrast map loading utilities
 ```
 
-Outputs are written to `results/supplementary/univariate-rois/{data,tables,figures}/` in the unified repo results tree.
+Outputs: per-subject data in `BIDS/derivatives/univariate-rois/`; group-level aggregates in `derivatives/group-results/supplementary/univariate-rois/{data,tables,figures}/`. The `results/` tree contains **only group-level aggregates** (GDPR-compliant).

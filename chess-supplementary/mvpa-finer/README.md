@@ -7,55 +7,54 @@ This supplementary analysis extends the main MVPA analysis by performing RSA and
 ## Required bundles
 
 - `01_roi_decoding_fine.m` (MATLAB subject script) reads SPM unsmoothed betas from `derivatives/fmriprep_spm-unsmoothed/` and the Glasser-22 atlas from `sourcedata/atlases/glasser22/`; it appends the new `_half` target rows to the same per-subject TSVs under `derivatives/fmriprep_spm-unsmoothed_rsa/` and `derivatives/fmriprep_spm-unsmoothed_decoding/` → needs **A** (core) + **D** (spm).
-- `02_mvpa_finer_group_rsa.py` and `03_mvpa_finer_group_decoding.py` read those per-subject TSVs → need **A** (core) + **E** (analyses).
-- `81/82/92` table and plot scripts only consume the outputs of `02`/`03` from the repo `results/` tree (no extra bundle).
+- `11_mvpa_finer_group_rsa.py` and `12_mvpa_finer_group_decoding.py` read those per-subject TSVs → need **A** (core) + **E** (analyses).
+- `81/82/91` table and plot scripts only consume the outputs of `11`/`12` from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef out fill:#fff5b1,stroke:#b08800,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ST[stimuli/]:::in
-  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
-  A22[sourcedata/atlases/glasser22/]:::in
+ PT[participants.tsv]:::in
+ ST[stimuli/]:::in
+ GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+ A22[sourcedata/atlases/glasser22/]:::in
 
-  MF01["01_roi_decoding_fine.m"]:::sc
-  MF02["02_mvpa_finer_group_rsa.py"]:::sc
-  MF03["03_mvpa_finer_group_decoding.py"]:::sc
-  MF81["81_table_mvpa_finer_rsa.py"]:::sc
-  MF82a["82_table_mvpa_finer_decoding.py"]:::sc
-  MF82b["82_table_mvpa_extended_dimensions.py"]:::sc
-  MF92["92_plot_mvpa_finer_panel.py"]:::sc
+ MF01["01_roi_decoding_fine.m"]:::sc
+ MF11["11_mvpa_finer_group_rsa.py"]:::sc
+ MF12["12_mvpa_finer_group_decoding.py"]:::sc
+ MF81["81_table_mvpa_finer_rsa.py"]:::sc
+ MF82a["82_table_mvpa_finer_decoding.py"]:::sc
+ MF82b["82_table_mvpa_extended_dimensions.py"]:::sc
+ MF91["91_plot_mvpa_finer_panel.py"]:::sc
 
-  MR["derivatives/fmriprep_spm-unsmoothed_rsa/ (extra cols)"]:::out
-  MD["derivatives/fmriprep_spm-unsmoothed_decoding/ (extra cols)"]:::out
-  DATA["results/supplementary/mvpa-finer/data/"]:::rl
-  TABLES["results/supplementary/mvpa-finer/tables/"]:::rl
-  FIGURES["results/supplementary/mvpa-finer/figures/"]:::rl
+ MR["derivatives/fmriprep_spm-unsmoothed_rsa/ (extra cols)"]:::out
+ MD["derivatives/fmriprep_spm-unsmoothed_decoding/ (extra cols)"]:::out
+ DATA["derivatives/group-results/supplementary/mvpa-finer/data/"]:::out
+ TABLES["derivatives/group-results/supplementary/mvpa-finer/tables/"]:::out
+ FIGURES["derivatives/group-results/supplementary/mvpa-finer/figures/"]:::out
 
-  GLMU --> MF01
-  A22 --> MF01
-  ST --> MF01
-  MF01 --> MR
-  MF01 --> MD
+ GLMU --> MF01
+ A22 --> MF01
+ ST --> MF01
+ MF01 --> MR
+ MF01 --> MD
 
-  MR --> MF02
-  PT --> MF02
-  MF02 --> DATA
+ MR --> MF11
+ PT --> MF11
+ MF11 --> DATA
 
-  MD --> MF03
-  PT --> MF03
-  MF03 --> DATA
+ MD --> MF12
+ PT --> MF12
+ MF12 --> DATA
 
-  DATA --> MF81 --> TABLES
-  DATA --> MF82a --> TABLES
-  DATA --> MF82b --> TABLES
-  DATA --> MF92 --> FIGURES
+ DATA --> MF81 --> TABLES
+ DATA --> MF82a --> TABLES
+ DATA --> MF82b --> TABLES
+ DATA --> MF91 --> FIGURES
 ```
 
 ## Methods
@@ -135,10 +134,10 @@ Same as main MVPA analysis (`chess-mvpa/`):
 
 ```bash
 # From repository root
-python chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py
+python chess-supplementary/mvpa-finer/11_mvpa_finer_group_rsa.py
 ```
 
-**Outputs** (saved to `results/supplementary/mvpa-finer/data/`):
+**Outputs** (saved to `derivatives/group-results/supplementary/mvpa-finer/data/`):
 - Statistical results per target (CSV files)
 - `mvpa_group_stats.pkl`: Complete results dictionary
 
@@ -147,10 +146,10 @@ python chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py
 ### Step 3: Group-Level Decoding Analysis (Python)
 
 ```bash
-python chess-supplementary/mvpa-finer/03_mvpa_finer_group_decoding.py
+python chess-supplementary/mvpa-finer/12_mvpa_finer_group_decoding.py
 ```
 
-**Outputs** (saved to `results/supplementary/mvpa-finer/data/`):
+**Outputs** (saved to `derivatives/group-results/supplementary/mvpa-finer/data/`):
 - Statistical results per target (CSV files)
 - `mvpa_group_stats.pkl`: Complete results dictionary
 
@@ -165,11 +164,11 @@ python chess-supplementary/mvpa-finer/82_table_mvpa_finer_decoding.py
 python chess-supplementary/mvpa-finer/82_table_mvpa_extended_dimensions.py
 
 # Figures
-python chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
+python chess-supplementary/mvpa-finer/91_plot_mvpa_finer_panel.py
 ```
 
-- Tables → `results/supplementary/mvpa-finer/tables/`
-- Figures → `results/supplementary/mvpa-finer/figures/`
+- Tables → `derivatives/group-results/supplementary/mvpa-finer/tables/`
+- Figures → `derivatives/group-results/supplementary/mvpa-finer/figures/`
 
 ## Key Results
 
@@ -181,16 +180,16 @@ python chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py
 
 ```
 chess-supplementary/mvpa-finer/
-├── README.md                              # This file
-├── 01_roi_decoding_fine.m                 # MATLAB: Subject-level RSA and decoding
-├── 02_mvpa_finer_group_rsa.py             # Python: Group-level RSA statistics
-├── 03_mvpa_finer_group_decoding.py        # Python: Group-level decoding statistics
-├── 81_table_mvpa_finer_rsa.py             # LaTeX/CSV table generation (RSA)
-├── 82_table_mvpa_finer_decoding.py        # LaTeX/CSV table generation (decoding)
-├── 82_table_mvpa_extended_dimensions.py   # Extended dimension summary table
-├── 92_plot_mvpa_finer_panel.py            # Figure generation
-├── METHODS.md                             # Detailed methods from manuscript
-└── DISCREPANCIES.md                       # Notes on analysis discrepancies
+├── README.md # This file
+├── 01_roi_decoding_fine.m # MATLAB: Subject-level RSA and decoding
+├── 11_mvpa_finer_group_rsa.py # Group-level: RSA statistics → derivatives/group-results/
+├── 12_mvpa_finer_group_decoding.py # Group-level: decoding statistics → derivatives/group-results/
+├── 81_table_mvpa_finer_rsa.py # LaTeX/CSV table generation (RSA)
+├── 82_table_mvpa_finer_decoding.py # LaTeX/CSV table generation (decoding)
+├── 82_table_mvpa_extended_dimensions.py # Extended dimension summary table
+├── 91_plot_mvpa_finer_panel.py # Figure generation
+├── METHODS.md # Detailed methods from manuscript
+└── DISCREPANCIES.md # Notes on analysis discrepancies
 ```
 
-Outputs are written to `results/supplementary/mvpa-finer/{data,tables,figures}/` in the unified repo results tree.
+Outputs are written to `derivatives/group-results/supplementary/mvpa-finer/{data,tables,figures}/` in the unified repo results tree. The `results/` tree contains **only group-level aggregates** (GDPR-compliant); per-subject data lives in `BIDS/derivatives/`.

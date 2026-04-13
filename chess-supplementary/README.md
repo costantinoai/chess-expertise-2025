@@ -174,15 +174,25 @@ Each subdirectory contains a complete analysis with its own README, scripts, and
 
 ## Running All Supplementary Analyses
 
-To run every group/table/plot script in the supplementary tree, use the top-level pipeline. With no arguments, `run_all_analyses.sh` runs at the `group` level (the Python layer that regenerates `results/supplementary/<name>/{data,tables,figures}/`):
+To run every group/table/plot script in the supplementary tree, use the top-level pipeline. With no arguments, `run_all_analyses.sh` runs at the `group` level (the Python layer that regenerates `derivatives/group-results/supplementary/<name>/{data,tables,figures}/`):
 
 ```bash
 # From repository root
-./run_all_analyses.sh            # default: group level
-./run_all_analyses.sh group      # same as above, explicit
+./run_all_analyses.sh # default: group level
+./run_all_analyses.sh group # same as above, explicit
 ```
 
 Use `./run_all_analyses.sh subject-level` to re-run the MATLAB subject scripts that write into `BIDS/derivatives/fmriprep_spm-unsmoothed_{rsa,decoding,...}/`; do not do this unless you have the time budget for the full MATLAB re-run.
 
-Outputs land in the unified repo tree at `results/supplementary/<name>/{data,tables,figures}/`.
+Outputs land in the unified repo tree at `derivatives/group-results/supplementary/<name>/{data,tables,figures}/`. The `results/` tree contains **only group-level aggregates** (GDPR-compliant); per-subject data lives in `BIDS/derivatives/`.
+
+### Naming convention
+
+Scripts follow a subject/group split numbering scheme:
+- **0x** = subject-level scripts (write per-subject data to `BIDS/derivatives/`)
+- **1x** = group-level scripts (read from `derivatives/`, write group-level aggregates to `derivatives/group-results/`)
+- **8x** = table scripts (read from `derivatives/group-results/`, write formatted tables)
+- **9x** = figure scripts (read from `derivatives/group-results/`, write rendered figures)
+
+Within each pipeline, related subject and group scripts share the same unit digit (e.g., `01` and `11` form a pair).
 

@@ -11,12 +11,16 @@ classification analyses, and writes outputs to
 
     results/manifold/data/
 
-Outputs (unchanged from the pre-refactor monolith for regression diff):
+This script writes only GROUP-LEVEL aggregates to the results/ tree.
+Per-subject PR values remain in BIDS/derivatives/ (written by the
+subject-level script 01_manifold_subject.py).
+
+Outputs:
 
     pr_summary_stats.csv           # group means, CIs, SEMs per ROI
     pr_statistical_tests.csv       # Welch t-tests + FDR + Cohen's d
     pr_classification_tests.csv    # ROI + PCA 2D permutation tests
-    pr_results.pkl                 # complete results dictionary
+    pr_results.pkl                 # group-level results dictionary
 """
 
 from __future__ import annotations
@@ -54,7 +58,7 @@ from analyses.manifold.analysis import (
 # Setup
 # ---------------------------------------------------------------------------
 config, _, logger = setup_analysis(
-    analysis_name="02_manifold_group",
+    analysis_name="11_manifold_group",
     results_base=CONFIG["RESULTS_ROOT"] / "manifold" / "logs",
     script_file=__file__,
 )
@@ -236,9 +240,8 @@ novices_desc = get_descriptives_per_roi(novice_vals, confidence_level=0.95)
 # Save complete results dict
 # ---------------------------------------------------------------------------
 results = {
-    "pr_long_format": pr_df,
+    # Group-level only -- per-subject data lives in BIDS/derivatives/
     "roi_info": roi_info,
-    "participants": participants,
     "roi_labels": roi_labels,
     "summary_stats": summary_stats,
     "stats_results": stats_results,
@@ -254,7 +257,6 @@ results = {
         "components": pca2d.components_,
     },
     "pr_matrix": {
-        "matrix": pr_matrix,
         "n_experts": int(n_experts_mat),
     },
     "voxel_corr": {

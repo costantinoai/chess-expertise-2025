@@ -12,15 +12,14 @@ This supplementary analysis provides visualization of the seven Neurosynth cogni
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  ATLNS["sourcedata/atlases/neurosynth/terms/"]:::in
-  P91["91_plot_neurosynth_terms.py"]:::sc
-  FIGURES["results/supplementary/neurosynth-terms/figures/"]:::rl
+ ATLNS["sourcedata/atlases/neurosynth/terms/"]:::in
+ P91["91_plot_neurosynth_terms.py"]:::sc
+ FIGURES["derivatives/group-results/supplementary/neurosynth-terms/figures/"]:::out
 
-  ATLNS --> P91 --> FIGURES
+ ATLNS --> P91 --> FIGURES
 ```
 
 ## Methods
@@ -65,8 +64,8 @@ See `requirements.txt` in the repository root for complete dependencies.
 ### Input Files
 
 - **Neurosynth term maps**: `BIDS/sourcedata/atlases/neurosynth/terms/*.nii.gz`
-  - Z-scored association test maps for each term
-  - Downloaded from https://neurosynth.org/
+ - Z-scored association test maps for each term
+ - Downloaded from https://neurosynth.org/
 
 ### Data Location
 
@@ -81,7 +80,7 @@ Path is derived from `CONFIG['NEUROSYNTH_ROOT']` in `common/constants.py`, which
 python chess-supplementary/neurosynth-terms/91_plot_neurosynth_terms.py
 ```
 
-**Outputs** (saved to `results/supplementary/neurosynth-terms/figures/`):
+**Outputs** (saved to `derivatives/group-results/supplementary/neurosynth-terms/figures/`):
 - Flatmap visualizations for each term
 - Glass brain projections for each term
 - Combined multi-panel figure showing all terms
@@ -98,14 +97,14 @@ python chess-supplementary/neurosynth-terms/91_plot_neurosynth_terms.py
 
 ```
 chess-supplementary/neurosynth-terms/
-├── README.md                              # This file
-├── 91_plot_neurosynth_terms.py            # Term map visualization
-├── METHODS.md                             # Detailed methods from manuscript
-└── DISCREPANCIES.md                       # Notes on analysis discrepancies
+├── README.md # This file
+├── 91_plot_neurosynth_terms.py # Term map visualization
+├── METHODS.md # Detailed methods from manuscript
+└── DISCREPANCIES.md # Notes on analysis discrepancies
 ```
 
 Outputs are written to the unified repo results tree at
-`results/supplementary/neurosynth-terms/figures/`.
+`derivatives/group-results/supplementary/neurosynth-terms/figures/`.
 
 ## Troubleshooting
 

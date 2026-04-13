@@ -9,44 +9,62 @@ provides diagnostic metrics for task compliance.
 
 ## Required bundles
 
-- `01_task_engagement.py`, `02_familiarisation_accuracy.py`, and `04_quantify_preference_drivers.py` read BIDS events, stimuli, and participants directly → needs **A** (core) only.
-- `91/92/93` plot scripts only consume the outputs of `01`/`02`/`04` from the repo `results/` tree (no extra bundle).
+- `01_task_engagement_subject.py` and `02_familiarisation_accuracy_subject.py` read BIDS events, stimuli, and participants, and write per-subject metrics into `derivatives/task-engagement/` → needs **A** (core) only.
+- `11_task_engagement_group.py`, `12_familiarisation_accuracy_group.py`, and `13_quantify_preference_drivers.py` read per-subject data from `derivatives/task-engagement/` and write group aggregates into `derivatives/group-results/supplementary/task-engagement/data/`.
+- `91/92/93` plot scripts only consume the outputs of `11`/`12`/`13` from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ST[stimuli/]:::in
-  EV["sub-*/func/ (events)"]:::in
+ PT[participants.tsv]:::in
+ ST[stimuli/]:::in
+ EV["sub-*/func/ (events)"]:::in
 
-  T01["01_task_engagement.py"]:::sc
-  T02["02_familiarisation_accuracy.py"]:::sc
-  T04["04_quantify_preference_drivers.py"]:::sc
-  T91["91_plot_novice_diagnostics.py"]:::sc
-  T92["92_plot_preference_features.py"]:::sc
-  T93["93_plot_gradient_panel.py"]:::sc
-  DATA["results/supplementary/task-engagement/data/"]:::rl
-  FIGURES["results/supplementary/task-engagement/figures/"]:::rl
+ T01["01_task_engagement_subject.py"]:::sc
+ T02["02_familiarisation_accuracy_subject.py"]:::sc
+ T11["11_task_engagement_group.py"]:::sc
+ T12["12_familiarisation_accuracy_group.py"]:::sc
+ T13["13_quantify_preference_drivers.py"]:::sc
+ T91["91_plot_novice_diagnostics.py"]:::sc
+ T92["92_plot_preference_features.py"]:::sc
+ T93["93_plot_gradient_panel.py"]:::sc
+ DERIV[derivatives/task-engagement/]:::out
+ DATA["derivatives/group-results/supplementary/task-engagement/data/"]:::out
+ FIGURES["derivatives/group-results/supplementary/task-engagement/figures/"]:::out
 
-  EV --> T01 --> DATA
-  PT --> T01
-  EV --> T02 --> DATA
-  PT --> T02
-  ST --> T04 --> DATA
+ EV --> T01
+ PT --> T01
+ T01 --> DERIV
 
-  DATA --> T91 --> FIGURES
-  EV --> T91
-  ST --> T91
-  PT --> T91
-  DATA --> T92 --> FIGURES
-  ST --> T92
-  DATA --> T93 --> FIGURES
-  PT --> T93
+ EV --> T02
+ PT --> T02
+ T02 --> DERIV
+
+ DERIV --> T11
+ PT --> T11
+ T11 --> DATA
+
+ DERIV --> T12
+ PT --> T12
+ T12 --> DATA
+
+ DERIV --> T13
+ ST --> T13
+ T13 --> DATA
+
+ DATA --> T91 --> FIGURES
+ EV --> T91
+ ST --> T91
+ PT --> T91
+ DATA --> T92 --> FIGURES
+ ST --> T92
+ DATA --> T93 --> FIGURES
+ PT --> T93
 ```
 
 ## Methods
@@ -60,7 +78,7 @@ board or the previous one. Button mapping was counterbalanced across runs.
 
 - 40 stimuli: 20 checkmate positions, 20 non-checkmate positions
 - 20 visual pairs: each pair consists of one checkmate and one non-checkmate
-  board matched for visual appearance (same position with/without checkmate)
+ board matched for visual appearance (same position with/without checkmate)
 - 80 trials per run, 6--10 runs per subject
 - First trial of each run excluded (no previous board to compare)
 
@@ -133,11 +151,11 @@ preferences indicate noisy or context-dependent judgments.
 **Computation**: For each subject:
 1. Extract all pairwise preferences from 1-back comparisons across all runs.
 2. For each pair (A, B), determine the net preference direction: A > B if A
-   was preferred over B more often than B over A. Ties (equal counts) are
-   excluded.
+ was preferred over B more often than B over A. Ties (equal counts) are
+ excluded.
 3. For all ordered triples (A, B, C) where A > B and B > C, test whether
-   A > C. The transitivity proportion = (number of transitive triples) /
-   (total testable triples).
+ A > C. The transitivity proportion = (number of transitive triples) /
+ (total testable triples).
 
 **Interpretation**: The 1-back task produces incomplete pairwise data (not
 all pairs are compared), so absolute transitivity values are descriptive
@@ -159,22 +177,22 @@ visual pair).
 
 **Computation**:
 1. For each board (1--40), compute the marginal selection frequency: how
-   often it is chosen as "current preferred" when it appears as the current
-   stimulus, across all opponents and all subjects in the group. This is the
-   board's "win rate" against random opponents.
+ often it is chosen as "current preferred" when it appears as the current
+ stimulus, across all opponents and all subjects in the group. This is the
+ board's "win rate" against random opponents.
 2. For each of the 20 visual pairs, extract the checkmate board's frequency
-   (C_freq) and the non-checkmate board's frequency (NC_freq).
+ (C_freq) and the non-checkmate board's frequency (NC_freq).
 3. Correlate C_freq with NC_freq across the 20 pairs (Pearson r).
 
 **Interpretation**:
 - **High positive C-NC r** (e.g., novice per-subject mean r = 0.675 (group-level r = 0.87)): Both members of a
-  visual pair have similar selection frequencies. This means preferences
-  are driven by visual features shared within the pair (e.g., complexity,
-  color balance), not by checkmate status.
+ visual pair have similar selection frequencies. This means preferences
+ are driven by visual features shared within the pair (e.g., complexity,
+ color balance), not by checkmate status.
 - **Near-zero or negative C-NC r** (e.g., expert r ≈ −0.06): The checkmate
-  and non-checkmate members of a pair have unrelated frequencies. This means
-  preferences depend on checkmate status (a relational feature), not on the
-  visual properties shared within the pair.
+ and non-checkmate members of a pair have unrelated frequencies. This means
+ preferences depend on checkmate status (a relational feature), not on the
+ visual properties shared within the pair.
 
 **Note on the selection frequency metric**: `current_chosen` = 1 when the
 board is preferred as the current stimulus, 0 when the previous board is
@@ -185,10 +203,10 @@ frequency is equivalent to a win rate in a tournament with random opponents.
 
 **Computed at two levels**:
 - Group-level: average selection frequency across all subjects in the group,
-  then correlate C vs NC across 20 pairs. Produces one r per group.
+ then correlate C vs NC across 20 pairs. Produces one r per group.
 - Per-subject: compute selection frequency per subject, correlate C vs NC
-  per subject. Produces one r per subject, enabling group comparison with
-  a t-test.
+ per subject. Produces one r per subject, enabling group comparison with
+ a t-test.
 
 **Fisher z-test**: Tests whether the group-level C-NC correlation differs
 between experts and novices.
@@ -232,14 +250,14 @@ between experts and novices.
 ### Statistical Tests
 
 - **Welch two-sample t-test**: Compares experts vs novices (unequal variance
-  assumed). Reports t-statistic, degrees of freedom (Welch-Satterthwaite),
-  and two-tailed p-value.
+ assumed). Reports t-statistic, degrees of freedom (Welch-Satterthwaite),
+ and two-tailed p-value.
 - **One-sample t-test**: Tests group mean against an interpretable theoretical
-  baseline (50% for checkmate preference, 0 for C-NC r).
+ baseline (50% for checkmate preference, 0 for C-NC r).
 - **Cohen's d**: Effect size using pooled SD:
-  d = (M_expert − M_novice) / sqrt((SD²_expert + SD²_novice) / 2).
+ d = (M_expert − M_novice) / sqrt((SD²_expert + SD²_novice) / 2).
 - **Fisher z-test**: Tests difference between two independent Pearson
-  correlations. Uses the Fisher z-transformation and normal approximation.
+ correlations. Uses the Fisher z-transformation and normal approximation.
 
 ## Dependencies
 
@@ -253,9 +271,9 @@ between experts and novices.
 ### Input Files
 
 - **BIDS events files**: `BIDS_ROOT/sub-XX/func/sub-XX_task-exp_run-N_events.tsv`
-  - Required columns: `stim_id`, `preference` (current_preferred, previous_preferred, or n/a), `onset`
+ - Required columns: `stim_id`, `preference` (current_preferred, previous_preferred, or n/a), `onset`
 - **Stimulus metadata**: `CONFIG['STIMULI_FILE']` (stimuli.tsv)
-  - Required columns: `stim_id`, `check_status`, `visual` (pair mapping)
+ - Required columns: `stim_id`, `check_status`, `visual` (pair mapping)
 - **Familiarisation data**: Subject-level pre-scan familiarisation task logs
 - **Stimulus images**: PNG files for image-level feature extraction (entropy, edge density, luminance)
 
@@ -270,32 +288,48 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 
 ## Running the Analysis
 
-### Step 1: Run task engagement diagnostics
+### Step 1: Per-subject task engagement metrics
 
 ```bash
 cd chess-supplementary/task-engagement
-python 01_task_engagement.py
+python 01_task_engagement_subject.py
 ```
 
-Computes response rate, checkmate preference, within-subject transitivity, and board preference profile (C-NC correlation) for all participants.
+Computes per-subject response rate, checkmate preference, within-subject transitivity, and board preference profile metrics. Outputs to `BIDS/derivatives/task-engagement/`.
 
-### Step 2: Run familiarisation accuracy analysis
+### Step 2: Per-subject familiarisation accuracy
 
 ```bash
-python 02_familiarisation_accuracy.py
+python 02_familiarisation_accuracy_subject.py
 ```
 
-Analyses pre-scan familiarisation task accuracy (move detection on checkmate boards) per subject and group.
+Computes per-subject pre-scan familiarisation task accuracy. Outputs to `BIDS/derivatives/task-engagement/`.
 
-### Step 3: Run board preference feature drivers
+### Step 3: Group-level task engagement
 
 ```bash
-python 04_quantify_preference_drivers.py
+python 11_task_engagement_group.py
 ```
 
-Extracts 16 board-level (FEN) and 4 image-level features per stimulus, correlates each with selection frequency per group, and applies FDR correction.
+Aggregates per-subject engagement metrics, runs group comparisons. Outputs to `derivatives/group-results/supplementary/task-engagement/data/`.
 
-### Step 4: Generate task engagement diagnostic figures
+### Step 4: Group-level familiarisation accuracy
+
+```bash
+python 12_familiarisation_accuracy_group.py
+```
+
+Aggregates per-subject familiarisation accuracy, runs group comparisons. Outputs to `derivatives/group-results/supplementary/task-engagement/data/`.
+
+### Step 5: Board preference feature drivers
+
+```bash
+python 13_quantify_preference_drivers.py
+```
+
+Extracts 16 board-level (FEN) and 4 image-level features per stimulus, correlates each with selection frequency per group, and applies FDR correction. Outputs to `derivatives/group-results/supplementary/task-engagement/data/`.
+
+### Step 6: Generate task engagement diagnostic figures
 
 ```bash
 python 91_plot_novice_diagnostics.py
@@ -303,7 +337,7 @@ python 91_plot_novice_diagnostics.py
 
 Produces the combined 2-row panel: Row 1 (a--d) engagement bar plots; Row 2 (e--f) board preference scatters.
 
-### Step 5: Generate preference feature driver figures
+### Step 7: Generate preference feature driver figures
 
 ```bash
 python 92_plot_preference_features.py
@@ -311,7 +345,7 @@ python 92_plot_preference_features.py
 
 Produces board-image panels of top-preferred boards per group and feature-preference correlation plots.
 
-### Step 6: Generate gradient figure
+### Step 8: Generate gradient figure
 
 ```bash
 python 93_plot_gradient_panel.py
@@ -413,17 +447,19 @@ Expert preferences are almost entirely explained by the strategic-relational blo
 
 ```
 chess-supplementary/task-engagement/
-├── 01_task_engagement.py              # Diagnostics 1-4 (engagement metrics)
-├── 02_familiarisation_accuracy.py     # Pre-scan familiarisation task accuracy
-├── 04_quantify_preference_drivers.py  # Diagnostic 5: 8-feature gradient, partial correlations, variance partitioning
-├── 91_plot_novice_diagnostics.py      # Diagnostics 1-4 figure panel
-├── 92_plot_preference_features.py     # Diagnostic 5 figure: board images + scatter
-├── 93_plot_gradient_panel.py          # Diagnostic 5 figure: bivariate vs partial + variance bars
+├── 01_task_engagement_subject.py # Subject-level: engagement metrics → derivatives/task-engagement/
+├── 02_familiarisation_accuracy_subject.py # Subject-level: familiarisation accuracy → derivatives/task-engagement/
+├── 11_task_engagement_group.py # Group-level: engagement group comparisons → derivatives/group-results/
+├── 12_familiarisation_accuracy_group.py # Group-level: familiarisation group comparisons → derivatives/group-results/
+├── 13_quantify_preference_drivers.py # Group-level: 8-feature gradient, partial correlations, variance partitioning → derivatives/group-results/
+├── 91_plot_novice_diagnostics.py # Diagnostics 1-4 figure panel
+├── 92_plot_preference_features.py # Diagnostic 5 figure: board images + scatter
+├── 93_plot_gradient_panel.py # Diagnostic 5 figure: bivariate vs partial + variance bars
 ├── README.md
-└── analyses/task_engagement/          # Shared analysis modules (in repo root analyses/ package)
-    ├── __init__.py
-    └── io.py                          # Familiarisation data loading utilities
+└── analyses/task_engagement/ # Shared analysis modules (in repo root analyses/ package)
+ ├── __init__.py
+ └── io.py # Familiarisation data loading utilities
 ```
 
-Outputs are written to `results/supplementary/task-engagement/{data,figures}/` in the unified repo results tree (no per-analysis `results/` folder under `chess-supplementary/task-engagement/` anymore).
+Outputs: per-subject data in `BIDS/derivatives/task-engagement/`; group-level aggregates in `derivatives/group-results/supplementary/task-engagement/{data,figures}/`. The `results/` tree contains **only group-level aggregates** (GDPR-compliant).
 

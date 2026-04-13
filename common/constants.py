@@ -80,11 +80,12 @@ _EXTERNAL_DATA_ROOT = Path(
 )
 
 # ============================================================================
-# Unified results/ tree (canonical location for every Python analysis output)
+# Unified results tree (canonical location for every Python analysis output)
 # ============================================================================
-# Every analysis writes into results/<analysis>/{data,tables,figures}/
-# under the repo root. See results_for() below for the idiomatic accessor.
-_RESULTS_ROOT = _REPO_ROOT / "results"
+# Every analysis writes into <analysis>/{data,tables,figures,logs}/ under this
+# root.  Group-level outputs live in BIDS/derivatives/group-results/ so that
+# everything (subject + group) ships in a single derivatives bundle.
+_RESULTS_ROOT = _EXTERNAL_DATA_ROOT / "BIDS" / "derivatives" / "group-results"
 
 # ============================================================================
 # Intermediate Path Construction (private - build CONFIG paths from these)
@@ -169,8 +170,12 @@ CONFIG = {
     'BIDS_MVPA_DECODING': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_decoding",             # ROI decoding
     'BIDS_RSA_SEARCHLIGHT': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_searchlight-rsa",    # Whole-brain searchlight RSA
     'BIDS_BEHAVIORAL_RSA': _BIDS_DERIVATIVES / "behavioral-rsa",                              # Per-subject behavioral preference RDMs
+    'BIDS_TASK_ENGAGEMENT': _BIDS_DERIVATIVES / "task-engagement",                             # Per-subject task-engagement diagnostics
+    'BIDS_SKILL_GRADIENT': _BIDS_DERIVATIVES / "skill-gradient",                               # Per-subject enriched skill-gradient table
     'BIDS_MANIFOLD': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_manifold",                  # Per-subject neural Participation Ratio per ROI
+    'BIDS_UNIVARIATE_ROIS': _BIDS_DERIVATIVES / "fmriprep_spm-smoothed_univariate-rois",       # Per-subject univariate ROI means
     'BIDS_EYETRACK': _BIDS_DERIVATIVES / "bidsmreye",                                         # BidsMReye gaze estimates
+    'BIDS_EYETRACK_DECODING': _BIDS_DERIVATIVES / "bidsmreye_eyetracking-decoding",            # Per-subject eyetracking decoding results
     'BIDS_MVPA_RSA_SUBCORTICAL': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_rsa-subcortical",             # Subcortical ROI RSA
     'BIDS_MVPA_DECODING_SUBCORTICAL': _BIDS_DERIVATIVES / "fmriprep_spm-unsmoothed_decoding-subcortical",   # Subcortical ROI decoding
 

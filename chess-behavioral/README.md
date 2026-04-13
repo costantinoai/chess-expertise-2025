@@ -7,44 +7,43 @@ This analysis examines behavioral similarity judgments from a 1-back preference 
 ## Required bundles
 
 - `01_behavioral_rsa_subject.py` needs **A** (core: BIDS events, stimuli, participants) and writes per-subject preference RDMs into `derivatives/behavioral-rsa/` (bundle E).
-- `02_behavioral_rsa_group.py` reads those per-subject RDMs from bundle E and writes group aggregates (correlations, FDR-corrected stats, group mean RDMs, DSMs) into `results/behavioral/data/`.
-- `81_table_behavioral_correlations.py` and `91_plot_behavioral_panels.py` only consume outputs of `02_behavioral_rsa_group.py` from the repo `results/` tree.
+- `11_behavioral_rsa_group.py` reads those per-subject RDMs from bundle E and writes group aggregates (correlations, FDR-corrected stats, group mean RDMs, DSMs) into `derivatives/group-results/behavioral/data/`.
+- `81_table_behavioral_correlations.py` and `91_plot_behavioral_panels.py` only consume outputs of `11_behavioral_rsa_group.py` from the group-results derivative folder.
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef out fill:#fff5b1,stroke:#b08800,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ST[stimuli/]:::in
-  EV["sub-*/func/ (events)"]:::in
+ PT[participants.tsv]:::in
+ ST[stimuli/]:::in
+ EV["sub-*/func/ (events)"]:::in
 
-  B01["01_behavioral_rsa_subject.py"]:::sc
-  B02["02_behavioral_rsa_group.py"]:::sc
-  B81["81_table_behavioral_correlations.py"]:::sc
-  B91["91_plot_behavioral_panels.py"]:::sc
-  BRSA[derivatives/behavioral-rsa/]:::out
-  DATA["results/behavioral/data/"]:::rl
-  TABLES["results/behavioral/tables/"]:::rl
-  FIGURES["results/behavioral/figures/"]:::rl
+ B01["01_behavioral_rsa_subject.py"]:::sc
+ B11["11_behavioral_rsa_group.py"]:::sc
+ B81["81_table_behavioral_correlations.py"]:::sc
+ B91["91_plot_behavioral_panels.py"]:::sc
+ BRSA[derivatives/behavioral-rsa/]:::out
+ DATA["derivatives/group-results/behavioral/data/"]:::out
+ TABLES["derivatives/group-results/behavioral/tables/"]:::out
+ FIGURES["derivatives/group-results/behavioral/figures/"]:::out
 
-  EV --> B01
-  PT --> B01
-  B01 --> BRSA
+ EV --> B01
+ PT --> B01
+ B01 --> BRSA
 
-  BRSA --> B02
-  PT --> B02
-  ST --> B02
-  B02 --> DATA
+ BRSA --> B11
+ PT --> B11
+ ST --> B11
+ B11 --> DATA
 
-  DATA --> B81 --> TABLES
-  PT --> B81
-  DATA --> B91 --> FIGURES
-  PT --> B91
+ DATA --> B81 --> TABLES
+ PT --> B81
+ DATA --> B91 --> FIGURES
+ PT --> B91
 ```
 
 ## Methods
@@ -110,9 +109,9 @@ See `requirements.txt` in the repository root for complete dependencies.
 
 - **Participant data**: `BIDS/participants.tsv` (columns: `participant_id`, `group`)
 - **Event files**: `BIDS/sub-*/func/sub-*_task-exp_run-*_events.tsv`
-  - Required columns: `stim_id`, `preference` (`current_preferred`, `previous_preferred`, or `n/a`)
+ - Required columns: `stim_id`, `preference` (`current_preferred`, `previous_preferred`, or `n/a`)
 - **Stimulus metadata**: `stimuli/stimuli.tsv`
-  - Required columns: `stim_id`, `check`, `strategy`, `visual`
+ - Required columns: `stim_id`, `check`, `strategy`, `visual`
 
 ### Data Location
 
@@ -128,11 +127,11 @@ Expected structure under this folder:
 
 ```
 /path/to/manuscript-data/
-└── BIDS/                      # Main dataset (BIDS-compliant)
-    ├── participants.tsv
-    ├── stimuli/               # Stimulus metadata
-    ├── sub-*/
-    └── derivatives/           # Per-subject derivatives + atlases
+└── BIDS/ # Main dataset (BIDS-compliant)
+ ├── participants.tsv
+ ├── stimuli/ # Stimulus metadata
+ ├── sub-*/
+ └── derivatives/ # Per-subject derivatives + atlases
 ```
 
 ## Running the Analysis
@@ -151,10 +150,10 @@ python chess-behavioral/01_behavioral_rsa_subject.py
 ### Step 2: Group aggregation
 
 ```bash
-python chess-behavioral/02_behavioral_rsa_group.py
+python chess-behavioral/11_behavioral_rsa_group.py
 ```
 
-**Outputs** (saved to `results/behavioral/data/`):
+**Outputs** (saved to `derivatives/group-results/behavioral/data/`):
 - `expert_behavioral_rdm.npy` / `novice_behavioral_rdm.npy`: count-normalized group RDMs (40×40)
 - `expert_behavioral_rdm_raw.npy` / `novice_behavioral_rdm_raw.npy`: raw-count variants
 - `expert_directional_dsm.npy` / `novice_directional_dsm.npy`: normalized directional preference matrices
@@ -169,7 +168,7 @@ python chess-behavioral/02_behavioral_rsa_group.py
 python chess-behavioral/81_table_behavioral_correlations.py
 ```
 
-**Outputs** (saved to `results/behavioral/tables/`):
+**Outputs** (saved to `derivatives/group-results/behavioral/tables/`):
 - `behavioral_rsa_correlations.tex`: LaTeX table
 - `behavioral_rsa_correlations.csv`: CSV table
 
@@ -179,7 +178,7 @@ python chess-behavioral/81_table_behavioral_correlations.py
 python chess-behavioral/91_plot_behavioral_panels.py
 ```
 
-**Outputs** (saved to `results/behavioral/figures/`):
+**Outputs** (saved to `derivatives/group-results/behavioral/figures/`):
 - Individual axes as SVG/PDF: `behavioral_A1_RDM_Experts.svg`, etc.
 - Complete panel: `panels/behavioral_rsa_panel.pdf` (raw directional DSMs + count-normalized RDMs + MDS + correlation bars)
 
@@ -204,24 +203,24 @@ This demonstrates that chess expertise shapes behavioral similarity judgments al
 
 ```
 chess-behavioral/
-├── README.md                              # This file
-├── 01_behavioral_rsa_subject.py           # Per-subject preference RDMs → BIDS derivatives
-├── 02_behavioral_rsa_group.py             # Group aggregate + stats → results/behavioral/data/
-├── 81_table_behavioral_correlations.py    # LaTeX/CSV table generation
-└── 91_plot_behavioral_panels.py           # Figure generation
+├── README.md # This file
+├── 01_behavioral_rsa_subject.py # Subject-level: per-subject preference RDMs → BIDS derivatives/
+├── 11_behavioral_rsa_group.py # Group-level: aggregate + stats → derivatives/group-results/behavioral/data/
+├── 81_table_behavioral_correlations.py # LaTeX/CSV table generation
+└── 91_plot_behavioral_panels.py # Figure generation
 
-BIDS/derivatives/behavioral-rsa/           # Per-subject derivatives (bundle E)
+BIDS/derivatives/behavioral-rsa/ # Per-subject derivatives (bundle E)
 └── sub-*/sub-*_desc-preference_rdm.{tsv,json}
 
-analyses/behavioral/                       # Shared analysis modules (repo root analyses/ package)
-├── data_loading.py                        # BIDS data loaders
-└── rdm_utils.py                           # RDM / DSM computation and RSA
+analyses/behavioral/ # Shared analysis modules (repo root analyses/ package)
+├── data_loading.py # BIDS data loaders
+└── rdm_utils.py # RDM / DSM computation and RSA
 
-results/behavioral/                        # Unified repo results tree (not committed)
-├── data/                                  # *.npy, *.pkl, *.csv numerical results
-├── tables/                                # LaTeX tables
-└── figures/                               # Publication figures
+derivatives/group-results/behavioral/ # Unified repo results tree (not committed)
+├── data/ # *.npy, *.pkl, *.csv numerical results
+├── tables/ # LaTeX tables
+└── figures/ # Publication figures
 ```
 
-The `results/` tree is distributed as a release artifact (`chess-bids_F_code-results.zip`) and via the RDR repo; it is not tracked in git. Use `from common import results_for; results_for('behavioral', 'data')` as the idiomatic accessor.
+Group-level outputs are stored in `BIDS/derivatives/group-results/`.
 

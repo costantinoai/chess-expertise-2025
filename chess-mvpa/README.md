@@ -7,66 +7,65 @@ This analysis examines neural representations of chess positions using two compl
 ## Required bundles
 
 - `01_roi_mvpa_subject.m` and `04_searchlight_rsa.m` (MATLAB subject scripts) read SPM unsmoothed betas → need **A** (core) + **D** (spm).
-- `02_mvpa_group_rsa.py` and `03_mvpa_group_decoding.py` read the per-subject RSA / decoding TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa/` and `derivatives/fmriprep_spm-unsmoothed_decoding/` → need **A** (core) + **E** (analyses).
-- `81_table_mvpa_rsa.py`, `82_table_mvpa_decoding.py`, `92_plot_mvpa_rsa.py`, `93_plot_mvpa_decoding.py` only consume the outputs of 02/03 from the repo `results/` tree (no extra bundle).
+- `11_mvpa_group_rsa.py` and `12_mvpa_group_decoding.py` read the per-subject RSA / decoding TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa/` and `derivatives/fmriprep_spm-unsmoothed_decoding/` → need **A** (core) + **E** (analyses).
+- `81_table_mvpa_rsa.py`, `82_table_mvpa_decoding.py`, `91_plot_mvpa_rsa.py`, `92_plot_mvpa_decoding.py` only consume the outputs of 11/12 from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef out fill:#fff5b1,stroke:#b08800,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ST[stimuli/]:::in
-  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
-  A22[sourcedata/atlases/glasser22/]:::in
+ PT[participants.tsv]:::in
+ ST[stimuli/]:::in
+ GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+ A22[sourcedata/atlases/glasser22/]:::in
 
-  M01["01_roi_mvpa_subject.m"]:::sc
-  M04["04_searchlight_rsa.m"]:::sc
-  M02["02_mvpa_group_rsa.py"]:::sc
-  M03["03_mvpa_group_decoding.py"]:::sc
-  M81["81_table_mvpa_rsa.py"]:::sc
-  M82["82_table_mvpa_decoding.py"]:::sc
-  M92["92_plot_mvpa_rsa.py"]:::sc
-  M93["93_plot_mvpa_decoding.py"]:::sc
+ M01["01_roi_mvpa_subject.m"]:::sc
+ M04["04_searchlight_rsa.m"]:::sc
+ M11["11_mvpa_group_rsa.py"]:::sc
+ M12["12_mvpa_group_decoding.py"]:::sc
+ M81["81_table_mvpa_rsa.py"]:::sc
+ M82["82_table_mvpa_decoding.py"]:::sc
+ M91["91_plot_mvpa_rsa.py"]:::sc
+ M92["92_plot_mvpa_decoding.py"]:::sc
 
-  MR[derivatives/fmriprep_spm-unsmoothed_rsa/]:::out
-  MD[derivatives/fmriprep_spm-unsmoothed_decoding/]:::out
-  SLR[derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/]:::out
-  DATA["results/mvpa/data/"]:::rl
-  TABLES["results/mvpa/tables/"]:::rl
-  FIGURES["results/mvpa/figures/"]:::rl
+ MR[derivatives/fmriprep_spm-unsmoothed_rsa/]:::out
+ MD[derivatives/fmriprep_spm-unsmoothed_decoding/]:::out
+ SLR[derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/]:::out
+ DATA["derivatives/group-results/mvpa/data/"]:::out
+ TABLES["derivatives/group-results/mvpa/tables/"]:::out
+ FIGURES["derivatives/group-results/mvpa/figures/"]:::out
 
-  GLMU --> M01
-  A22 --> M01
-  ST --> M01
-  M01 --> MR
-  M01 --> MD
+ GLMU --> M01
+ A22 --> M01
+ ST --> M01
+ M01 --> MR
+ M01 --> MD
 
-  GLMU --> M04
-  ST --> M04
-  M04 --> SLR
+ GLMU --> M04
+ ST --> M04
+ M04 --> SLR
 
-  MR --> M02
-  PT --> M02
-  M02 --> DATA
+ MR --> M11
+ PT --> M11
+ M11 --> DATA
 
-  MD --> M03
-  PT --> M03
-  M03 --> DATA
+ MD --> M12
+ PT --> M12
+ M12 --> DATA
 
-  DATA --> M81 --> TABLES
-  PT --> M81
-  DATA --> M82 --> TABLES
-  PT --> M82
-  DATA --> M92 --> FIGURES
-  PT --> M92
-  DATA --> M93 --> FIGURES
-  PT --> M93
-  ST --> M93
+ DATA --> M81 --> TABLES
+ PT --> M81
+ DATA --> M82 --> TABLES
+ PT --> M82
+ DATA --> M91 --> FIGURES
+ PT --> M91
+ DATA --> M92 --> FIGURES
+ PT --> M92
+ ST --> M92
 ```
 
 ## Methods
@@ -143,19 +142,19 @@ Subject-level RSA correlations and decoding accuracies were aggregated and teste
 **Three statistical tests per ROI**:
 
 1. **Experts vs Chance (zero for RSA, theoretical chance for decoding)**:
-   - One-sample one-tailed t-test (greater)
-   - Null hypothesis: μ_expert ≤ chance
-   - Implementation: `scipy.stats.ttest_1samp` with `alternative='greater'`
+ - One-sample one-tailed t-test (greater)
+ - Null hypothesis: μ_expert ≤ chance
+ - Implementation: `scipy.stats.ttest_1samp` with `alternative='greater'`
 
 2. **Novices vs Chance**:
-   - One-sample one-tailed t-test (greater)
-   - Null hypothesis: μ_novice ≤ chance
-   - Implementation: `scipy.stats.ttest_1samp` with `alternative='greater'`
+ - One-sample one-tailed t-test (greater)
+ - Null hypothesis: μ_novice ≤ chance
+ - Implementation: `scipy.stats.ttest_1samp` with `alternative='greater'`
 
 3. **Experts vs Novices**:
-   - Welch two-sample two-tailed t-test
-   - Null hypothesis: μ_expert = μ_novice
-   - Implementation: `scipy.stats.ttest_ind` with `equal_var=False` (allows unequal variances)
+ - Welch two-sample two-tailed t-test
+ - Null hypothesis: μ_expert = μ_novice
+ - Implementation: `scipy.stats.ttest_ind` with `equal_var=False` (allows unequal variances)
 
 **False Discovery Rate (FDR) Correction**:
 - Applied across 22 ROIs using Benjamini-Hochberg procedure (α=0.05)
@@ -177,19 +176,19 @@ Subject-level RSA correlations and decoding accuracies were aggregated and teste
 
 **For subject-level analysis (MATLAB)**:
 - **SPM GLM outputs**: `BIDS/derivatives/fmriprep_spm-unsmoothed/sub-*/exp/SPM.mat`
-  - Trial-wise beta estimates (unsmoothed)
-  - One beta image per condition per run
+ - Trial-wise beta estimates (unsmoothed)
+ - One beta image per condition per run
 - **Atlas**: `BIDS/sourcedata/atlases/glasser22/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz`
 - **ROI metadata**: `BIDS/sourcedata/atlases/glasser22/region_info.tsv`
-  - Columns: `index`, `name`, `hemisphere`
+ - Columns: `index`, `name`, `hemisphere`
 
 **For group-level analysis (Python)**:
 - **RSA correlations**: `BIDS/derivatives/fmriprep_spm-unsmoothed_rsa/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv`
 - **Decoding accuracies**: `BIDS/derivatives/fmriprep_spm-unsmoothed_decoding/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv`
 - **Participant data**: `BIDS/participants.tsv`
-  - Columns: `participant_id`, `group` (expert/novice)
+ - Columns: `participant_id`, `group` (expert/novice)
 - **Stimulus metadata**: `BIDS/stimuli/stimuli.tsv`
-  - Required for deriving chance levels for decoding targets
+ - Required for deriving chance levels for decoding targets
 
 ### Data Location
 
@@ -228,11 +227,11 @@ cd /path/to/chess-expertise-2025/chess-mvpa/
 
 **Outputs**:
 - `BIDS/derivatives/fmriprep_spm-unsmoothed_rsa/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv`
-  - Subject-level RSA correlations (one row per model target, one column per ROI)
+ - Subject-level RSA correlations (one row per model target, one column per ROI)
 - `BIDS/derivatives/fmriprep_spm-unsmoothed_decoding/sub-*/sub-*_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv`
-  - Subject-level decoding accuracies (one row per classification target, one column per ROI)
+ - Subject-level decoding accuracies (one row per classification target, one column per ROI)
 - `BIDS/derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/sub-*/sub-*_space-MNI152NLin2009cAsym_desc-<regressor>_stat-r_searchlight.nii.gz`
-  - Whole-brain searchlight RSA maps (one per regressor: `checkmate`, `strategy`, `visualSimilarity`)
+ - Whole-brain searchlight RSA maps (one per regressor: `checkmate`, `strategy`, `visualSimilarity`)
 
 **Expected runtime**:
 - ROI-based analysis: ~2-5 minutes per subject (total ~2-4 hours for 40 subjects)
@@ -242,30 +241,30 @@ cd /path/to/chess-expertise-2025/chess-mvpa/
 
 ```bash
 # From repository root
-python chess-mvpa/02_mvpa_group_rsa.py
+python chess-mvpa/11_mvpa_group_rsa.py
 ```
 
-**Outputs** (saved to `results/mvpa/data/`):
+**Outputs** (saved to `derivatives/group-results/mvpa/data/`):
 - `<target>_experts_vs_chance.csv`: Expert vs zero statistics per ROI
 - `<target>_novices_vs_chance.csv`: Novice vs zero statistics per ROI
 - `<target>_experts_vs_novices.csv`: Group comparison statistics per ROI
 - `mvpa_group_stats.pkl`: Complete results dictionary (for plotting scripts)
-- `02_mvpa_group_rsa.py`: Copy of the analysis script
+- `11_mvpa_group_rsa.py`: Copy of the group-level analysis script
 
 **Expected runtime**: ~30 seconds
 
 ### Step 3: Group-Level Decoding Analysis (Python)
 
 ```bash
-python chess-mvpa/03_mvpa_group_decoding.py
+python chess-mvpa/12_mvpa_group_decoding.py
 ```
 
-**Outputs** (saved to `results/mvpa/data/`):
+**Outputs** (saved to `derivatives/group-results/mvpa/data/`):
 - `<target>_experts_vs_chance.csv`: Expert vs chance statistics per ROI
 - `<target>_novices_vs_chance.csv`: Novice vs chance statistics per ROI
 - `<target>_experts_vs_novices.csv`: Group comparison statistics per ROI
 - `mvpa_group_stats.pkl`: Complete results dictionary (for plotting scripts)
-- `03_mvpa_group_decoding.py`: Copy of the analysis script
+- `12_mvpa_group_decoding.py`: Copy of the group-level analysis script
 
 **Expected runtime**: ~30 seconds
 
@@ -279,7 +278,7 @@ python chess-mvpa/81_table_mvpa_rsa.py
 python chess-mvpa/82_table_mvpa_decoding.py
 ```
 
-**Outputs** (saved to `results/mvpa/tables/`):
+**Outputs** (saved to `derivatives/group-results/mvpa/tables/`):
 - `mvpa_rsa_summary.tex`: Combined LaTeX table for the three main RSA targets
 - `mvpa_rsa_summary.csv`: CSV version of the RSA summary table
 - `mvpa_decoding_summary.tex`: Combined LaTeX table for the main decoding targets
@@ -289,13 +288,13 @@ python chess-mvpa/82_table_mvpa_decoding.py
 
 ```bash
 # RSA figures
-python chess-mvpa/92_plot_mvpa_rsa.py
+python chess-mvpa/91_plot_mvpa_rsa.py
 
 # Decoding figures
-python chess-mvpa/93_plot_mvpa_decoding.py
+python chess-mvpa/92_plot_mvpa_decoding.py
 ```
 
-**Outputs** (saved to `results/mvpa/figures/`):
+**Outputs** (saved to `derivatives/group-results/mvpa/figures/`):
 - Individual RSA axes as SVG: `mvpa_rsa__*.svg`
 - Individual decoding axes as SVG: `mvpa_svm__*.svg`
 - Complete panels: `panels/mvpa_rsa_panel.pdf`, `panels/mvpa_svm_panel.pdf`
@@ -348,28 +347,28 @@ python chess-mvpa/93_plot_mvpa_decoding.py
 
 ```
 chess-mvpa/
-├── README.md                          # This file
-├── 01_roi_mvpa_subject.m              # MATLAB: Subject-level ROI RSA and decoding
-├── 02_mvpa_group_rsa.py               # Python: Group-level RSA statistics
-├── 03_mvpa_group_decoding.py          # Python: Group-level decoding statistics
-├── 04_searchlight_rsa.m               # MATLAB: Whole-brain searchlight RSA
-├── 81_table_mvpa_rsa.py               # LaTeX/CSV table generation (RSA)
-├── 82_table_mvpa_decoding.py          # LaTeX/CSV table generation (decoding)
-├── 92_plot_mvpa_rsa.py                # Figure generation (RSA)
-├── 93_plot_mvpa_decoding.py           # Figure generation (decoding)
-├── METHODS.md                         # Detailed methods from manuscript
-├── RESULTS.md                         # Detailed results summary
-├── DISCREPANCIES.md                   # Notes on analysis discrepancies
-└── analyses/mvpa/                     # Shared analysis modules (in repo root analyses/ package)
-    ├── __init__.py
-    ├── io.py                          # Loading subject-level MVPA results
-    ├── group.py                       # Group-level statistical tests
-    └── plot_utils.py                  # Plotting utilities
+├── README.md # This file
+├── 01_roi_mvpa_subject.m # MATLAB: Subject-level ROI RSA and decoding
+├── 11_mvpa_group_rsa.py # Group-level: RSA statistics → derivatives/group-results/mvpa/data/
+├── 12_mvpa_group_decoding.py # Group-level: decoding statistics → derivatives/group-results/mvpa/data/
+├── 04_searchlight_rsa.m # MATLAB: Whole-brain searchlight RSA
+├── 81_table_mvpa_rsa.py # LaTeX/CSV table generation (RSA)
+├── 82_table_mvpa_decoding.py # LaTeX/CSV table generation (decoding)
+├── 91_plot_mvpa_rsa.py # Figure: RSA panels
+├── 92_plot_mvpa_decoding.py # Figure: decoding panels
+├── METHODS.md # Detailed methods from manuscript
+├── RESULTS.md # Detailed results summary
+├── DISCREPANCIES.md # Notes on analysis discrepancies
+└── analyses/mvpa/ # Shared analysis modules (in repo root analyses/ package)
+ ├── __init__.py
+ ├── io.py # Loading subject-level MVPA results
+ ├── group.py # Group-level statistical tests
+ └── plot_utils.py # Plotting utilities
 
-results/mvpa/                          # Unified results tree (not committed)
-├── data/                              # *.csv, *.pkl statistical results
-├── tables/                            # LaTeX tables
-└── figures/                           # Publication figures
+derivatives/group-results/mvpa/ # Unified results tree (not committed)
+├── data/ # *.csv, *.pkl statistical results
+├── tables/ # LaTeX tables
+└── figures/ # Publication figures
 ```
 
-The `results/` tree is distributed as a release artifact (`chess-bids_F_code-results.zip`) and via the RDR repo; it is not tracked in git. Use `from common import results_for; results_for('mvpa', 'data')` as the idiomatic accessor.
+Group-level outputs are stored in `BIDS/derivatives/group-results/`.
