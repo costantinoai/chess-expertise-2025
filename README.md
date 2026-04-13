@@ -6,6 +6,27 @@
 
 This repository contains the complete analysis code for our study investigating how chess expertise shapes neural and behavioral representations of chess board positions. We combine behavioral preference judgments, fMRI multi-voxel pattern analysis (MVPA), univariate analyses, and meta-analytic correlations to characterize expertise-related differences in representational structure.
 
+## Quick Start
+
+```bash
+# 1. Clone and install
+git clone https://github.com/costantinoai/chess-expertise-2025.git
+cd chess-expertise-2025
+conda env create -f environment.yml && conda activate chess-expertise
+pip install -e .
+
+# 2. Download data from RDR (doi.org/10.48804/VVCEWP)
+#    For most users: bundles A (core, 20 MB) + E (derivatives, 184 MB)
+
+# 3. Extract into a folder and point the repo at it
+export CHESS_DATA_ROOT=/path/to/extracted/data   # parent of BIDS/
+
+# 4. Reproduce all group stats, tables, and figures
+./run_all_analyses.sh group
+```
+
+That's it. All outputs go to `BIDS/derivatives/group-results/`. No source files need editing — `CHESS_DATA_ROOT` is the only configuration.
+
 ## Overview
 
 **Participants**: 40 adults (20 expert chess players, 20 novices)
@@ -112,8 +133,7 @@ If running subject-level GLM and/or MVPA analyses:
 The BIDS dataset is deposited in the KU Leuven Research Data Repository (RDR):
 **DOI: [10.48804/VVCEWP](https://doi.org/10.48804/VVCEWP)**. The repository
 entry hosts raw MRI, preprocessed data, all subject-level analysis derivatives
-and a mirror of this repo's group-level `derivatives/group-results/` snapshot, split into six
-layered bundles so you only have to download what your workflow needs:
+split into five layered bundles so you only have to download what your workflow needs:
 
 | Bundle | Approx. size | Contents | When to download |
 |:--:|---|---|---|
@@ -121,7 +141,7 @@ layered bundles so you only have to download what your workflow needs:
 | **B** `raw` | ~39 GB | `sub-*/anat/`, `sub-*/func/*_bold.nii.gz`, `sub-*/beh/` | Re-running fMRIPrep from scratch. |
 | **C** `fmriprep` | ~187 GB | `derivatives/fmriprep/` | Re-running the SPM first-level GLM. |
 | **D** `spm` | ~30 GB | `derivatives/fmriprep_spm-{un,}smoothed/` (subject betas + group contrasts) | Re-running any subject-level MVPA / manifold / searchlight; also neurosynth univariate and univariate-rois. |
-| **E** `analyses` | ~260 MB | `derivatives/fmriprep_spm-unsmoothed_{rsa,decoding,searchlight-rsa,manifold,rsa-run-matched,rsa-subcortical,decoding-subcortical}/`, `derivatives/behavioral-rsa/`, `derivatives/bidsmreye/` | **Most users** — enough to regenerate every group stat, table, and figure together with this code repo. |
+| **E** `derivatives` | ~184 MB | All other `derivatives/` folders (subject-level analysis outputs + `group-results/` with pre-computed stats, tables, figures) | **Most users** — enough to regenerate every group stat, table, and figure together with this code repo. |
 
 The typical **"reproduce the paper's group stats and figures"** path is bundles
 **A + E** (~370 MB total), pointing `CHESS_DATA_ROOT` at the extracted BIDS
@@ -158,20 +178,38 @@ All analyses read their inputs from a **single external data root**. Configure t
  ├── fmriprep_spm-unsmoothed_rsa-run-matched/ # Run-matched ROI RSA (supplementary)
  ├── fmriprep_spm-unsmoothed_rsa-subcortical/ # Subcortical ROI RSA (CAB-NP)
  ├── fmriprep_spm-unsmoothed_decoding-subcortical/ # Subcortical ROI decoding (CAB-NP)
+ ├── fmriprep_spm-unsmoothed_rsa-rois/ # Glasser-180 ROI means from searchlight
+ ├── fmriprep_spm-smoothed_univariate-rois/ # Glasser-180 ROI means from univariate
  ├── behavioral-rsa/ # Per-subject behavioural preference RDMs
- └── bidsmreye/ # BidsMReye gaze estimates
+ ├── bidsmreye/ # BidsMReye gaze estimates
+ ├── bidsmreye_eyetracking-decoding/ # Eyetracking SVM decoding results
+ ├── task-engagement/ # Per-subject behavioural diagnostics
+ ├── skill-gradient/ # Enriched per-subject skill metrics
+ └── group-results/ # Group-level stats, tables, figures
 ```
 
 2) Point the repository to your local data folder by setting the `CHESS_DATA_ROOT`
-environment variable:
+environment variable (the parent directory that contains `BIDS/`):
 
 ```bash
+# Linux / macOS (bash/zsh)
 export CHESS_DATA_ROOT=/path/to/manuscript-data
+
+# Windows (PowerShell)
+$env:CHESS_DATA_ROOT = "C:\path\to\manuscript-data"
+
+# Windows (cmd)
+set CHESS_DATA_ROOT=C:\path\to\manuscript-data
 ```
 
 Both Python (`common/constants.py`) and MATLAB (`common/chess_config.m`) read this
 variable automatically. All other paths (BIDS root, derivatives, atlases, etc.) are
 derived from this single root. No source files need to be edited.
+
+**Platform notes:**
+- **macOS**: Works out of the box. Use Terminal or iTerm2. The bash pipeline script (`run_all_analyses.sh`) requires bash 4+ — macOS ships bash 3, so install a newer version via `brew install bash` or run scripts individually with Python.
+- **Windows**: Run individual Python scripts directly (`python chess-behavioral/01_behavioral_rsa_subject.py`). The bash pipeline script requires WSL or Git Bash. Alternatively, run the scripts in order from the `GROUP_SCRIPTS` array in `run_all_analyses.sh`.
+- **Linux**: Works out of the box.
 
 ## Expected Inputs
 
@@ -214,8 +252,19 @@ The repository expects the following layout under `_EXTERNAL_DATA_ROOT`. Everyth
  ├── fmriprep_spm-unsmoothed_rsa-run-matched/sub-*/
  ├── fmriprep_spm-unsmoothed_rsa-subcortical/sub-*/
  ├── fmriprep_spm-unsmoothed_decoding-subcortical/sub-*/
- ├── behavioral-rsa/sub-*/ # Per-subject preference RDMs
- └── bidsmreye/sub-*/ # Gaze-position estimates
+ ├── fmriprep_spm-unsmoothed_rsa-rois/sub-*/  # Glasser-180 searchlight ROI means
+ ├── fmriprep_spm-smoothed_univariate-rois/sub-*/ # Glasser-180 univariate ROI means
+ ├── behavioral-rsa/sub-*/               # Per-subject preference RDMs
+ ├── bidsmreye/sub-*/                    # Gaze-position estimates
+ ├── bidsmreye_eyetracking-decoding/     # SVM decoding from gaze features
+ ├── task-engagement/                    # Per-subject behavioural diagnostics
+ ├── skill-gradient/                     # Enriched per-subject skill metrics
+ └── group-results/                      # Group-level stats, tables, figures
+     ├── behavioral/{data,tables,figures,logs}/
+     ├── manifold/{data,tables,figures,logs}/
+     ├── mvpa/{data,tables,figures,logs}/
+     ├── neurosynth/{data,tables,figures,logs}/
+     └── supplementary/<analysis>/{data,tables,figures,logs}/
 ```
 
 ## Running Analyses
