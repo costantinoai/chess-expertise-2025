@@ -41,24 +41,6 @@ That's it. All outputs go to `BIDS/derivatives/`. No source files need editing �
 - **Manifold**: Experts show higher-dimensional representations in task-relevant cortical regions
 - **Meta-analytic**: Expertise differences localize to brain networks associated with working memory and spatial navigation
 
-## Table of Contents
-
-- [Installation](#installation)
-- [Data Download and Setup](#data-download-and-setup)
-- [Folder Setup](#folder-setup)
-- [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [Running Analyses](#running-analyses)
-- [Outputs](#outputs)
-- [Analysis Overview](#analysis-overview)
-- [Dependencies](#dependencies)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [Reproducibility](#reproducibility)
-- [Citation](#citation)
-- [License](#license)
-- [Contact](#contact)
-
 ## Installation
 
 ### Prerequisites
@@ -125,147 +107,48 @@ If running subject-level GLM and/or MVPA analyses:
 - Rename the file by removing the numeric prefix (e.g., `01_roi_mvpa_subject.m` → `roi_mvpa_subject.m`), or
 - Call them via `run('01_roi_mvpa_subject.m')` from the MATLAB command window
 
-## Data Download and Setup
+## Data Setup
 
-### Download Data
+The BIDS dataset is on the KU Leuven Research Data Repository:
+**[doi.org/10.48804/VVCEWP](https://doi.org/10.48804/VVCEWP)**.
+Most users need only bundles **A** (core, 20 MB) and **E** (derivatives, 184 MB).
+See the RDR README for the full bundle table, extraction steps, and per-analysis
+dependency chart.
 
-The BIDS dataset is deposited in the KU Leuven Research Data Repository (RDR):
-**DOI: [10.48804/VVCEWP](https://doi.org/10.48804/VVCEWP)**. The repository
-entry hosts raw MRI, preprocessed data, all subject-level analysis derivatives
-split into five layered bundles so you only have to download what your workflow needs:
-
-| Bundle | Approx. size | Contents | When to download |
-|:--:|---|---|---|
-| **A** `core` | ~20 MB | Sidecars, `participants.tsv`, `stimuli/`, `sourcedata/atlases/` | **Mandatory** for every user. |
-| **B** `raw` | ~39 GB | `sub-*/anat/`, `sub-*/func/*_bold.nii.gz`, `sub-*/beh/` | Re-running fMRIPrep from scratch. |
-| **C** `fmriprep` | ~187 GB | `derivatives/fmriprep/` | Re-running the SPM first-level GLM. |
-| **D** `spm` | ~30 GB | `derivatives/fmriprep_spm-{un,}smoothed/` (subject betas + group contrasts) | Re-running any subject-level MVPA / manifold / searchlight; also neurosynth univariate and univariate-rois. |
-| **E** `derivatives` | ~184 MB | All other `derivatives/` folders (subject-level analysis outputs + `group-results/` with pre-computed stats, tables, figures) | **Most users** — enough to regenerate every group stat, table, and figure together with this code repo. |
-
-The typical **"reproduce the paper's group stats and figures"** path is bundles
-**A + E** (~370 MB total), pointing `CHESS_DATA_ROOT` at the extracted BIDS
-root. See the dataset-side `README` on RDR for the exact extraction steps and
-the full dependency chain (`B → fmriprep → C → SPM → D → subject scripts → E`).
-
-The dataset is organised according to the Brain Imaging Data Structure (BIDS)
-specification (v1.10.0).
-
-### Data Organization
-
-After downloading, extract the data. The dataset follows the BIDS specification. All data -- including stimuli, atlases, and analysis derivatives -- lives under `BIDS/`. See [Folder Setup](#folder-setup) and [Expected Inputs](#expected-inputs) for the full directory tree.
-
-## Folder Setup
-
-All analyses read their inputs from a **single external data root**. Configure this once and all paths are derived from it.
-
-1) Choose a folder on your system to hold the BIDS dataset:
-
-```
-/path/to/manuscript-data/
-└── BIDS/ # BIDS dataset (raw + derivatives)
- ├── sub-xx/{anat,func}
- ├── participants.tsv
- ├── stimuli/ # Stimulus images and metadata
- ├── sourcedata/atlases/ # Reference atlases (Glasser, CAB-NP, Neurosynth)
- └── derivatives/
-   ├── fmriprep/ # fMRIPrep outputs
-   ├── fmriprep_spm-unsmoothed/ # SPM first-level GLM on unsmoothed BOLD
-   ├── fmriprep_spm-smoothed/ # SPM first-level GLM on 4 mm smoothed BOLD
-   ├── fmriprep_spm-unsmoothed_rsa/ # ROI RSA (Glasser-22)
-   ├── fmriprep_spm-unsmoothed_decoding/ # ROI decoding (Glasser-22)
-   ├── fmriprep_spm-unsmoothed_searchlight-rsa/ # Whole-brain searchlight RSA
-   ├── fmriprep_spm-unsmoothed_manifold/ # Per-ROI neural Participation Ratio
-   ├── fmriprep_spm-unsmoothed_rsa-run-matched/ # Run-matched ROI RSA (supplementary)
-   ├── fmriprep_spm-unsmoothed_rsa-subcortical/ # Subcortical ROI RSA (CAB-NP)
-   ├── fmriprep_spm-unsmoothed_decoding-subcortical/ # Subcortical ROI decoding (CAB-NP)
-   ├── fmriprep_spm-unsmoothed_rsa-rois/ # Glasser-180 ROI means from searchlight
-   ├── fmriprep_spm-smoothed_univariate-rois/ # Glasser-180 ROI means from univariate
-   ├── behavioral-rsa/ # Per-subject behavioural preference RDMs
-   ├── bidsmreye/ # BidsMReye gaze estimates
-   ├── bidsmreye_eyetracking-decoding/ # Eyetracking SVM decoding results
-   ├── task-engagement/ # Per-subject behavioural diagnostics
-   ├── skill-gradient/ # Enriched per-subject skill metrics
-   └── group-results/ # Group-level stats, tables, figures
-```
-
-2) Point the repository to your local data folder by setting the `CHESS_DATA_ROOT`
-environment variable (the parent directory that contains `BIDS/`):
+After extracting, set one environment variable:
 
 ```bash
-# Linux / macOS (bash/zsh)
-export CHESS_DATA_ROOT=/path/to/manuscript-data
+# Linux / macOS
+export CHESS_DATA_ROOT=/path/to/manuscript-data   # the parent of BIDS/
 
 # Windows (PowerShell)
 $env:CHESS_DATA_ROOT = "C:\path\to\manuscript-data"
-
-# Windows (cmd)
-set CHESS_DATA_ROOT=C:\path\to\manuscript-data
 ```
 
-Both Python (`common/constants.py`) and MATLAB (`common/chess_config.m`) read this
-variable automatically. All other paths (BIDS root, derivatives, atlases, etc.) are
-derived from this single root. No source files need to be edited.
+All paths are derived automatically from `CHESS_DATA_ROOT` — no source files to edit. The expected layout is:
+
+```
+$CHESS_DATA_ROOT/
+└── BIDS/
+    ├── participants.tsv
+    ├── stimuli/
+    ├── sourcedata/atlases/{glasser22, glasser180, cab-np, neurosynth}/
+    ├── sub-01/ ... sub-44/
+    └── derivatives/
+        ├── fmriprep/                            # bundle C
+        ├── fmriprep_spm-{un,}smoothed/          # bundle D
+        ├── fmriprep_spm-unsmoothed_{rsa,decoding,searchlight-rsa,manifold,...}/
+        ├── behavioral-rsa/, bidsmreye/, task-engagement/, skill-gradient/, ...
+        └── group-results/                       # group-level stats, tables, figures
+            ├── behavioral/{data,tables,figures}/
+            ├── manifold/, mvpa/, neurosynth/
+            └── supplementary/<analysis>/
+```
 
 **Platform notes:**
-- **macOS**: Works out of the box. Use Terminal or iTerm2. The bash pipeline script (`run_all_analyses.sh`) requires bash 4+ — macOS ships bash 3, so install a newer version via `brew install bash` or run scripts individually with Python.
-- **Windows**: Run individual Python scripts directly (`python chess-behavioral/01_behavioral_rsa_subject.py`). The bash pipeline script requires WSL or Git Bash. Alternatively, run the scripts in order from the `GROUP_SCRIPTS` array in `run_all_analyses.sh`.
 - **Linux**: Works out of the box.
-
-## Expected Inputs
-
-The repository expects the following layout under `_EXTERNAL_DATA_ROOT`. Everything lives inside `BIDS/` (including stimuli, atlases, and neurosynth term maps under `derivatives/atlases/`).
-
-```
-<EXTERNAL_DATA_ROOT>/
-└── BIDS/
- ├── dataset_description.json
- ├── participants.tsv # participant_id, age, sex, group, rating
- ├── participants.json
- ├── README
- ├── task-exp_bold.json # TaskName via BIDS inheritance
- ├── task-familiarisation_beh.json # Beh sidecar via BIDS inheritance
- ├── stimuli/
- │ ├── stimuli.tsv # Stimulus metadata (stim_id, check, strategy, ...)
- │ └── *.png # 40 chess board images
- ├── sourcedata/atlases/ # Reference atlases (never consumed
- │ ├── glasser22/ # as derivatives — they are the input
- │ ├── glasser180/ # side of the analysis pipeline).
- │ ├── glasser180-surface/ # Surface parcellation (.annot)
- │ ├── cab-np/ # Subcortical ROIs (CAB-NP)
- │ └── neurosynth/terms/ # Meta-analytic term maps
- ├── sub-01/
- │ ├── anat/sub-01_T1w.nii.gz
- │ ├── func/sub-01_task-exp_run-{1..6}_bold.nii.gz
- │ ├── func/sub-01_task-exp_run-{1..6}_events.tsv
- │ └── beh/sub-01_task-familiarisation_beh.tsv
- ├── sub-02/ ... sub-44/
- └── derivatives/
- ├── fmriprep/ # fMRIPrep preprocessed data
- ├── fmriprep_spm-unsmoothed/sub-*/exp/ # Unsmoothed SPM betas (for MVPA)
- ├── fmriprep_spm-smoothed/ # Smoothed SPM first + group levels
- │ ├── sub-*/exp/ # Smoothed SPM betas
- │ └── group/ # Group contrasts (used by neurosynth)
- ├── fmriprep_spm-unsmoothed_rsa/sub-*/ # ROI RSA Pearson-r TSVs (Glasser-22)
- ├── fmriprep_spm-unsmoothed_decoding/sub-*/ # ROI SVM accuracy TSVs (Glasser-22)
- ├── fmriprep_spm-unsmoothed_searchlight-rsa/sub-*/ # Whole-brain searchlight r-maps
- ├── fmriprep_spm-unsmoothed_manifold/sub-*/ # Per-ROI Participation Ratio TSVs
- ├── fmriprep_spm-unsmoothed_rsa-run-matched/sub-*/
- ├── fmriprep_spm-unsmoothed_rsa-subcortical/sub-*/
- ├── fmriprep_spm-unsmoothed_decoding-subcortical/sub-*/
- ├── fmriprep_spm-unsmoothed_rsa-rois/sub-*/  # Glasser-180 searchlight ROI means
- ├── fmriprep_spm-smoothed_univariate-rois/sub-*/ # Glasser-180 univariate ROI means
- ├── behavioral-rsa/sub-*/               # Per-subject preference RDMs
- ├── bidsmreye/sub-*/                    # Gaze-position estimates
- ├── bidsmreye_eyetracking-decoding/     # SVM decoding from gaze features
- ├── task-engagement/                    # Per-subject behavioural diagnostics
- ├── skill-gradient/                     # Enriched per-subject skill metrics
- └── group-results/                      # Group-level stats, tables, figures
-     ├── behavioral/{data,tables,figures,logs}/
-     ├── manifold/{data,tables,figures,logs}/
-     ├── mvpa/{data,tables,figures,logs}/
-     ├── neurosynth/{data,tables,figures,logs}/
-     └── supplementary/<analysis>/{data,tables,figures,logs}/
-```
+- **macOS**: The pipeline script needs bash 4+ (`brew install bash`), or run scripts individually with Python.
+- **Windows**: Run Python scripts directly or use WSL/Git Bash for the pipeline script.
 
 ## Running Analyses
 
@@ -334,36 +217,6 @@ See individual analysis READMEs for details:
 - [`chess-mvpa/README.md`](chess-mvpa/README.md) - MVPA (RSA and decoding)
 - [`chess-neurosynth/README.md`](chess-neurosynth/README.md) - Meta-analytic correlations
 - [`chess-supplementary/*/README.md`](chess-supplementary/) - Supplementary analyses
-
-## Outputs
-
-Every Python analysis writes group-level outputs into `BIDS/derivatives/group-results/`. Each analysis owns one subfolder with four fixed buckets:
-
-```
-BIDS/derivatives/group-results/
-├── behavioral/
-│   ├── data/       # Numerical aggregates (CSV, TSV, JSON, NPY, PKL)
-│   ├── tables/     # Formatted tables (LaTeX, CSV)
-│   ├── figures/    # Rendered figures (PDF, PNG, SVG)
-│   └── logs/       # Script copies and execution logs
-├── manifold/{data,tables,figures,logs}/
-├── mvpa/{data,tables,figures,logs}/
-├── neurosynth/{data,tables,figures,logs}/
-└── supplementary/
-    ├── behavioral-reliability/{data,tables,figures,logs}/
-    ├── eyetracking/{data,tables,figures,logs}/
-    ├── mvpa-finer/{data,tables,figures,logs}/
-    ├── neurosynth-terms/{figures,logs}/
-    ├── rdm-intercorrelation/{data,tables,figures,logs}/
-    ├── rsa-rois/{data,tables,figures,logs}/
-    ├── run-matching/{data,tables,logs}/
-    ├── skill-gradient/{data,figures,logs}/
-    ├── subcortical-rois/{data,figures,logs}/
-    ├── task-engagement/{data,figures,logs}/
-    └── univariate-rois/{data,tables,figures,logs}/
-```
-
-This tree is regenerated by running `./run_all_analyses.sh group` (every 1x/8x/9x script). It lives inside the BIDS derivatives tree and ships as part of bundle E.
 
 ## Analysis Overview
 
