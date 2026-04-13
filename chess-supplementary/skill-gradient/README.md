@@ -8,46 +8,52 @@ only as a binary expert-vs-novice group split. Two complementary skill proxies
 are used:
 
 1. **Elo rating** (general chess strength): Correlated with neural metrics
-   within the expert group (n=20, Elo 1751--2269).
+ within the expert group (n=20, Elo 1751--2269).
 2. **Familiarisation accuracy** (stimulus-specific competence): Move accuracy
-   on the 20 checkmate boards used in fMRI, correlated with neural metrics
-   across all participants (n=38) and within experts only.
+ on the 20 checkmate boards used in fMRI, correlated with neural metrics
+ across all participants (n=38) and within experts only.
 
 ## Required bundles
 
-- `01_skill_gradient.py` reads per-subject RSA TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa/` and decoding TSVs from `derivatives/fmriprep_spm-unsmoothed_decoding/` → needs **A** (core) + **E** (analyses).
-- It also reads the manifold group aggregate and the familiarisation-accuracy aggregate from the repo `results/` tree (no extra bundle).
-- `91_plot_skill_gradient.py` consumes the outputs of `01` from the repo `results/` tree.
+- `01_skill_gradient_subject.py` reads per-subject RSA TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa/` and decoding TSVs from `derivatives/fmriprep_spm-unsmoothed_decoding/`, and writes per-subject skill-gradient features into `derivatives/skill-gradient/` → needs **A** (core) + **E** (analyses).
+- `11_skill_gradient_group.py` reads per-subject features from `derivatives/skill-gradient/`, the manifold group aggregate, and the familiarisation-accuracy aggregate from the group-results derivative folder, and writes group-level correlations into `derivatives/group-results/supplementary/skill-gradient/data/`.
+- `91_plot_skill_gradient.py` consumes the outputs of `11` from the group-results derivative folder.
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  MR[derivatives/fmriprep_spm-unsmoothed_rsa/]:::in
-  MD[derivatives/fmriprep_spm-unsmoothed_decoding/]:::in
-  MANDATA["results/manifold/data/"]:::rl
-  TASKDATA["results/supplementary/task-engagement/data/"]:::rl
+ PT[participants.tsv]:::in
+ MR[derivatives/fmriprep_spm-unsmoothed_rsa/]:::in
+ MD[derivatives/fmriprep_spm-unsmoothed_decoding/]:::in
+ MANDATA["derivatives/group-results/manifold/data/"]:::out
+ TASKDATA["derivatives/group-results/supplementary/task-engagement/data/"]:::out
 
-  SG01["01_skill_gradient.py"]:::sc
-  SG91["91_plot_skill_gradient.py"]:::sc
-  DATA["results/supplementary/skill-gradient/data/"]:::rl
-  FIGURES["results/supplementary/skill-gradient/figures/"]:::rl
+ SG01["01_skill_gradient_subject.py"]:::sc
+ SG11["11_skill_gradient_group.py"]:::sc
+ SG91["91_plot_skill_gradient.py"]:::sc
+ DERIV[derivatives/skill-gradient/]:::out
+ DATA["derivatives/group-results/supplementary/skill-gradient/data/"]:::out
+ FIGURES["derivatives/group-results/supplementary/skill-gradient/figures/"]:::out
 
-  MR --> SG01
-  MD --> SG01
-  MANDATA --> SG01
-  TASKDATA --> SG01
-  PT --> SG01
-  SG01 --> DATA
+ MR --> SG01
+ MD --> SG01
+ PT --> SG01
+ SG01 --> DERIV
 
-  DATA --> SG91 --> FIGURES
-  MANDATA --> SG91
-  PT --> SG91
+ DERIV --> SG11
+ MANDATA --> SG11
+ TASKDATA --> SG11
+ PT --> SG11
+ SG11 --> DATA
+
+ DATA --> SG91 --> FIGURES
+ MANDATA --> SG91
+ PT --> SG91
 ```
 
 ## Methods
@@ -69,7 +75,7 @@ continuous skill measures within and across groups.
 **Neural measures**:
 - RSA model fit (checkmate, strategy) from `derivatives/fmriprep_spm-unsmoothed_rsa/`
 - SVM decoding accuracy (checkmate, strategy) from `derivatives/fmriprep_spm-unsmoothed_decoding/`
-- Participation ratio (PR) from the chess-manifold group aggregate in `results/manifold/data/`
+- Participation ratio (PR) from the chess-manifold group aggregate in `derivatives/group-results/manifold/data/`
 
 ### Correlation Procedure
 
@@ -93,7 +99,7 @@ skill gradient.
 ### Familiarisation Correlations (All Participants + Experts Only)
 
 - Move accuracy x PR, RSA (checkmate, strategy, visual similarity),
-  Decoding (checkmate, strategy)
+ Decoding (checkmate, strategy)
 - Tested in both the full sample (n=38) and within experts (n=19)
 - FDR correction applied across neural metrics within each sample
 
@@ -107,10 +113,10 @@ skill gradient.
 ### Input Files
 
 - **Participant metadata**: `BIDS/participants.tsv` (Elo in `rating` column)
-- **Participation ratio**: `results/manifold/data/pr_results.pkl` (from chess-manifold group aggregate)
+- **Participation ratio**: `derivatives/group-results/manifold/data/pr_results.pkl` (from chess-manifold group aggregate)
 - **RSA per-subject results**: `BIDS/derivatives/fmriprep_spm-unsmoothed_rsa/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-r_rsa.tsv`
 - **Decoding per-subject results**: `BIDS/derivatives/fmriprep_spm-unsmoothed_decoding/sub-XX/sub-XX_space-MNI152NLin2009cAsym_roi-glasser_stat-accuracy_decoding.tsv`
-- **Familiarisation accuracy**: `results/supplementary/task-engagement/data/familiarisation_subject_accuracy.csv`
+- **Familiarisation accuracy**: `derivatives/group-results/supplementary/task-engagement/data/familiarisation_subject_accuracy.csv`
 
 ### Data Location
 
@@ -123,24 +129,32 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 
 ## Running the Analysis
 
-### Step 1: Run skill gradient correlations
+### Step 1: Per-subject feature assembly
 
 ```bash
 cd chess-supplementary/skill-gradient
-python 01_skill_gradient.py
+python 01_skill_gradient_subject.py
+```
+
+Extracts per-subject neural metrics (RSA, decoding, PR) and writes them to `BIDS/derivatives/skill-gradient/`.
+
+### Step 2: Group-level skill gradient correlations
+
+```bash
+python 11_skill_gradient_group.py
 ```
 
 Computes Elo and familiarisation correlations with all neural metrics (RSA, decoding, PR) at the mean and per-ROI level, with FDR correction.
-Outputs to `results/supplementary/skill-gradient/data/`.
+Outputs to `derivatives/group-results/supplementary/skill-gradient/data/`.
 
-### Step 2: Generate skill gradient figures
+### Step 3: Generate skill gradient figures
 
 ```bash
 python 91_plot_skill_gradient.py
 ```
 
 Produces the combined 3x3 panel: Elo correlations (row 1, experts only) and familiarisation correlations (rows 2--3, all participants and experts only).
-Outputs to `results/supplementary/skill-gradient/figures/`.
+Outputs to `derivatives/group-results/supplementary/skill-gradient/figures/`.
 
 ## Key Results
 
@@ -150,7 +164,7 @@ No ROI-level correlations survive FDR correction for any measure. The
 strongest uncorrected effects:
 
 - **RSA checkmate (mean)**: r=0.465, p=0.039 -- higher Elo associated with
-  stronger checkmate model fit (experts only)
+ stronger checkmate model fit (experts only)
 - **RSA strategy (mean)**: r=0.366, p=0.113
 
 PR and decoding show no reliable Elo gradient (all p>0.25 at the mean level).
@@ -173,9 +187,10 @@ range restriction within the expert group.
 
 ```
 chess-supplementary/skill-gradient/
-├── 01_skill_gradient.py               # Main analysis: Elo and familiarisation correlations with neural metrics
-├── 91_plot_skill_gradient.py          # Combined 3x3 figure: Elo (row 1) + familiarisation (rows 2-3)
+├── 01_skill_gradient_subject.py # Subject-level: per-subject neural metrics → derivatives/skill-gradient/
+├── 11_skill_gradient_group.py # Group-level: Elo and familiarisation correlations → derivatives/group-results/
+├── 91_plot_skill_gradient.py # Combined 3x3 figure: Elo (row 1) + familiarisation (rows 2-3)
 └── README.md
 ```
 
-Outputs are written to `results/supplementary/skill-gradient/{data,figures}/` in the unified repo results tree.
+Outputs: per-subject data in `BIDS/derivatives/skill-gradient/`; group-level aggregates in `derivatives/group-results/supplementary/skill-gradient/{data,figures}/`. The `results/` tree contains **only group-level aggregates** (GDPR-compliant).

@@ -8,8 +8,6 @@ Generates one combined 3x3 figure:
 """
 
 from pathlib import Path
-
-import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,7 +18,6 @@ from scipy import stats
 from common import CONFIG
 from common.script_utils import setup_script
 from common.logging_utils import log_script_end
-from utils import compute_subject_mean_pr, load_bids_tsvs
 from common.plotting import (
     apply_nature_rc,
     PLOT_PARAMS,
@@ -56,47 +53,24 @@ RNG = np.random.default_rng(CONFIG['RANDOM_SEED'])
 
 elo_all = pd.read_csv(results_dir / 'elo_correlations_all.csv')
 
-# Load enriched familiarisation data (produced by 01_skill_gradient.py)
-fam_subj_file = results_dir / 'familiarisation_subject_enriched.csv'
-fam_subj = pd.read_csv(fam_subj_file)
-
-# Load participants for Elo (all 20 experts)
-participants = pd.read_csv(CONFIG['BIDS_PARTICIPANTS'], sep='\t')
-experts = participants[(participants['group'] == 'expert') & participants['rating'].notna()]
-elo_map = dict(zip(experts['participant_id'], experts['rating']))
-expert_ids = set(elo_map.keys())
+# Load enriched per-subject table from BIDS derivatives
+enriched_file = Path(CONFIG['BIDS_SKILL_GRADIENT']) / 'familiarisation_subject_enriched.csv'
+anon_df = pd.read_csv(enriched_file)
+if 'participant_id' in anon_df.columns:
+    anon_df = anon_df.drop(columns=['participant_id'])
 
 logger.info(f"Loaded Elo correlations: {len(elo_all)} rows")
-logger.info(f"Loaded familiarisation data: {len(fam_subj)} subjects")
-logger.info(f"Experts with Elo: {len(expert_ids)}")
+logger.info(f"Loaded subject data from derivatives: {len(anon_df)} subjects")
 
-# PR: load from pickle (same trusted internal source as the analysis
-# script; written by chess-manifold/02_manifold_group.py into the
-# unified results/ tree under results/manifold/data/).
-pr_pkl = Path(CONFIG['RESULTS_ROOT']) / 'manifold' / 'data' / 'pr_results.pkl'
-with open(pr_pkl, 'rb') as f:
-    pr_data = pickle.load(f)
-pr_long = pr_data['pr_long_format']
-expert_mean_pr = compute_subject_mean_pr(pr_long, subject_ids=expert_ids)
+# Expert subset for Elo scatter plots (row 1)
+expert_subj_all = anon_df[
+    (anon_df['group'] == 'expert') & anon_df['rating'].notna()
+].copy()
+expert_subj_all = expert_subj_all.rename(columns={'rating': 'elo'})
+logger.info(f"Experts with Elo: {len(expert_subj_all)}")
 
-# RSA: load from BIDS derivatives
-rsa_df = load_bids_tsvs(CONFIG['BIDS_MVPA_RSA'])
-rsa_roi_cols = [c for c in rsa_df.columns if c not in ['subject', 'target']]
-rsa_cm = rsa_df[(rsa_df['subject'].isin(expert_ids)) & (rsa_df['target'] == 'checkmate')].copy()
-rsa_cm['rsa_checkmate'] = rsa_cm[rsa_roi_cols].astype(float).mean(axis=1)
-rsa_st = rsa_df[(rsa_df['subject'].isin(expert_ids)) & (rsa_df['target'] == 'strategy')].copy()
-rsa_st['rsa_strategy'] = rsa_st[rsa_roi_cols].astype(float).mean(axis=1)
-expert_rsa = rsa_cm[['subject', 'rsa_checkmate']].rename(columns={'subject': 'participant_id'})
-expert_rsa = expert_rsa.merge(
-    rsa_st[['subject', 'rsa_strategy']].rename(columns={'subject': 'participant_id'}),
-    on='participant_id', how='outer',
-)
-
-# Combine into expert_subj_all (all 20 experts)
-expert_subj_all = expert_mean_pr.merge(expert_rsa, on='participant_id', how='outer')
-expert_subj_all['elo'] = expert_subj_all['participant_id'].map(elo_map)
-expert_subj_all = expert_subj_all[expert_subj_all['elo'].notna()]
-logger.info(f"Expert Elo-row data: {len(expert_subj_all)} subjects")
+# All-participant data for familiarisation scatter plots (rows 2-3)
+fam_subj = anon_df
 
 
 # ============================================================================

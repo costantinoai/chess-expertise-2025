@@ -8,63 +8,62 @@ This analysis is **exploratory and supplementary**. All existing cortical analys
 
 ## Required bundles
 
-- `00_prepare_atlas.py` materialises the CAB-NP subcortical atlas into `sourcedata/atlases/cab-np/`. It only needs the Glasser-22 reference atlas, so **A** (core) is enough.
+- `01_prepare_atlas.py` materialises the CAB-NP subcortical atlas into `sourcedata/atlases/cab-np/`. It only needs the Glasser-22 reference atlas, so **A** (core) is enough.
 - `subcortical_rsa.m` (MATLAB subject script) reads SPM unsmoothed betas from `derivatives/fmriprep_spm-unsmoothed/` and the CAB-NP atlas → needs **A** (core) + **D** (spm).
-- `02_subcortical_group_rsa.py` and `03_subcortical_group_decoding.py` read the per-subject TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/` and `derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/` → need **A** (core) + **E** (analyses).
-- `91/92/93` plot scripts only consume the outputs of `02`/`03` from the repo `results/` tree (no extra bundle).
+- `11_subcortical_group_rsa.py` and `12_subcortical_group_decoding.py` read the per-subject TSVs from `derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/` and `derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/` → need **A** (core) + **E** (analyses).
+- `91/92/93` plot scripts only consume the outputs of `11`/`12` from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef out fill:#fff5b1,stroke:#b08800,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ST[stimuli/]:::in
-  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
-  A22[sourcedata/atlases/glasser22/]:::in
+ PT[participants.tsv]:::in
+ ST[stimuli/]:::in
+ GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+ A22[sourcedata/atlases/glasser22/]:::in
 
-  SC00["00_prepare_atlas.py"]:::sc
-  SCM["subcortical_rsa.m"]:::sc
-  SC02["02_subcortical_group_rsa.py"]:::sc
-  SC03["03_subcortical_group_decoding.py"]:::sc
-  SC91["91_plot_subcortical_rsa.py"]:::sc
-  SC92["92_plot_atlas_on_mni.py"]:::sc
-  SC93["93_plot_subcortical_decoding.py"]:::sc
+ SC01["01_prepare_atlas.py"]:::sc
+ SCM["subcortical_rsa.m"]:::sc
+ SC11["11_subcortical_group_rsa.py"]:::sc
+ SC12["12_subcortical_group_decoding.py"]:::sc
+ SC91["91_plot_subcortical_rsa.py"]:::sc
+ SC92["92_plot_atlas_on_mni.py"]:::sc
+ SC93["93_plot_subcortical_decoding.py"]:::sc
 
-  ACAB[sourcedata/atlases/cab-np/]:::out
-  SR[derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/]:::out
-  SD[derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/]:::out
-  DATA["results/supplementary/subcortical-rois/data/"]:::rl
-  FIGURES["results/supplementary/subcortical-rois/figures/"]:::rl
+ ACAB[sourcedata/atlases/cab-np/]:::out
+ SR[derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/]:::out
+ SD[derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/]:::out
+ DATA["derivatives/group-results/supplementary/subcortical-rois/data/"]:::out
+ FIGURES["derivatives/group-results/supplementary/subcortical-rois/figures/"]:::out
 
-  A22 --> SC00
-  SC00 --> ACAB
+ A22 --> SC01
+ SC01 --> ACAB
 
-  GLMU --> SCM
-  ACAB --> SCM
-  ST --> SCM
-  SCM --> SR
-  SCM --> SD
+ GLMU --> SCM
+ ACAB --> SCM
+ ST --> SCM
+ SCM --> SR
+ SCM --> SD
 
-  SR --> SC02
-  ACAB --> SC02
-  PT --> SC02
-  SC02 --> DATA
+ SR --> SC11
+ ACAB --> SC11
+ PT --> SC11
+ SC11 --> DATA
 
-  SD --> SC03
-  ACAB --> SC03
-  PT --> SC03
-  SC03 --> DATA
+ SD --> SC12
+ ACAB --> SC12
+ PT --> SC12
+ SC12 --> DATA
 
-  DATA --> SC91 --> FIGURES
-  PT --> SC91
-  ACAB --> SC92 --> FIGURES
-  DATA --> SC93 --> FIGURES
-  PT --> SC93
+ DATA --> SC91 --> FIGURES
+ PT --> SC91
+ ACAB --> SC92 --> FIGURES
+ DATA --> SC93 --> FIGURES
+ PT --> SC93
 ```
 
 ## Methods
@@ -130,7 +129,7 @@ Bar plots color each ROI by its anatomical group, matching the convention used f
 
 Expert and novice bars share the same color per ROI (experts = solid fill, novices = hatched). Colorblind-safe alternatives are stored in the `color_cb` column of `region_info.tsv`.
 
-### Atlas Preparation (00_prepare_atlas.py)
+### Atlas Preparation (01_prepare_atlas.py)
 
 1. **Download**: Clone the ColeAnticevicNetPartition GitHub repository
 2. **Extract subcortical parcels**: Load the CIFTI dlabel file and extract subcortical brain model voxels by iterating over CIFTI brain model structures, excluding CORTEX_LEFT and CORTEX_RIGHT
@@ -143,10 +142,10 @@ Expert and novice bars share the same color per ROI (experts = solid fill, novic
 **Output files**:
 ```
 BIDS/sourcedata/atlases/cab-np/
-  tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii.gz
-  tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii
-  region_info.tsv
-  atlas-CABNP_description.json
+ tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii.gz
+ tpl-MNI152NLin2009cAsym_res-02_atlas-CABNP_desc-subcortical_bilateral_resampled.nii
+ region_info.tsv
+ atlas-CABNP_description.json
 ```
 
 ### Pipeline: Exact Replication of Cortical MVPA
@@ -178,28 +177,28 @@ The analysis replicates the **exact same MVPA pipeline** used for cortical ROIs 
 **Output per subject** (same format as cortical):
 ```
 BIDS/derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/sub-XX/
-    sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_stat-accuracy_decoding.tsv
+ sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_stat-accuracy_decoding.tsv
 BIDS/derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/sub-XX/
-    sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_stat-r_rsa.tsv
+ sub-XX_space-MNI152NLin2009cAsym_roi-cabnp_stat-r_rsa.tsv
 ```
 
 Each TSV has columns: target, then one column per subcortical ROI name. Rows: checkmate, strategy, visual_similarity. Values: SVM accuracy (0-1) or Spearman correlation (r).
 
 ### Group-Level RSA Statistics (Python)
 
-**Script**: 02_subcortical_group_rsa.py (mirrors chess-mvpa/02_mvpa_group_rsa.py)
+**Script**: 11_subcortical_group_rsa.py (mirrors chess-mvpa/11_mvpa_group_rsa.py)
 
 **Procedure** (identical to cortical):
 
-1. **Data loading**: Find all subject-level RSA TSV files from `derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/` using find_subject_tsvs(). Consolidate into a group DataFrame using build_group_dataframe() with expert/novice labels from participants.tsv via get_participants_with_expertise().
+1. **Data loading**: Find all subject-level RSA TSV files from `derivatives/fmriprep_spm-unsmoothed_rsa-subcortical/` using find_subject_tsvs. Consolidate into a group DataFrame using build_group_dataframe with expert/novice labels from participants.tsv via get_participants_with_expertise.
 
 2. **Statistical tests per target per ROI** (3 targets x 9 ROIs):
 
-   a. **Experts vs Chance (zero)**: One-sample one-tailed t-test (greater) testing whether expert mean correlation exceeds zero. Null: mu_expert <= 0. Implementation: scipy.stats.ttest_1samp with alternative='greater'.
+ a. **Experts vs Chance (zero)**: One-sample one-tailed t-test (greater) testing whether expert mean correlation exceeds zero. Null: mu_expert <= 0. Implementation: scipy.stats.ttest_1samp with alternative='greater'.
 
-   b. **Novices vs Chance (zero)**: One-sample one-tailed t-test (greater) testing whether novice mean correlation exceeds zero. Null: mu_novice <= 0. Same implementation.
+ b. **Novices vs Chance (zero)**: One-sample one-tailed t-test (greater) testing whether novice mean correlation exceeds zero. Null: mu_novice <= 0. Same implementation.
 
-   c. **Experts vs Novices**: Welch two-sample two-tailed t-test comparing expert and novice mean correlations. Does not assume equal variances. Null: mu_expert = mu_novice. Implementation: scipy.stats.ttest_ind with equal_var=False.
+ c. **Experts vs Novices**: Welch two-sample two-tailed t-test comparing expert and novice mean correlations. Does not assume equal variances. Null: mu_expert = mu_novice. Implementation: scipy.stats.ttest_ind with equal_var=False.
 
 3. **FDR correction**: Benjamini-Hochberg FDR correction applied separately within each target and test type, across the **9 subcortical ROIs** (not 22 as in cortical). Alpha = 0.05. Implementation: statsmodels.stats.multitest.multipletests with method='fdr_bh'.
 
@@ -209,16 +208,16 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 
 ### Group-Level Decoding Statistics (Python)
 
-**Script**: 03_subcortical_group_decoding.py (mirrors chess-mvpa/03_mvpa_group_decoding.py)
+**Script**: 12_subcortical_group_decoding.py (mirrors chess-mvpa/12_mvpa_group_decoding.py)
 
 **Procedure** (identical to cortical):
 
 1. Same data loading and group assignment as the RSA step, but reading from `derivatives/fmriprep_spm-unsmoothed_decoding-subcortical/`.
 
-2. **Chance-level determination**: Target-specific chance levels derived from stimulus design via derive_target_chance_from_stimuli():
-   - checkmate: chance = 0.5 (binary: check vs non-check)
-   - strategy: chance = 1/n_classes (multi-class)
-   - visual_similarity: chance = 1/n_classes
+2. **Chance-level determination**: Target-specific chance levels derived from stimulus design via derive_target_chance_from_stimuli:
+ - checkmate: chance = 0.5 (binary: check vs non-check)
+ - strategy: chance = 1/n_classes (multi-class)
+ - visual_similarity: chance = 1/n_classes
 
 3. **Statistical tests**: Identical three-test battery (vs chance, between groups) with FDR across 9 ROIs.
 
@@ -247,7 +246,7 @@ Each TSV has columns: target, then one column per subcortical ROI name. Rows: ch
 
 - **GLM beta estimates**: `BIDS/derivatives/fmriprep_spm-unsmoothed/sub-XX/exp/SPM.mat` and associated NIfTI beta images
 - **Cortical atlas** (for overlap removal): `BIDS/sourcedata/atlases/glasser22/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz`
-- **CAB-NP atlas source**: https://github.com/ColeLab/ColeAnticevicNetPartition (cloned by 00_prepare_atlas.py)
+- **CAB-NP atlas source**: https://github.com/ColeLab/ColeAnticevicNetPartition (cloned by 01_prepare_atlas.py)
 - **Participant metadata**: `BIDS/participants.tsv`
 - **Stimulus metadata**: `BIDS/stimuli/stimuli.tsv`
 
@@ -266,7 +265,7 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 
 ```bash
 cd chess-supplementary/subcortical-rois
-python 00_prepare_atlas.py
+python 01_prepare_atlas.py
 ```
 
 Downloads the CAB-NP atlas, extracts subcortical parcels, merges into 9 bilateral ROIs, resamples to functional space, removes cortical overlap, and saves the NIfTI atlas with region metadata.
@@ -283,7 +282,7 @@ Runs the identical MVPA pipeline (SVM decoding + RSA correlations) for each subj
 ### Step 2: Run group-level RSA statistics
 
 ```bash
-python 02_subcortical_group_rsa.py
+python 11_subcortical_group_rsa.py
 ```
 
 Computes group-level t-tests (experts vs chance, novices vs chance, experts vs novices) with FDR correction across 9 subcortical ROIs for all three RSA model targets.
@@ -291,7 +290,7 @@ Computes group-level t-tests (experts vs chance, novices vs chance, experts vs n
 ### Step 3: Run group-level decoding statistics
 
 ```bash
-python 03_subcortical_group_decoding.py
+python 12_subcortical_group_decoding.py
 ```
 
 Computes group-level decoding statistics with the same three-test battery and FDR correction as the RSA step.
@@ -355,12 +354,12 @@ The cortical pipeline that this analysis replicates:
 
 ```
 chess-mvpa/
-  01_roi_mvpa_subject.m        # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
-  02_mvpa_group_rsa.py         # Group-level RSA statistics (Python)
-  03_mvpa_group_decoding.py    # Group-level decoding statistics (Python)
-  04_searchlight_rsa.m         # Whole-brain searchlight RSA (MATLAB/CoSMoMVPA)
-  92_plot_mvpa_rsa.py          # RSA bar plots + pial surfaces
-  93_plot_mvpa_decoding.py     # SVM + RSA + RDM combined panel
+ 01_roi_mvpa_subject.m # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
+ 11_mvpa_group_rsa.py # Group-level RSA statistics (Python)
+ 12_mvpa_group_decoding.py # Group-level decoding statistics (Python)
+ 04_searchlight_rsa.m # Whole-brain searchlight RSA (MATLAB/CoSMoMVPA)
+ 91_plot_mvpa_rsa.py # RSA bar plots + pial surfaces
+ 92_plot_mvpa_decoding.py # SVM + RSA + RDM combined panel
 ```
 
 ### Manuscript Integration
@@ -375,17 +374,17 @@ Results are reported in a supplementary section ("Subcortical Representational a
 
 ```
 chess-supplementary/subcortical-rois/
-├── 00_prepare_atlas.py                # Atlas download, extraction, bilateral merge, resample
-├── subcortical_rsa.m                  # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
-├── 02_subcortical_group_rsa.py        # Group-level RSA statistics
-├── 03_subcortical_group_decoding.py   # Group-level decoding statistics
-├── 91_plot_subcortical_rsa.py         # RSA bar plots
-├── 92_plot_atlas_on_mni.py            # Atlas visualization on MNI anatomy
-├── 93_plot_subcortical_decoding.py    # SVM + RSA combined panel
+├── 01_prepare_atlas.py # Atlas download, extraction, bilateral merge, resample
+├── subcortical_rsa.m # Subject-level SVM + RSA (MATLAB/CoSMoMVPA)
+├── 11_subcortical_group_rsa.py # Group-level RSA statistics
+├── 12_subcortical_group_decoding.py # Group-level decoding statistics
+├── 91_plot_subcortical_rsa.py # RSA bar plots
+├── 92_plot_atlas_on_mni.py # Atlas visualization on MNI anatomy
+├── 93_plot_subcortical_decoding.py # SVM + RSA combined panel
 └── README.md
 ```
 
-Outputs are written to `results/supplementary/subcortical-rois/{data,figures}/` in the unified repo results tree.
+Outputs are written to `derivatives/group-results/supplementary/subcortical-rois/{data,figures}/` in the unified repo results tree. The `results/` tree contains **only group-level aggregates** (GDPR-compliant); per-subject data lives in `BIDS/derivatives/`.
 
 ## References
 

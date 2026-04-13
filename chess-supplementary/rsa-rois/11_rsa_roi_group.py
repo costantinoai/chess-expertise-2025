@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-RSA Searchlight ROI Summary (Glasser-180 Bilateral) — Supplementary Analysis
+RSA Searchlight ROI Group Statistics (Glasser-180 Bilateral) — Supplementary Analysis
 
 METHODS
 =======
 
 Overview
 --------
-This analysis summarizes subject-level RSA searchlight correlation maps within
-the 180 bilateral Glasser cortical ROIs and performs expert vs. novice group
-comparisons per ROI for three model RDM targets:
+This script reads per-subject ROI mean TSVs produced by
+``01_rsa_roi_subject.py`` (stored in BIDS derivatives) and performs
+expert vs. novice group comparisons per ROI for three model RDM targets:
   - Visual Similarity
   - Strategy
   - Checkmate
@@ -20,56 +20,55 @@ Data
 ----
 - Participants: All subjects in participants.tsv (n_experts, n_novices derived
   at runtime via BIDS participants table).
-- Imaging: RSA searchlight r-maps from CONFIG['BIDS_RSA_SEARCHLIGHT'] with files
-  named per subject and target (e.g., sub-XX_desc-searchlight_<target>_stat-r_map.nii.gz).
-- Volumetric atlas: Glasser-180 bilateral atlas in MNI152NLin2009cAsym space (180 ROIs total).
+- Per-subject ROI means: TSVs from
+  ``BIDS/derivatives/fmriprep_spm-unsmoothed_rsa-rois/sub-XX/`` written by
+  ``01_rsa_roi_subject.py``.
+- Volumetric atlas: Glasser-180 bilateral atlas in MNI152NLin2009cAsym space
+  (used only for Harvard-Oxford mapping, not NIfTI extraction).
 - ROI metadata: region_info.tsv from CONFIG['ROI_GLASSER_180'].
 
 Procedure
 ---------
-1. Set up a timestamped results directory and log configuration (seed, paths).
+1. Set up the results directory and log configuration.
 2. Load participants and derive expert vs novice groups.
-3. Load the Glasser-180 bilateral volumetric atlas and initialize NiftiLabelsMasker.
+3. Load the Glasser-180 bilateral volumetric atlas (for H-O mapping).
 4. Load ROI metadata (180 bilateral ROIs).
-5. For each subject and RSA target:
-   - Load the volumetric r-map
-   - Extract 180 bilateral ROI means using NiftiLabelsMasker
+5. Read per-subject ROI mean TSVs from BIDS derivatives (written by 01).
 6. For each target:
-   - Form expert and novice matrices (subjects × 180 ROIs)
-   - Run Welch's t-tests per ROI with Benjamini–Hochberg FDR correction (180 tests)
+   - Form expert and novice matrices (subjects x 180 ROIs)
+   - Run Welch's t-tests per ROI with Benjamini-Hochberg FDR correction (180 tests)
    - Compute per-group descriptive means and 95% CIs per ROI
-7. Save artifacts: per-target subject×ROI TSVs and a consolidated
-   rsa_group_stats.pkl containing statistics.
+7. Save group-level artifacts: rsa_group_stats.pkl and roi_info TSV.
 
 Statistical Tests
 -----------------
 - Welch two-sample t-test (unequal variances) per ROI comparing experts vs
   novices. 95% confidence intervals are reported for the group difference.
-- Multiple comparisons: FDR correction (Benjamini–Hochberg) at alpha=0.05,
+- Multiple comparisons: FDR correction (Benjamini-Hochberg) at alpha=0.05,
   applied across all 180 bilateral ROIs.
 
 Outputs
 -------
-All outputs are saved to results/<timestamp>_rsa_rois/:
-- rsa_subject_roi_means_{target}.tsv (subject × ROI tables per target)
+All outputs are saved to results/supplementary/rsa-rois/data/:
 - rsa_group_stats.pkl (dict with per-target Welch table and descriptives)
+- roi_info_with_ho_labels.tsv (ROI metadata with Harvard-Oxford labels)
+
+Per-subject data lives in BIDS/derivatives/ (GDPR compliance).
 """
 
 from pathlib import Path
-import pickle
+import pickle  # noqa: S403 — trusted internal data only
 import numpy as np
 import pandas as pd
 
-# Enable repo root imports
 from common import CONFIG
 from common.logging_utils import setup_analysis, log_script_end
-from common.bids_utils import get_participants_with_expertise, load_roi_metadata
+from common.bids_utils import get_participants_with_expertise, get_subject_list, load_roi_metadata
 from common.neuro_utils import load_nifti, map_glasser_roi_to_harvard_oxford
 from common.group_stats import get_descriptives_per_roi
 from common.stats_utils import per_roi_welch_and_fdr
-from nilearn.maskers import NiftiLabelsMasker
 
-from analyses.rsa_rois.io import RSA_TARGETS, find_subject_rsa_path
+from analyses.rsa_rois.io import RSA_TARGETS, _BIDS_DESC_FOR_TARGET
 
 
 # ============================================================================
@@ -77,23 +76,22 @@ from analyses.rsa_rois.io import RSA_TARGETS, find_subject_rsa_path
 # ============================================================================
 
 config, out_dir, logger = setup_analysis(
-    analysis_name="rsa_rois",
+    analysis_name="11_rsa_rois_group",
     results_base=Path(__file__).parent / "results",
     script_file=__file__,
 )
 
 logger.info("=" * 80)
-logger.info("RSA SEARCHLIGHT ROI SUMMARY (GLASSER-180 BILATERAL, VOLUME-BASED)")
+logger.info("RSA SEARCHLIGHT ROI GROUP STATISTICS (GLASSER-180 BILATERAL)")
 logger.info("=" * 80)
 
 # Participants
 participants, (n_exp, n_nov) = get_participants_with_expertise()
 logger.info(f"Participants loaded: {len(participants)} (experts={n_exp}, novices={n_nov})")
 
-# Load bilateral volumetric atlas and ROI metadata
+# Load bilateral volumetric atlas (needed for Harvard-Oxford mapping) and ROI metadata
 atlas_path = CONFIG['ROI_GLASSER_180_ATLAS']
 atlas_img = load_nifti(atlas_path)
-masker = NiftiLabelsMasker(labels_img=str(atlas_path), standardize=False, strategy='mean')
 logger.info(f"Loaded Glasser-180 bilateral atlas from: {atlas_path}")
 
 roi_info = load_roi_metadata(CONFIG['ROI_GLASSER_180'])
@@ -114,40 +112,48 @@ logger.info("Harvard-Oxford mapping complete")
 
 
 # ============================================================================
-# Per-subject ROI means (volume-based extraction, bilateral)
+# Read per-subject ROI means from BIDS derivatives (written by 01)
 # ============================================================================
 
-rsa_base = Path(CONFIG['BIDS_RSA_SEARCHLIGHT'])
+RSA_ROIS_ROOT: Path = (
+    Path(CONFIG['BIDS_RSA_SEARCHLIGHT']).parent / 'fmriprep_spm-unsmoothed_rsa-rois'
+)
+logger.info(f"Reading per-subject ROI means from: {RSA_ROIS_ROOT}")
 
-# Storage for all targets
-subject_rows = {k: [] for k in RSA_TARGETS.keys()}
+all_subjects = get_subject_list()
+expert_set = {sub_id for sub_id, is_expert in participants if is_expert}
+
 expert_vals = {k: [] for k in RSA_TARGETS.keys()}
 novice_vals = {k: [] for k in RSA_TARGETS.keys()}
+missing = []
 
-for sub_id, is_expert in participants:
-    for tgt_key, tgt_label in RSA_TARGETS.items():
-        path = find_subject_rsa_path(sub_id, tgt_key, rsa_base)
-        img = load_nifti(path)
-
-        # Extract all 180 bilateral ROI means at once
-        roi_means = masker.fit_transform(img).flatten()  # shape: (180,)
-
-        subject_rows[tgt_key].append({
-            'subject': sub_id,
-            **{f"roi_{rid}": v for rid, v in zip(roi_ids, roi_means)}
-        })
+for sub_id in all_subjects:
+    is_expert = sub_id in expert_set
+    for tgt_key in RSA_TARGETS.keys():
+        bids_desc = _BIDS_DESC_FOR_TARGET[tgt_key]
+        tsv_name = (
+            f"{sub_id}_space-MNI152NLin2009cAsym"
+            f"_roi-glasser180_desc-rsamean"
+            f"_target-{bids_desc}_rois.tsv"
+        )
+        tsv_path = RSA_ROIS_ROOT / sub_id / tsv_name
+        if not tsv_path.is_file():
+            logger.warning(f"  {sub_id}/{tgt_key}: no TSV at {tsv_path} -- skipping")
+            missing.append((sub_id, tgt_key))
+            continue
+        df = pd.read_csv(tsv_path, sep="\t")
+        roi_cols = [c for c in df.columns if c.startswith("roi_")]
+        roi_means = df[roi_cols].values.flatten()  # shape: (180,)
 
         if is_expert:
             expert_vals[tgt_key].append(roi_means)
         else:
             novice_vals[tgt_key].append(roi_means)
 
-# Write per-target subject×ROI TSVs
-for tgt_key, rows in subject_rows.items():
-    df = pd.DataFrame(rows)
-    fname = f"rsa_subject_roi_means_{tgt_key}.tsv"
-    df.to_csv(out_dir / fname, sep="\t", index=False)
-    logger.info(f"Saved subject ROI means for {tgt_key} → {out_dir / fname}")
+logger.info(
+    f"Loaded per-subject ROI means for {len(all_subjects)} subjects "
+    f"({len(missing)} subject/target pairs missing)"
+)
 
 
 # ============================================================================

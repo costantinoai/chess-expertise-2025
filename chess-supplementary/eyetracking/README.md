@@ -6,8 +6,9 @@ This analysis tests whether eye-tracking time-series features discriminate chess
 
 ## Required bundles
 
-- `01_eye_decoding.py` reads per-run gaze estimates from `derivatives/bidsmreye/sub-*/func/` → needs **A** (core) + **E** (analyses).
-- `81/91` table and plot scripts only consume the outputs of `01` from the repo `results/` tree (no extra bundle).
+- `01_eye_decoding_subject.py` reads per-run gaze estimates from `derivatives/bidsmreye/sub-*/func/` and writes per-subject decoding features into `derivatives/eyetracking/` → needs **A** (core) + **E** (analyses).
+- `11_eye_decoding_group.py` reads per-subject features from `derivatives/eyetracking/` and writes group aggregates into `derivatives/group-results/supplementary/eyetracking/data/`.
+- `81/91` table and plot scripts only consume the outputs of `11` from the group-results derivative folder (no extra bundle).
 
 Note: `bidsmreye/` is populated by the upstream BidsMReye tool, not by this analysis; the chess code only reads it.
 
@@ -15,26 +16,32 @@ Note: `bidsmreye/` is populated by the upstream BidsMReye tool, not by this anal
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ETR[derivatives/bidsmreye/]:::in
+ PT[participants.tsv]:::in
+ ETR[derivatives/bidsmreye/]:::in
 
-  E01["01_eye_decoding.py"]:::sc
-  E81["81_table_eyetracking_decoding.py"]:::sc
-  E91["91_plot_eyetracking_decoding.py"]:::sc
-  DATA["results/supplementary/eyetracking/data/"]:::rl
-  TABLES["results/supplementary/eyetracking/tables/"]:::rl
-  FIGURES["results/supplementary/eyetracking/figures/"]:::rl
+ E01["01_eye_decoding_subject.py"]:::sc
+ E11["11_eye_decoding_group.py"]:::sc
+ E81["81_table_eyetracking_decoding.py"]:::sc
+ E91["91_plot_eyetracking_decoding.py"]:::sc
+ DERIV[derivatives/eyetracking/]:::out
+ DATA["derivatives/group-results/supplementary/eyetracking/data/"]:::out
+ TABLES["derivatives/group-results/supplementary/eyetracking/tables/"]:::out
+ FIGURES["derivatives/group-results/supplementary/eyetracking/figures/"]:::out
 
-  ETR --> E01
-  PT --> E01
-  E01 --> DATA
+ ETR --> E01
+ PT --> E01
+ E01 --> DERIV
 
-  DATA --> E81 --> TABLES
-  DATA --> E91 --> FIGURES
+ DERIV --> E11
+ PT --> E11
+ E11 --> DATA
+
+ DATA --> E81 --> TABLES
+ DATA --> E91 --> FIGURES
 ```
 
 ## Methods
@@ -55,9 +62,9 @@ Eye movements reflect cognitive processes during chess perception and problem-so
 
 1. Load all eye-tracking TSV files and corresponding JSON metadata
 2. For each feature set (xy, displacement):
-   - Truncate runs to common length (minimum number of timepoints across all runs)
-   - Flatten each run into a fixed-length feature vector
-   - Result: Matrix of runs × features
+ - Truncate runs to common length (minimum number of timepoints across all runs)
+ - Flatten each run into a fixed-length feature vector
+ - Result: Matrix of runs × features
 
 ### Classification Procedure
 
@@ -97,14 +104,23 @@ Path is derived from `CONFIG['BIDS_EYETRACK']` in `common/constants.py`, which p
 
 ## Running the Analysis
 
-### Step 1: Run Decoding Analysis
+### Step 1: Per-subject feature extraction
 
 ```bash
 # From repository root
-python chess-supplementary/eyetracking/01_eye_decoding.py
+python chess-supplementary/eyetracking/01_eye_decoding_subject.py
 ```
 
-**Outputs** (saved to `results/supplementary/eyetracking/data/`):
+**Outputs** (saved to `BIDS/derivatives/eyetracking/sub-*/`):
+- Per-subject decoding feature matrices (gaze coordinates, displacement)
+
+### Step 2: Group-level decoding
+
+```bash
+python chess-supplementary/eyetracking/11_eye_decoding_group.py
+```
+
+**Outputs** (saved to `derivatives/group-results/supplementary/eyetracking/data/`):
 - `results_xy.json`: Metrics and predictions for xy features
 - `results_displacement.json`: Metrics and predictions for displacement features
 - `fold_accuracies_xy.csv`: Per-fold accuracies for xy
@@ -112,15 +128,15 @@ python chess-supplementary/eyetracking/01_eye_decoding.py
 - `subject_accuracies_xy.csv`: Per-subject out-of-fold accuracies for xy
 - `subject_accuracies_displacement.csv`: Per-subject out-of-fold accuracies for displacement
 
-### Step 2: Tables and figures
+### Step 3: Tables and figures
 
 ```bash
 python chess-supplementary/eyetracking/81_table_eyetracking_decoding.py
 python chess-supplementary/eyetracking/91_plot_eyetracking_decoding.py
 ```
 
-- Tables → `results/supplementary/eyetracking/tables/`
-- Figures → `results/supplementary/eyetracking/figures/`
+- Tables → `derivatives/group-results/supplementary/eyetracking/tables/`
+- Figures → `derivatives/group-results/supplementary/eyetracking/figures/`
 
 **Expected runtime**: ~2-5 minutes
 
@@ -132,15 +148,16 @@ Subject-level decoding accuracies indicate whether gaze features systematically 
 
 ```
 chess-supplementary/eyetracking/
-├── README.md                              # This file
-├── 01_eye_decoding.py                     # Main decoding analysis
-├── 81_table_eyetracking_decoding.py       # Summary table
-├── 91_plot_eyetracking_decoding.py        # Summary figure
-├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-└── analyses/eyetracking/                  # Shared analysis modules (in repo root analyses/ package)
-    ├── __init__.py
-    ├── io.py                              # Eye-tracking data loading
-    └── features.py                        # Feature extraction utilities
+├── README.md # This file
+├── 01_eye_decoding_subject.py # Subject-level: feature extraction → derivatives/eyetracking/
+├── 11_eye_decoding_group.py # Group-level: decoding + stats → derivatives/group-results/
+├── 81_table_eyetracking_decoding.py # Summary table
+├── 91_plot_eyetracking_decoding.py # Summary figure
+├── DISCREPANCIES.md # Notes on analysis discrepancies
+└── analyses/eyetracking/ # Shared analysis modules (in repo root analyses/ package)
+ ├── __init__.py
+ ├── io.py # Eye-tracking data loading
+ └── features.py # Feature extraction utilities
 ```
 
-Outputs are written to `results/supplementary/eyetracking/{data,tables,figures}/` in the unified repo results tree.
+Outputs: per-subject data in `BIDS/derivatives/eyetracking/`; group-level aggregates in `derivatives/group-results/supplementary/eyetracking/{data,tables,figures}/`. The `results/` tree contains **only group-level aggregates** (GDPR-compliant).

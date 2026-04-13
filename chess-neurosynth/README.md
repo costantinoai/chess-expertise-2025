@@ -6,46 +6,45 @@ This analysis places observed expertise-related brain activation differences in 
 
 ## Required bundles
 
-- `01_univariate_neurosynth.py` reads SPM smoothed group t-maps from `derivatives/fmriprep_spm-smoothed/group/` → needs **A** (core) + **D** (spm).
-- `02_rsa_neurosynth.py` reads per-subject searchlight RSA maps from `derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/` → needs **A** (core) + **E** (analyses).
-- `81/82` (tables) and `91/92` (figures) only consume the outputs of 01/02 from the repo `results/` tree (no extra bundle).
+- `11_univariate_neurosynth.py` reads SPM smoothed group t-maps from `derivatives/fmriprep_spm-smoothed/group/` → needs **A** (core) + **D** (spm).
+- `12_rsa_neurosynth.py` reads per-subject searchlight RSA maps from `derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/` → needs **A** (core) + **E** (analyses).
+- `81/82` (tables) and `91/92` (figures) only consume the outputs of 11/12 from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ATLNS["sourcedata/atlases/neurosynth/terms/"]:::in
-  GLMS_GRP["derivatives/fmriprep_spm-smoothed/group/"]:::in
-  SLR[derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/]:::in
+ PT[participants.tsv]:::in
+ ATLNS["sourcedata/atlases/neurosynth/terms/"]:::in
+ GLMS_GRP["derivatives/fmriprep_spm-smoothed/group/"]:::in
+ SLR[derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/]:::in
 
-  N01["01_univariate_neurosynth.py"]:::sc
-  N02["02_rsa_neurosynth.py"]:::sc
-  N81["81_table_neurosynth_univariate.py"]:::sc
-  N82["82_table_neurosynth_rsa.py"]:::sc
-  N91["91_plot_neurosynth_univariate.py"]:::sc
-  N92["92_plot_neurosynth_rsa.py"]:::sc
-  DATA["results/neurosynth/data/"]:::rl
-  TABLES["results/neurosynth/tables/"]:::rl
-  FIGURES["results/neurosynth/figures/"]:::rl
+ N11["11_univariate_neurosynth.py"]:::sc
+ N12["12_rsa_neurosynth.py"]:::sc
+ N81["81_table_neurosynth_univariate.py"]:::sc
+ N82["82_table_neurosynth_rsa.py"]:::sc
+ N91["91_plot_neurosynth_univariate.py"]:::sc
+ N92["92_plot_neurosynth_rsa.py"]:::sc
+ DATA["derivatives/group-results/neurosynth/data/"]:::out
+ TABLES["derivatives/group-results/neurosynth/tables/"]:::out
+ FIGURES["derivatives/group-results/neurosynth/figures/"]:::out
 
-  ATLNS --> N01
-  GLMS_GRP --> N01
-  N01 --> DATA
+ ATLNS --> N11
+ GLMS_GRP --> N11
+ N11 --> DATA
 
-  ATLNS --> N02
-  SLR --> N02
-  PT --> N02
-  N02 --> DATA
+ ATLNS --> N12
+ SLR --> N12
+ PT --> N12
+ N12 --> DATA
 
-  DATA --> N81 --> TABLES
-  DATA --> N82 --> TABLES
-  DATA --> N91 --> FIGURES
-  DATA --> N92 --> FIGURES
+ DATA --> N81 --> TABLES
+ DATA --> N82 --> TABLES
+ DATA --> N91 --> FIGURES
+ DATA --> N92 --> FIGURES
 ```
 
 ## Methods
@@ -126,12 +125,12 @@ This allows separate functional interpretation of expertise-enhanced vs expertis
 **Second-level group analysis**:
 1. **Fisher z-transformation**: Subject-level correlation maps Fisher z-transformed (z = arctanh(r)) to stabilize variance for group-level inference
 2. **Group GLM**: Fit second-level GLM with two regressors:
-   - Intercept (group mean)
-   - Group contrast (experts = +1, novices = −1)
-   - Implementation: `nilearn.glm.second_level.SecondLevelModel`
+ - Intercept (group mean)
+ - Group contrast (experts = +1, novices = −1)
+ - Implementation: `nilearn.glm.second_level.SecondLevelModel`
 3. **Group contrast map**: Extract z-score map for Experts > Novices contrast
-   - Positive z-values: Voxels where experts show stronger RSA correlations
-   - Negative z-values: Voxels where novices show stronger correlations
+ - Positive z-values: Voxels where experts show stronger RSA correlations
+ - Negative z-values: Voxels where novices show stronger correlations
 4. **Sign-specific maps**: Split into Z+ and Z− as above
 
 Paths (under external data root):
@@ -150,18 +149,18 @@ Paths (under external data root):
 
 **For univariate analysis**:
 - **Group t-maps**: `BIDS/derivatives/fmriprep_spm-smoothed/group/spmT_exp-gt-nonexp_*.nii.gz`
-  - SPM12 second-level GLM outputs
-  - Contrasts: Experts > Novices for various first-level contrasts
+ - SPM12 second-level GLM outputs
+ - Contrasts: Experts > Novices for various first-level contrasts
 - **Neurosynth term maps**: `BIDS/sourcedata/atlases/neurosynth/terms/*.nii.gz`
-  - Z-scored association test maps for cognitive terms
-  - Downloaded from https://neurosynth.org/
+ - Z-scored association test maps for cognitive terms
+ - Downloaded from https://neurosynth.org/
 
 **For RSA analysis**:
 - **Subject-level searchlight maps**: `BIDS/derivatives/fmriprep_spm-unsmoothed_searchlight-rsa/sub-*/sub-*_space-MNI152NLin2009cAsym_desc-<pattern>_stat-r_searchlight.nii.gz`
-  - Correlation coefficient maps from whole-brain RSA searchlight
-  - Models: checkmate, strategy, visualSimilarity
+ - Correlation coefficient maps from whole-brain RSA searchlight
+ - Models: checkmate, strategy, visualSimilarity
 - **Participant data**: `BIDS/participants.tsv`
-  - Columns: `participant_id`, `group` (expert/novice)
+ - Columns: `participant_id`, `group` (expert/novice)
 - **Neurosynth term maps**: Same as above
 
 ## Running the Analysis
@@ -170,25 +169,25 @@ Paths (under external data root):
 
 ```bash
 # From repository root
-python chess-neurosynth/01_univariate_neurosynth.py
+python chess-neurosynth/11_univariate_neurosynth.py
 ```
 
-**Outputs** (saved to `results/neurosynth/data/`):
+**Outputs** (saved to `derivatives/group-results/neurosynth/data/`):
 - `zmap_<contrast>.nii.gz`: Signed z-score maps (converted from t-maps)
 - `<contrast>_term_corr_positive.csv`: Z+ term correlations (term, r)
 - `<contrast>_term_corr_negative.csv`: Z− term correlations (term, r)
 - `<contrast>_term_corr_difference.csv`: Correlation differences (term, r_pos, r_neg, r_diff)
-- `01_univariate_neurosynth.py`: Copy of the analysis script
+- `11_univariate_neurosynth.py`: Copy of the analysis script
 
 **Expected runtime**: ~2-3 minutes per contrast
 
 ### Step 2: RSA Searchlight Neurosynth Correlation
 
 ```bash
-python chess-neurosynth/02_rsa_neurosynth.py
+python chess-neurosynth/12_rsa_neurosynth.py
 ```
 
-**Outputs** (saved to `results/neurosynth/data/`):
+**Outputs** (saved to `derivatives/group-results/neurosynth/data/`):
 - `zmap_searchlight_{checkmate,strategy,visual_similarity}.nii.gz`: group z-score maps (Experts > Novices) per RSA model
 - `searchlight_{checkmate,strategy,visual_similarity}_term_corr_positive.csv`: Z+ term correlations
 - `searchlight_{checkmate,strategy,visual_similarity}_term_corr_negative.csv`: Z− term correlations
@@ -212,14 +211,14 @@ python chess-neurosynth/82_table_neurosynth_rsa.py
 ```
 
 **Outputs**:
-- Univariate tables → `results/neurosynth/tables/`
-  - `neurosynth_univariate_summary.tex`: Combined LaTeX summary table
-  - `neurosynth_univariate_summary.csv`: Combined CSV summary table
-  - `neurosynth_univariate_full_stats.csv`: Full statistics with CIs and p-values
-- RSA tables → `results/neurosynth/tables/`
-  - `neurosynth_rsa_summary.tex`: Combined LaTeX summary table
-  - `neurosynth_rsa_summary.csv`: Combined CSV summary table
-  - `neurosynth_rsa_full_stats.csv`: Full statistics with CIs and p-values
+- Univariate tables → `derivatives/group-results/neurosynth/tables/`
+ - `neurosynth_univariate_summary.tex`: Combined LaTeX summary table
+ - `neurosynth_univariate_summary.csv`: Combined CSV summary table
+ - `neurosynth_univariate_full_stats.csv`: Full statistics with CIs and p-values
+- RSA tables → `derivatives/group-results/neurosynth/tables/`
+ - `neurosynth_rsa_summary.tex`: Combined LaTeX summary table
+ - `neurosynth_rsa_summary.csv`: Combined CSV summary table
+ - `neurosynth_rsa_full_stats.csv`: Full statistics with CIs and p-values
 
 ### Step 4: Generate Figures
 
@@ -232,12 +231,12 @@ python chess-neurosynth/92_plot_neurosynth_rsa.py
 ```
 
 **Outputs**:
-- Univariate figures → `results/neurosynth/figures/`
-  - Individual axes as SVG: `neurosynth_univariate__*.svg`
-  - Complete panel PDF: `panels/neurosynth_univariate_panel.pdf`
-- RSA figures → `results/neurosynth/figures/`
-  - Individual axes as SVG: `neurosynth_rsa__*.svg`
-  - Complete panel PDF: `panels/neurosynth_rsa_panel.pdf`
+- Univariate figures → `derivatives/group-results/neurosynth/figures/`
+ - Individual axes as SVG: `neurosynth_univariate__*.svg`
+ - Complete panel PDF: `panels/neurosynth_univariate_panel.pdf`
+- RSA figures → `derivatives/group-results/neurosynth/figures/`
+ - Individual axes as SVG: `neurosynth_rsa__*.svg`
+ - Complete panel PDF: `panels/neurosynth_rsa_panel.pdf`
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 
@@ -280,28 +279,28 @@ python chess-neurosynth/92_plot_neurosynth_rsa.py
 
 ```
 chess-neurosynth/
-├── README.md                             # This file
-├── 01_univariate_neurosynth.py           # Univariate GLM t-map correlations
-├── 02_rsa_neurosynth.py                  # RSA searchlight group contrast correlations
-├── 81_table_neurosynth_univariate.py     # LaTeX/CSV table generation (univariate)
-├── 82_table_neurosynth_rsa.py            # LaTeX/CSV table generation (RSA)
-├── 91_plot_neurosynth_univariate.py      # Figure generation (univariate)
-├── 92_plot_neurosynth_rsa.py             # Figure generation (RSA)
-├── METHODS.md                            # Detailed methods from manuscript
-├── RESULTS.md                            # Detailed results summary
-├── DISCREPANCIES.md                      # Notes on analysis discrepancies
-└── analyses/neurosynth/                  # Shared analysis modules (in repo root analyses/ package)
-    ├── __init__.py
-    ├── io_utils.py                       # Loading term maps and group t-maps
-    ├── maps_utils.py                     # T-to-Z conversion, map splitting, correlations
-    ├── glm_utils.py                      # Second-level GLM design matrix
-    ├── plot_utils.py                     # Plotting utilities
-    └── tables.py                         # Table formatting
+├── README.md # This file
+├── 11_univariate_neurosynth.py # Group-level: univariate GLM t-map correlations
+├── 12_rsa_neurosynth.py # Group-level: RSA searchlight group contrast correlations
+├── 81_table_neurosynth_univariate.py # LaTeX/CSV table generation (univariate)
+├── 82_table_neurosynth_rsa.py # LaTeX/CSV table generation (RSA)
+├── 91_plot_neurosynth_univariate.py # Figure generation (univariate)
+├── 92_plot_neurosynth_rsa.py # Figure generation (RSA)
+├── METHODS.md # Detailed methods from manuscript
+├── RESULTS.md # Detailed results summary
+├── DISCREPANCIES.md # Notes on analysis discrepancies
+└── analyses/neurosynth/ # Shared analysis modules (in repo root analyses/ package)
+ ├── __init__.py
+ ├── io_utils.py # Loading term maps and group t-maps
+ ├── maps_utils.py # T-to-Z conversion, map splitting, correlations
+ ├── glm_utils.py # Second-level GLM design matrix
+ ├── plot_utils.py # Plotting utilities
+ └── tables.py # Table formatting
 
-results/neurosynth/                       # Unified results tree (not committed)
-├── data/                                 # zmap_*.nii.gz, *_term_corr_*.csv
-├── tables/                               # LaTeX tables
-└── figures/                              # Publication figures
+derivatives/group-results/neurosynth/ # Unified results tree (not committed)
+├── data/ # zmap_*.nii.gz, *_term_corr_*.csv
+├── tables/ # LaTeX tables
+└── figures/ # Publication figures
 ```
 
-The `results/` tree is distributed as a release artifact (`chess-bids_F_code-results.zip`) and via the RDR repo; it is not tracked in git. Use `from common import results_for; results_for('neurosynth', 'data')` as the idiomatic accessor.
+Group-level outputs are stored in `BIDS/derivatives/group-results/`.

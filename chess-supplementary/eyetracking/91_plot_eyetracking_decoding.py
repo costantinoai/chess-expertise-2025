@@ -35,9 +35,9 @@ Visual Elements (both panels):
 Inputs
 ------
 - results_xy.json (from eyetracking decoding analysis)
-  Contains: subject_accuracies, mean_accuracy, ci_low, ci_high, n_subjects
+  Contains: anonymous_subject_accuracies, mean_accuracy, ci_low, ci_high, n_subjects
 - results_displacement.json (from eyetracking decoding analysis)
-  Contains: subject_accuracies, mean_accuracy, ci_low, ci_high, n_subjects
+  Contains: anonymous_subject_accuracies, mean_accuracy, ci_low, ci_high, n_subjects
 
 Dependencies
 ------------
@@ -92,11 +92,17 @@ RESULTS_DIR = results_dir
 FIGURES_DIR = dirs['figures']
 
 # Load decoding results for both feature representations
-# Each JSON contains: subject_accuracies (list), mean_accuracy, ci_low, ci_high, n_subjects
+# Group-level JSONs (mean, CI, t-test — no per-subject data)
 with open(RESULTS_DIR / 'results_xy.json', 'r') as f:
-    results_xy = json.load(f)       # 2D gaze coordinates (x, y)
+    results_xy = json.load(f)
 with open(RESULTS_DIR / 'results_displacement.json', 'r') as f:
-    results_disp = json.load(f)     # Displacement from center
+    results_disp = json.load(f)
+
+# Per-subject accuracies from BIDS derivatives
+import pandas as pd
+DERIV_ROOT = Path(CONFIG['BIDS_EYETRACK_DECODING'])
+subj_xy_df = pd.read_csv(DERIV_ROOT / 'subject_accuracies_xy.csv')
+subj_disp_df = pd.read_csv(DERIV_ROOT / 'subject_accuracies_displacement.csv')
 
 logger.info(
     f"Loaded results: xy (n_subjects={results_xy['n_subjects']}), "
@@ -104,16 +110,13 @@ logger.info(
 )
 
 # Extract xy features data
-# - subject_accuracies: out-of-fold accuracy for each participant
-# - mean_accuracy: average subject-level accuracy
-# - ci_low, ci_high: 95% confidence interval bounds
-xy_acc = np.array(results_xy['subject_accuracies'])
+xy_acc = subj_xy_df['subject_accuracy'].to_numpy()
 xy_mean = results_xy['mean_accuracy']
 xy_ci_low = results_xy['ci_low']
 xy_ci_high = results_xy['ci_high']
 
-# Extract displacement features data (same structure as xy)
-disp_acc = np.array(results_disp['subject_accuracies'])
+# Extract displacement features data
+disp_acc = subj_disp_df['subject_accuracy'].to_numpy()
 disp_mean = results_disp['mean_accuracy']
 disp_ci_low = results_disp['ci_low']
 disp_ci_high = results_disp['ci_high']

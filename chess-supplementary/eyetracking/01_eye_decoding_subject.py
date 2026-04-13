@@ -1,5 +1,17 @@
 """
-Eyetracking decoding (experts vs novices) — separate analyses for XY and displacement features.
+Eyetracking decoding (experts vs novices) -- subject-level stage.
+
+Runs the full SVM cross-validation analysis and writes per-subject accuracy
+CSVs and complete results JSONs to the BIDS derivatives tree:
+
+    BIDS/derivatives/bidsmreye_eyetracking-decoding/
+        subject_accuracies_xy.csv
+        subject_accuracies_displacement.csv
+        results_xy.json
+        results_displacement.json
+
+The group-level script ``11_eye_decoding_group.py`` reads these derivatives
+and computes group-level statistics for the results/ tree.
 
 METHODS
 =======
@@ -40,26 +52,15 @@ Statistical Tests
 
 Outputs
 -------
-Saved under results/<ts>_eyetracking_decoding/:
-- results_xy.json: metrics and predictions for XY features
-- results_displacement.json: metrics and predictions for displacement features
-- fold_accuracies_xy.csv: per-fold accuracies for XY
-- fold_accuracies_displacement.csv: per-fold accuracies for displacement
+Saved under BIDS/derivatives/bidsmreye_eyetracking-decoding/:
+- results_xy.json: full metrics and predictions for XY features
+- results_displacement.json: full metrics and predictions for displacement features
 - subject_accuracies_xy.csv: per-subject out-of-fold accuracies for XY
 - subject_accuracies_displacement.csv: per-subject out-of-fold accuracies for displacement
-- copies of this script and logs
-
-JSON keys (per feature set):
-- mean_accuracy, ci_low, ci_high, p_value, p_value_ttest
-- subject_accuracies, subject_accuracy_records, n_subjects
-- fold_accuracies, fold_mean_accuracy, fold_ci_low, fold_ci_high
-- pooled_accuracy, pooled_ci_low, pooled_ci_high, n_correct, n_total
 """
 
 from pathlib import Path
 import json
-
-script_dir = Path(__file__).parent
 
 import numpy as np
 import pandas as pd
@@ -253,12 +254,17 @@ def run_svm_cv(X, y, groups, feature_label, logger, n_splits=20):
     }
 
 
-# Set up analysis
-config, out_dir, logger = setup_analysis(
-    analysis_name="eyetracking_decoding",
-    results_base=script_dir / 'results',
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+config, _, logger = setup_analysis(
+    analysis_name="01_eye_decoding_subject",
+    results_base=CONFIG["RESULTS_ROOT"] / "eyetracking" / "logs",
     script_file=__file__,
 )
+
+DERIV_ROOT: Path = CONFIG['BIDS_EYETRACK_DECODING']
+DERIV_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Load eyetracking long-format data from canonical derivatives folder
 et_root = CONFIG['BIDS_EYETRACK']
@@ -280,11 +286,11 @@ logger.info(f"xy features: X={X_xy.shape}, n_runs={len(y_xy)}, n_subjects={len(n
 
 results_xy = run_svm_cv(X_xy, y_xy, groups_xy, feature_label='xy', logger=logger, n_splits=20)
 
-# Save xy results
-pd.DataFrame({'fold_accuracy': results_xy['fold_accuracies']}).to_csv(out_dir / 'fold_accuracies_xy.csv', index=False)
-pd.DataFrame(results_xy['subject_accuracy_records']).to_csv(out_dir / 'subject_accuracies_xy.csv', index=False)
-with open(out_dir / 'results_xy.json', 'w') as f:
+# Save xy per-subject accuracies and full results to derivatives
+pd.DataFrame(results_xy['subject_accuracy_records']).to_csv(DERIV_ROOT / 'subject_accuracies_xy.csv', index=False)
+with open(DERIV_ROOT / 'results_xy.json', 'w') as f:
     json.dump(results_xy, f, indent=2)
+logger.info(f"Saved subject_accuracies_xy.csv and results_xy.json to {DERIV_ROOT}")
 
 # ============================================================================
 # Analysis 2: displacement features (distance from center)
@@ -298,11 +304,11 @@ logger.info(f"displacement features: X={X_disp.shape}, n_runs={len(y_disp)}, n_s
 
 results_disp = run_svm_cv(X_disp, y_disp, groups_disp, feature_label='displacement', logger=logger, n_splits=20)
 
-# Save displacement results
-pd.DataFrame({'fold_accuracy': results_disp['fold_accuracies']}).to_csv(out_dir / 'fold_accuracies_displacement.csv', index=False)
-pd.DataFrame(results_disp['subject_accuracy_records']).to_csv(out_dir / 'subject_accuracies_displacement.csv', index=False)
-with open(out_dir / 'results_displacement.json', 'w') as f:
+# Save displacement per-subject accuracies and full results to derivatives
+pd.DataFrame(results_disp['subject_accuracy_records']).to_csv(DERIV_ROOT / 'subject_accuracies_displacement.csv', index=False)
+with open(DERIV_ROOT / 'results_displacement.json', 'w') as f:
     json.dump(results_disp, f, indent=2)
+logger.info(f"Saved subject_accuracies_displacement.csv and results_displacement.json to {DERIV_ROOT}")
 
 logger.info("=" * 80)
 logger.info("Summary:")

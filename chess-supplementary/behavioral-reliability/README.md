@@ -6,37 +6,36 @@ This analysis assesses the internal consistency of behavioral representational d
 
 ## Required bundles
 
-- `01_behavioral_split_half_reliability.py` and `02_marginal_split_half.py` read BIDS events, stimuli, and participants directly → needs **A** (core) only.
-- `81_table_split_half_reliability.py` and `91_plot_reliability_panels.py` only consume the outputs of 01/02 from the repo `results/` tree (no extra bundle).
+- `11_behavioral_split_half_reliability.py` and `12_marginal_split_half.py` read BIDS events, stimuli, and participants directly → needs **A** (core) only.
+- `81_table_split_half_reliability.py` and `91_plot_reliability_panels.py` only consume the outputs of 11/12 from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  ST[stimuli/]:::in
-  EV["sub-*/func/ (events)"]:::in
+ PT[participants.tsv]:::in
+ ST[stimuli/]:::in
+ EV["sub-*/func/ (events)"]:::in
 
-  S01["01_behavioral_split_half_reliability.py"]:::sc
-  S02["02_marginal_split_half.py"]:::sc
-  S81["81_table_split_half_reliability.py"]:::sc
-  S91["91_plot_reliability_panels.py"]:::sc
-  DATA["results/supplementary/behavioral-reliability/data/"]:::rl
-  TABLES["results/supplementary/behavioral-reliability/tables/"]:::rl
-  FIGURES["results/supplementary/behavioral-reliability/figures/"]:::rl
+ S11["11_behavioral_split_half_reliability.py"]:::sc
+ S12["12_marginal_split_half.py"]:::sc
+ S81["81_table_split_half_reliability.py"]:::sc
+ S91["91_plot_reliability_panels.py"]:::sc
+ DATA["derivatives/group-results/supplementary/behavioral-reliability/data/"]:::out
+ TABLES["derivatives/group-results/supplementary/behavioral-reliability/tables/"]:::out
+ FIGURES["derivatives/group-results/supplementary/behavioral-reliability/figures/"]:::out
 
-  EV --> S01 --> DATA
-  PT --> S01
-  EV --> S02 --> DATA
-  ST --> S02
-  PT --> S02
+ EV --> S11 --> DATA
+ PT --> S11
+ EV --> S12 --> DATA
+ ST --> S12
+ PT --> S12
 
-  DATA --> S81 --> TABLES
-  DATA --> S91 --> FIGURES
+ DATA --> S81 --> TABLES
+ DATA --> S91 --> FIGURES
 ```
 
 ## Methods
@@ -62,18 +61,18 @@ For each participant group (experts, novices) separately:
 3. **Split-Half Correlation**: Compute Spearman correlation between the two half RDMs; this is the half-sample reliability r_half.
 
 4. **Spearman-Brown Correction**: Estimate full-sample reliability using the prophecy formula:
-   ```
-   r_full = (2 × r_half) / (1 + r_half)
-   ```
-   This corrects for the reduced sample size inherent in split-half designs.
+ ```
+ r_full = (2 × r_half) / (1 + r_half)
+ ```
+ This corrects for the reduced sample size inherent in split-half designs.
 
 5. **Bootstrap Intervals and p-values**: Using the distribution of r_full across 1,000 random splits:
-   - Compute 95% CIs via percentile method (2.5th and 97.5th percentiles)
-   - Compute two-sided bootstrap p-value using sign-proportion approach with +1 correction:
-     ```
-     p_boot = 2 × min{ (#{r_full ≤ 0} + 1) / (n + 1),
-                       (#{r_full ≥ 0} + 1) / (n + 1) }
-     ```
+ - Compute 95% CIs via percentile method (2.5th and 97.5th percentiles)
+ - Compute two-sided bootstrap p-value using sign-proportion approach with +1 correction:
+ ```
+ p_boot = 2 × min{ (#{r_full ≤ 0} + 1) / (n + 1),
+ (#{r_full ≥ 0} + 1) / (n + 1) }
+ ```
 
 ### Between-Group Similarity and Group Difference
 
@@ -128,14 +127,14 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 
 ```bash
 # From repository root
-python chess-supplementary/behavioral-reliability/01_behavioral_split_half_reliability.py
+python chess-supplementary/behavioral-reliability/11_behavioral_split_half_reliability.py
 ```
 
-**Outputs** (saved to `results/supplementary/behavioral-reliability/data/`):
+**Outputs** (saved to `derivatives/group-results/supplementary/behavioral-reliability/data/`):
 - `reliability_metrics.pkl`: Full reliability statistics for table generation
 - `reliability_summary.csv`: Human-readable summary (bootstrap CIs and p_boot)
 - `split_rdm_distributions.npz`: Bootstrap distributions of r_half and r_full
-- `01_behavioral_split_half_reliability.py`: Copy of the analysis script
+- `11_behavioral_split_half_reliability.py`: Copy of the analysis script
 
 **Expected runtime**: ~5-10 minutes (1,000 bootstrap iterations)
 
@@ -145,7 +144,7 @@ python chess-supplementary/behavioral-reliability/01_behavioral_split_half_relia
 python chess-supplementary/behavioral-reliability/81_table_split_half_reliability.py
 ```
 
-**Outputs** (saved to `chess-supplementary/behavioral-reliability/results/behavioral_split_half/tables/`):
+**Outputs** (saved to `derivatives/group-results/supplementary/behavioral-reliability/tables/`):
 - `split_half_reliability.tex`: LaTeX table
 - `split_half_reliability.csv`: CSV table
 
@@ -173,18 +172,18 @@ python chess-supplementary/behavioral-reliability/81_table_split_half_reliabilit
 
 ```
 chess-supplementary/behavioral-reliability/
-├── README.md                                   # This file
-├── 01_behavioral_split_half_reliability.py     # Main split-half analysis
-├── 81_table_split_half_reliability.py          # LaTeX/CSV table generation
-├── METHODS.md                                  # Detailed methods from manuscript
-├── DISCREPANCIES.md                            # Notes on analysis discrepancies
-├── analyses/behavioral_reliability/            # Shared analysis modules (in repo root analyses/ package)
-│   ├── __init__.py
-│   └── split_half_utils.py                     # Split-half and Spearman-Brown utilities
-└── results/                                    # Analysis outputs (timestamped)
-    └── <timestamp>_behavioral_split_half/
-        ├── *.pkl                               # Python objects
-        ├── *.csv                               # Summary tables
-        ├── *.npz                               # Bootstrap distributions
-        └── tables/                             # LaTeX tables
+├── README.md # This file
+├── 11_behavioral_split_half_reliability.py # Main split-half analysis
+├── 81_table_split_half_reliability.py # LaTeX/CSV table generation
+├── METHODS.md # Detailed methods from manuscript
+├── DISCREPANCIES.md # Notes on analysis discrepancies
+├── analyses/behavioral_reliability/ # Shared analysis modules (in repo root analyses/ package)
+│ ├── __init__.py
+│ └── split_half_utils.py # Split-half and Spearman-Brown utilities
+└── (outputs go to derivatives/group-results/supplementary/behavioral-reliability/)
+ └── <timestamp>_behavioral_split_half/
+ ├── *.pkl # Python objects
+ ├── *.csv # Summary tables
+ ├── *.npz # Bootstrap distributions
+ └── tables/ # LaTeX tables
 ```

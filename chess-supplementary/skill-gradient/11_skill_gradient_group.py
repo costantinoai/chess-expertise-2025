@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Skill-Gradient Analysis — Supplementary Analysis
+Skill-Gradient Group-Level Analysis — Supplementary Analysis
 
 METHODS
 =======
@@ -20,15 +20,19 @@ All correlations are computed across the 22 coarsened bilateral Glasser ROI
 groups. FDR correction (Benjamini-Hochberg) is applied across ROIs within
 each measure.
 
+Prerequisites
+-------------
+Run 01_skill_gradient_subject.py first to produce the enriched per-subject
+table (familiarisation_subject_enriched.csv) in the results data directory.
+
 Data
 ----
 - Participants: BIDS participants.tsv (Elo in 'rating' column)
-- PR: results/manifold/data/pr_results.pkl
+- PR: BIDS/derivatives/fmriprep_spm-unsmoothed_manifold per-subject TSVs
 - RSA: BIDS/derivatives/fmriprep_spm-unsmoothed_rsa per-subject TSVs
 - Decoding: BIDS/derivatives/fmriprep_spm-unsmoothed_decoding per-subject TSVs
-- Familiarisation: results/supplementary/task-engagement/data/
-  familiarisation_subject_accuracy.csv (behavioural only; neural enrichment
-  is computed within this script)
+- Familiarisation (enriched): results/supplementary/skill-gradient/data/
+  familiarisation_subject_enriched.csv (produced by 01_skill_gradient_subject.py)
 
 Outputs
 -------
@@ -37,9 +41,11 @@ Outputs
 - elo_decoding_correlations.csv: Elo x decoding per ROI + mean
 - elo_correlations_all.csv: Combined Elo results
 - familiarisation_neural_correlations.csv: Familiarisation accuracy x neural metrics
+- skill_gradient_anonymous.csv: Anonymous per-subject table (no participant_id)
+  for the plot script — columns: group, rating, move_acc_all_cm, mean_pr,
+  rsa_checkmate, rsa_strategy, rsa_visual_similarity, dec_checkmate, dec_strategy
 """
 
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -91,14 +97,30 @@ logger.info(
     f"range: {min(elo_map.values()):.0f}-{max(elo_map.values()):.0f}"
 )
 
-# PR data (trusted internal analysis output) — written by
-# chess-manifold/02_manifold_group.py into the unified results/ tree.
-pr_pkl = Path(config['RESULTS_ROOT']) / 'manifold' / 'data' / 'pr_results.pkl'
-with open(pr_pkl, 'rb') as f:
-    pr_data = pickle.load(f)
-pr_long = pr_data['pr_long_format']
-roi_info = pr_data['roi_info']
-roi_id_to_name = dict(zip(roi_info['roi_id'], roi_info['pretty_name']))
+# PR data — read per-subject TSVs from BIDS derivatives
+MANIFOLD_ROOT = Path(config['BIDS_MANIFOLD'])
+SUBJECT_FILE_SUFFIX = "_space-MNI152NLin2009cAsym_roi-glasser_desc-pr_values.tsv"
+
+logger.info(f"Loading per-subject PR from {MANIFOLD_ROOT}...")
+pr_records = []
+for sub_dir in sorted(MANIFOLD_ROOT.iterdir()):
+    if not sub_dir.is_dir() or not sub_dir.name.startswith('sub-'):
+        continue
+    subject_id = sub_dir.name
+    tsv_path = sub_dir / f"{subject_id}{SUBJECT_FILE_SUFFIX}"
+    if not tsv_path.is_file():
+        continue
+    df = pd.read_csv(tsv_path, sep='\t')
+    for _, row in df.iterrows():
+        pr_records.append({
+            'subject_id': subject_id,
+            'ROI_Label': int(row['ROI_Label']),
+            'roi_name': row['roi_name'],
+            'PR': float(row['PR']),
+        })
+
+pr_long = pd.DataFrame(pr_records)
+roi_id_to_name = dict(zip(pr_long['ROI_Label'], pr_long['roi_name']))
 logger.info(f"PR data: {pr_long['subject_id'].nunique()} subjects, "
             f"{pr_long['ROI_Label'].nunique()} ROIs")
 
@@ -304,40 +326,13 @@ logger.info("=" * 60)
 logger.info("FAMILIARISATION ACCURACY x NEURAL METRICS")
 logger.info("=" * 60)
 
-fam_file = (Path(config['REPO_ROOT']) / 'chess-supplementary' / 'task-engagement' /
-            'results' / 'familiarisation_accuracy' / 'familiarisation_subject_accuracy.csv')
+# Enriched per-subject table (produced by 01_skill_gradient_subject.py)
+SKILL_DERIV = Path(config.get('BIDS_SKILL_GRADIENT', '')) if config.get('BIDS_SKILL_GRADIENT') else Path(config['BIDS_ROOT']).parent / 'derivatives' / 'skill-gradient'
+fam_file = SKILL_DERIV / 'familiarisation_subject_enriched.csv'
 
 if fam_file.exists():
     fam_df = pd.read_csv(fam_file)
-    logger.info(f"Loaded familiarisation data: {len(fam_df)} subjects")
-
-    # Enrich with neural metrics (mean across 22 ROIs per subject)
-    # PR
-    subject_pr = compute_subject_mean_pr(pr_long)
-    fam_df = fam_df.merge(subject_pr, on='participant_id', how='left')
-
-    # RSA (mean across ROIs per subject per target model)
-    for target in ['checkmate', 'strategy', 'visual_similarity']:
-        rsa_target = rsa_df[rsa_df['target'] == target].copy()
-        if len(rsa_target) > 0:
-            rsa_target[f'rsa_{target}'] = rsa_target[roi_cols].astype(float).mean(axis=1)
-            fam_df = fam_df.merge(
-                rsa_target[['subject', f'rsa_{target}']].rename(columns={'subject': 'participant_id'}),
-                on='participant_id', how='left',
-            )
-
-    # Decoding (mean across ROIs per subject per target)
-    for target in ['checkmate', 'strategy']:
-        dec_target = dec_df[dec_df['target'] == target].copy()
-        if len(dec_target) > 0:
-            dec_target[f'dec_{target}'] = dec_target[dec_roi_cols].astype(float).mean(axis=1)
-            fam_df = fam_df.merge(
-                dec_target[['subject', f'dec_{target}']].rename(columns={'subject': 'participant_id'}),
-                on='participant_id', how='left',
-            )
-
-    # Save enriched CSV for plotting script
-    fam_df.to_csv(out_dir / 'familiarisation_subject_enriched.csv', index=False)
+    logger.info(f"Loaded enriched familiarisation data: {len(fam_df)} subjects")
 
     neural_cols = ['mean_pr', 'rsa_checkmate', 'rsa_strategy',
                    'rsa_visual_similarity', 'dec_checkmate', 'dec_strategy']
@@ -386,7 +381,10 @@ if fam_file.exists():
 
     fam_corr_df.to_csv(out_dir / 'familiarisation_neural_correlations.csv', index=False)
 else:
-    logger.warning(f"Familiarisation file not found: {fam_file}")
+    logger.warning(
+        f"Enriched familiarisation file not found: {fam_file}\n"
+        "Run 01_skill_gradient_subject.py first."
+    )
 
 
 # ============================================================================

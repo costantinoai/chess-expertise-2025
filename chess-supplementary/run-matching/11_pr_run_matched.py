@@ -541,9 +541,8 @@ experts_desc = get_descriptives_per_roi(expert_vals, confidence_level=0.95)
 novices_desc = get_descriptives_per_roi(novice_vals, confidence_level=0.95)
 
 results = {
-    "pr_long_format": pr_df,
+    # Group-level only -- per-subject data lives in BIDS/derivatives/
     "roi_info": roi_info,
-    "participants": participants,
     "roi_labels": roi_labels,
     "summary_stats": summary_stats,
     "stats_results": stats_results,
@@ -559,7 +558,6 @@ results = {
         "components": pca2d.components_,
     },
     "pr_matrix": {
-        "matrix": pr_matrix,
         "n_experts": int(n_experts),
     },
     "voxel_corr": {

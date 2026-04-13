@@ -7,44 +7,43 @@ This analysis quantifies the effective dimensionality of neural representations 
 ## Required bundles
 
 - `01_manifold_subject.py` reads SPM unsmoothed beta images and the Glasser-22 atlas → needs **A** (core) + **D** (spm). Writes per-subject PR values into `derivatives/fmriprep_spm-unsmoothed_manifold/` (bundle E).
-- `02_manifold_group.py` reads those per-subject PR values from bundle E and writes group aggregates into `results/manifold/data/`.
-- `81_table_manifold_pr.py` and `91_plot_manifold_panels.py` only consume the outputs of `02_manifold_group.py` from the repo `results/` tree.
+- `11_manifold_group.py` reads those per-subject PR values from bundle E and writes group aggregates into `derivatives/group-results/manifold/data/`.
+- `81_table_manifold_pr.py` and `91_plot_manifold_panels.py` only consume the outputs of `11_manifold_group.py` from the group-results derivative folder.
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef out fill:#fff5b1,stroke:#b08800,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef out fill:#fff5b1,stroke:#b08800,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  PT[participants.tsv]:::in
-  GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
-  A22[sourcedata/atlases/glasser22/]:::in
+ PT[participants.tsv]:::in
+ GLMU[derivatives/fmriprep_spm-unsmoothed/]:::in
+ A22[sourcedata/atlases/glasser22/]:::in
 
-  MAN01["01_manifold_subject.py"]:::sc
-  MAN02["02_manifold_group.py"]:::sc
-  MAN81["81_table_manifold_pr.py"]:::sc
-  MAN91["91_plot_manifold_panels.py"]:::sc
-  MAN[derivatives/fmriprep_spm-unsmoothed_manifold/]:::out
-  DATA["results/manifold/data/"]:::rl
-  TABLES["results/manifold/tables/"]:::rl
-  FIGURES["results/manifold/figures/"]:::rl
+ MAN01["01_manifold_subject.py"]:::sc
+ MAN11["11_manifold_group.py"]:::sc
+ MAN81["81_table_manifold_pr.py"]:::sc
+ MAN91["91_plot_manifold_panels.py"]:::sc
+ MAN[derivatives/fmriprep_spm-unsmoothed_manifold/]:::out
+ DATA["derivatives/group-results/manifold/data/"]:::out
+ TABLES["derivatives/group-results/manifold/tables/"]:::out
+ FIGURES["derivatives/group-results/manifold/figures/"]:::out
 
-  GLMU --> MAN01
-  A22 --> MAN01
-  PT --> MAN01
-  MAN01 --> MAN
+ GLMU --> MAN01
+ A22 --> MAN01
+ PT --> MAN01
+ MAN01 --> MAN
 
-  MAN --> MAN02
-  PT --> MAN02
-  MAN02 --> DATA
+ MAN --> MAN11
+ PT --> MAN11
+ MAN11 --> DATA
 
-  DATA --> MAN81 --> TABLES
-  PT --> MAN81
-  DATA --> MAN91 --> FIGURES
-  PT --> MAN91
+ DATA --> MAN81 --> TABLES
+ PT --> MAN81
+ DATA --> MAN91 --> FIGURES
+ PT --> MAN91
 ```
 
 ## Methods
@@ -81,12 +80,12 @@ PR ranges from 1 (activity concentrated along one dimension) to n_voxels (activi
 PR values were grouped by expertise (experts vs novices) for each ROI. Three statistical tests were conducted:
 
 1. **Welch two-sample t-test**: Comparing expert and novice mean PR values for each ROI
-   - Null hypothesis: μ_expert = μ_novice
-   - Implementation: `scipy.stats.ttest_ind` with `equal_var=False` (allows unequal variances)
-   - Two-tailed tests
+ - Null hypothesis: μ_expert = μ_novice
+ - Implementation: `scipy.stats.ttest_ind` with `equal_var=False` (allows unequal variances)
+ - Two-tailed tests
 
 2. **False Discovery Rate (FDR) correction**: Applied across 22 ROIs using the Benjamini-Hochberg procedure (α=0.05)
-   - Implementation: `statsmodels.stats.multitest.multipletests` with `method='fdr_bh'`
+ - Implementation: `statsmodels.stats.multitest.multipletests` with `method='fdr_bh'`
 
 3. **Effect size**: Cohen's d computed as (mean_expert − mean_novice) / pooled_std
 
@@ -117,14 +116,14 @@ Principal component analysis (PCA) was performed on the standardized 22-dimensio
 ### Input Files
 
 - **Atlas**: `rois/glasser22/tpl-MNI152NLin2009cAsym_res-02_atlas-Glasser2016_desc-22_bilateral_resampled.nii.gz`
-  - 3D volume with integer labels for 22 bilateral cortical regions
+ - 3D volume with integer labels for 22 bilateral cortical regions
 - **ROI metadata**: `rois/glasser22/region_info.tsv`
-  - Columns: `roi_id`, `roi_name`, `hemisphere`
+ - Columns: `roi_id`, `roi_name`, `hemisphere`
 - **Participant data**: `BIDS/participants.tsv`
-  - Columns: `participant_id`, `group` (expert/novice)
+ - Columns: `participant_id`, `group` (expert/novice)
 - **Beta images**: `BIDS/derivatives/fmriprep_spm-unsmoothed/sub-*/exp/beta_*.nii.gz`
-  - Trial-wise beta estimates from SPM12 first-level GLMs (unsmoothed)
-  - One beta image per stimulus per run
+ - Trial-wise beta estimates from SPM12 first-level GLMs (unsmoothed)
+ - One beta image per stimulus per run
 
 ### Data Location
 
@@ -158,11 +157,11 @@ python 01_manifold_subject.py
 ### Step 2: Group aggregation
 
 ```bash
-python 02_manifold_group.py
+python 11_manifold_group.py
 ```
 
-**Outputs** (saved to `results/manifold/data/`):
-- `pr_results.pkl`: Complete results dictionary (includes the long-format PR table used by plots/tables)
+**Outputs** (saved to `derivatives/group-results/manifold/data/`):
+- `pr_results.pkl`: Group-level results dictionary (summary statistics, classification results; no longer contains `pr_long_format`, `participants`, or `pr_matrix['matrix']` -- those per-subject fields now live in `derivatives/`)
 - `pr_summary_stats.csv`: Group means, standard errors, and 95% CIs per ROI
 - `pr_statistical_tests.csv`: Welch t-tests, FDR-corrected q-values, Cohen's d per ROI
 - `pr_classification_tests.csv`: Classification accuracy and permutation p-values for ROI and PCA-2D spaces
@@ -173,7 +172,7 @@ python 02_manifold_group.py
 python chess-manifold/81_table_manifold_pr.py
 ```
 
-**Outputs** (saved to `results/manifold/tables/`):
+**Outputs** (saved to `derivatives/group-results/manifold/tables/`):
 - `manifold_pr_results.tex`: LaTeX table with group statistics and t-test results
 - `manifold_pr_results.csv`: CSV version of the table
 
@@ -183,22 +182,22 @@ python chess-manifold/81_table_manifold_pr.py
 python chess-manifold/91_plot_manifold_panels.py
 ```
 
-**Outputs** (saved to `results/manifold/figures/`):
+**Outputs** (saved to `derivatives/group-results/manifold/figures/`):
 - Individual axes as SVG:
-  - `manifold_bars__Bars_Top_Mean_PR.svg`
-  - `manifold_bars__Bars_Bottom_Diff_PR.svg`
-  - `manifold_bars__ROI_Groups_Legend.svg`
-  - `manifold_matrix_pca__A_PR_Matrix.svg`
-  - `manifold_matrix_pca__B_PCA_Projection.svg`
-  - `manifold_matrix_pca__C_Feature_Importance.svg`
-  - `manifold_matrix_pca__D_PCA_Loadings.svg`
-  - `manifold_pr_voxels__E_PR_vs_Voxels_Experts.svg`
-  - `manifold_pr_voxels__F_PR_vs_Voxels_Novices.svg`
-  - `manifold_pr_voxels__G_PRdiff_vs_VoxelsAvg.svg`
+ - `manifold_bars__Bars_Top_Mean_PR.svg`
+ - `manifold_bars__Bars_Bottom_Diff_PR.svg`
+ - `manifold_bars__ROI_Groups_Legend.svg`
+ - `manifold_matrix_pca__A_PR_Matrix.svg`
+ - `manifold_matrix_pca__B_PCA_Projection.svg`
+ - `manifold_matrix_pca__C_Feature_Importance.svg`
+ - `manifold_matrix_pca__D_PCA_Loadings.svg`
+ - `manifold_pr_voxels__E_PR_vs_Voxels_Experts.svg`
+ - `manifold_pr_voxels__F_PR_vs_Voxels_Novices.svg`
+ - `manifold_pr_voxels__G_PRdiff_vs_VoxelsAvg.svg`
 - Complete panel PDFs:
-  - `panels/manifold_bars_panel.pdf`
-  - `panels/manifold_matrix_pca_panel.pdf`
-  - `panels/manifold_pr_voxels_panel.pdf`
+ - `panels/manifold_bars_panel.pdf`
+ - `panels/manifold_matrix_pca_panel.pdf`
+ - `panels/manifold_pr_voxels_panel.pdf`
 
 **Note**: If `ENABLE_PYLUSTRATOR=True` in `common/constants.py`, this will open an interactive layout editor. Set to `False` for automated figure generation.
 
@@ -222,28 +221,28 @@ python chess-manifold/91_plot_manifold_panels.py
 
 ```
 chess-manifold/
-├── README.md                        # This file
-├── 01_manifold_subject.py           # Per-subject PR → BIDS derivatives
-├── 02_manifold_group.py             # Group aggregate + stats → results/manifold/data/
-├── 81_table_manifold_pr.py          # LaTeX/CSV table generation
-├── 91_plot_manifold_panels.py       # Figure generation
-├── METHODS.md                       # Detailed methods from manuscript
-├── RESULTS.md                       # Detailed results summary
-├── DISCREPANCIES.md                 # Notes on analysis discrepancies
-└── analyses/manifold/               # Shared analysis modules (in repo root analyses/ package)
-    ├── __init__.py
-    ├── analysis.py                  # Group comparison and FDR correction
-    ├── data.py                      # Data loading and reshaping utilities
-    ├── models.py                    # Classification, PCA, permutation tests
-    ├── pr_computation.py            # Core PR computation from beta images
-    ├── plotting.py                  # Plotting utilities
-    ├── tables.py                    # Table formatting
-    └── utils.py                     # General utilities
+├── README.md # This file
+├── 01_manifold_subject.py # Subject-level: per-subject PR → BIDS derivatives/
+├── 11_manifold_group.py # Group-level: aggregate + stats → derivatives/group-results/manifold/data/
+├── 81_table_manifold_pr.py # LaTeX/CSV table generation
+├── 91_plot_manifold_panels.py # Figure generation
+├── METHODS.md # Detailed methods from manuscript
+├── RESULTS.md # Detailed results summary
+├── DISCREPANCIES.md # Notes on analysis discrepancies
+└── analyses/manifold/ # Shared analysis modules (in repo root analyses/ package)
+ ├── __init__.py
+ ├── analysis.py # Group comparison and FDR correction
+ ├── data.py # Data loading and reshaping utilities
+ ├── models.py # Classification, PCA, permutation tests
+ ├── pr_computation.py # Core PR computation from beta images
+ ├── plotting.py # Plotting utilities
+ ├── tables.py # Table formatting
+ └── utils.py # General utilities
 
-results/manifold/                    # Unified results tree (not committed)
-├── data/                            # *.pkl, *.csv numerical results
-├── tables/                          # LaTeX tables
-└── figures/                         # Publication figures
+derivatives/group-results/manifold/ # Unified results tree (not committed)
+├── data/ # *.pkl, *.csv numerical results
+├── tables/ # LaTeX tables
+└── figures/ # Publication figures
 ```
 
-The `results/` tree is distributed as a release artifact (`chess-bids_F_code-results.zip`) and via the RDR repo; it is not tracked in git. Use `from common import results_for; results_for('manifold', 'data')` as the idiomatic accessor.
+Group-level outputs are stored in `BIDS/derivatives/group-results/`.

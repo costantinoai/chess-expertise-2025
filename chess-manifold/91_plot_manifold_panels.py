@@ -138,11 +138,38 @@ roi_info = results['roi_info']                  # DataFrame: roi_id, pretty_name
 roi_labels = results['roi_labels']              # List[int]: ordered ROI IDs for matrix columns
 classifier = results['classifier']              # LogisticRegression: trained model
 pca2d = results.get('pca2d')                   # Dict: PCA 2D projection data
-pr_matrix_pack = results.get('pr_matrix')      # Dict: PR matrix (subjects×ROIs) + n_experts
+pr_matrix_pack = results.get('pr_matrix', {})  # Dict: n_experts (matrix removed for GDPR)
 
 # Fail fast if critical data is missing
-if pca2d is None or pr_matrix_pack is None:
-    raise RuntimeError("Missing pca2d or pr_matrix in results. Re-run 02_manifold_group.py.")
+if pca2d is None:
+    raise RuntimeError("Missing pca2d in results. Re-run 11_manifold_group.py.")
+
+# Reconstruct pr_matrix from BIDS derivatives if not in pkl (GDPR-compliant pkl)
+if 'matrix' not in pr_matrix_pack:
+    import pandas as pd
+    from common.bids_utils import get_subject_list, get_participants_with_expertise
+    MANIFOLD_ROOT = Path(CONFIG["BIDS_MANIFOLD"])
+    SUFFIX = "_space-MNI152NLin2009cAsym_roi-glasser_desc-pr_values.tsv"
+    participants_list, _ = get_participants_with_expertise()
+    all_subjects = get_subject_list()
+    expert_set = {s for s, is_exp in participants_list if is_exp}
+    expert_rows, novice_rows = [], []
+    for sub_id in all_subjects:
+        path = MANIFOLD_ROOT / sub_id / f"{sub_id}{SUFFIX}"
+        if not path.is_file():
+            continue
+        df = pd.read_csv(path, sep="\t")
+        row = df.sort_values("ROI_Label")["PR"].to_numpy()
+        if sub_id in expert_set:
+            expert_rows.append(row)
+        else:
+            novice_rows.append(row)
+    import numpy as _np
+    pr_matrix_pack = {
+        "matrix": _np.vstack(expert_rows + novice_rows),
+        "n_experts": len(expert_rows),
+    }
+    logger.info(f"Reconstructed pr_matrix from derivatives ({len(expert_rows)} experts, {len(novice_rows)} novices)")
 
 logger.info("Data loaded successfully")
 

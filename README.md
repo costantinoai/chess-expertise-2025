@@ -87,7 +87,7 @@ Quick checks:
 pdflatex --version
 kpsewhich booktabs.sty && echo OK || echo MISSING
 kpsewhich multirow.sty && echo OK || echo MISSING
-kpsewhich siunitx.sty  && echo OK || echo MISSING
+kpsewhich siunitx.sty && echo OK || echo MISSING
 ```
 
 See docs/TABLES.md for details on the table style policy and validation.
@@ -112,7 +112,7 @@ If running subject-level GLM and/or MVPA analyses:
 The BIDS dataset is deposited in the KU Leuven Research Data Repository (RDR):
 **DOI: [10.48804/VVCEWP](https://doi.org/10.48804/VVCEWP)**. The repository
 entry hosts raw MRI, preprocessed data, all subject-level analysis derivatives
-and a mirror of this repo's group-level `results/` snapshot, split into six
+and a mirror of this repo's group-level `derivatives/group-results/` snapshot, split into six
 layered bundles so you only have to download what your workflow needs:
 
 | Bundle | Approx. size | Contents | When to download |
@@ -122,12 +122,11 @@ layered bundles so you only have to download what your workflow needs:
 | **C** `fmriprep` | ~187 GB | `derivatives/fmriprep/` | Re-running the SPM first-level GLM. |
 | **D** `spm` | ~30 GB | `derivatives/fmriprep_spm-{un,}smoothed/` (subject betas + group contrasts) | Re-running any subject-level MVPA / manifold / searchlight; also neurosynth univariate and univariate-rois. |
 | **E** `analyses` | ~260 MB | `derivatives/fmriprep_spm-unsmoothed_{rsa,decoding,searchlight-rsa,manifold,rsa-run-matched,rsa-subcortical,decoding-subcortical}/`, `derivatives/behavioral-rsa/`, `derivatives/bidsmreye/` | **Most users** — enough to regenerate every group stat, table, and figure together with this code repo. |
-| **F** `code-results` | ~170 MB | Snapshot of this repo's `results/<analysis>/{data,tables,figures}/` at the published tag. Also attached as a release asset on GitHub. | Users who only want to view the paper's numbers / figures without cloning the code. |
 
 The typical **"reproduce the paper's group stats and figures"** path is bundles
-**A + E + F** (~450 MB total), pointing `CHESS_DATA_ROOT` at the extracted BIDS
+**A + E** (~370 MB total), pointing `CHESS_DATA_ROOT` at the extracted BIDS
 root. See the dataset-side `README` on RDR for the exact extraction steps and
-the full dependency chain (`B → fmriprep → C → SPM → D → group code → E → F`).
+the full dependency chain (`B → fmriprep → C → SPM → D → subject scripts → E`).
 
 The dataset is organised according to the Brain Imaging Data Structure (BIDS)
 specification (v1.10.0).
@@ -144,23 +143,23 @@ All analyses read their inputs from a **single external data root**. Configure t
 
 ```
 /path/to/manuscript-data/
-└── BIDS/                                          # BIDS dataset (raw + derivatives)
-    ├── participants.tsv
-    ├── stimuli/                                   # Stimulus images and metadata
-    ├── sourcedata/atlases/                        # Reference atlases (Glasser, CAB-NP, Neurosynth)
-    └── derivatives/
-        ├── fmriprep/                              # fMRIPrep outputs
-        ├── fmriprep_spm-unsmoothed/               # SPM first-level GLM on unsmoothed BOLD
-        ├── fmriprep_spm-smoothed/                 # SPM first-level GLM on 4 mm smoothed BOLD
-        ├── fmriprep_spm-unsmoothed_rsa/           # ROI RSA (Glasser-22)
-        ├── fmriprep_spm-unsmoothed_decoding/      # ROI decoding (Glasser-22)
-        ├── fmriprep_spm-unsmoothed_searchlight-rsa/  # Whole-brain searchlight RSA
-        ├── fmriprep_spm-unsmoothed_manifold/      # Per-ROI neural Participation Ratio
-        ├── fmriprep_spm-unsmoothed_rsa-run-matched/      # Run-matched ROI RSA (supplementary)
-        ├── fmriprep_spm-unsmoothed_rsa-subcortical/      # Subcortical ROI RSA (CAB-NP)
-        ├── fmriprep_spm-unsmoothed_decoding-subcortical/ # Subcortical ROI decoding (CAB-NP)
-        ├── behavioral-rsa/                        # Per-subject behavioural preference RDMs
-        └── bidsmreye/                             # BidsMReye gaze estimates
+└── BIDS/ # BIDS dataset (raw + derivatives)
+ ├── participants.tsv
+ ├── stimuli/ # Stimulus images and metadata
+ ├── sourcedata/atlases/ # Reference atlases (Glasser, CAB-NP, Neurosynth)
+ └── derivatives/
+ ├── fmriprep/ # fMRIPrep outputs
+ ├── fmriprep_spm-unsmoothed/ # SPM first-level GLM on unsmoothed BOLD
+ ├── fmriprep_spm-smoothed/ # SPM first-level GLM on 4 mm smoothed BOLD
+ ├── fmriprep_spm-unsmoothed_rsa/ # ROI RSA (Glasser-22)
+ ├── fmriprep_spm-unsmoothed_decoding/ # ROI decoding (Glasser-22)
+ ├── fmriprep_spm-unsmoothed_searchlight-rsa/ # Whole-brain searchlight RSA
+ ├── fmriprep_spm-unsmoothed_manifold/ # Per-ROI neural Participation Ratio
+ ├── fmriprep_spm-unsmoothed_rsa-run-matched/ # Run-matched ROI RSA (supplementary)
+ ├── fmriprep_spm-unsmoothed_rsa-subcortical/ # Subcortical ROI RSA (CAB-NP)
+ ├── fmriprep_spm-unsmoothed_decoding-subcortical/ # Subcortical ROI decoding (CAB-NP)
+ ├── behavioral-rsa/ # Per-subject behavioural preference RDMs
+ └── bidsmreye/ # BidsMReye gaze estimates
 ```
 
 2) Point the repository to your local data folder by setting the `CHESS_DATA_ROOT`
@@ -181,42 +180,42 @@ The repository expects the following layout under `_EXTERNAL_DATA_ROOT`. Everyth
 ```
 <EXTERNAL_DATA_ROOT>/
 └── BIDS/
-    ├── dataset_description.json
-    ├── participants.tsv                     # participant_id, age, sex, group, rating
-    ├── participants.json
-    ├── README
-    ├── task-exp_bold.json                   # TaskName via BIDS inheritance
-    ├── task-familiarisation_beh.json        # Beh sidecar via BIDS inheritance
-    ├── stimuli/
-    │   ├── stimuli.tsv                      # Stimulus metadata (stim_id, check, strategy, ...)
-    │   └── *.png                            # 40 chess board images
-    ├── sourcedata/atlases/                  # Reference atlases (never consumed
-    │   ├── glasser22/                       #  as derivatives — they are the input
-    │   ├── glasser180/                      #  side of the analysis pipeline).
-    │   ├── glasser180-surface/              # Surface parcellation (.annot)
-    │   ├── cab-np/                          # Subcortical ROIs (CAB-NP)
-    │   └── neurosynth/terms/                # Meta-analytic term maps
-    ├── sub-01/
-    │   ├── anat/sub-01_T1w.nii.gz
-    │   ├── func/sub-01_task-exp_run-{1..6}_bold.nii.gz
-    │   ├── func/sub-01_task-exp_run-{1..6}_events.tsv
-    │   └── beh/sub-01_task-familiarisation_beh.tsv
-    ├── sub-02/ ... sub-44/
-    └── derivatives/
-        ├── fmriprep/                                     # fMRIPrep preprocessed data
-        ├── fmriprep_spm-unsmoothed/sub-*/exp/            # Unsmoothed SPM betas (for MVPA)
-        ├── fmriprep_spm-smoothed/                        # Smoothed SPM first + group levels
-        │   ├── sub-*/exp/                                # Smoothed SPM betas
-        │   └── group/                                    # Group contrasts (used by neurosynth)
-        ├── fmriprep_spm-unsmoothed_rsa/sub-*/            # ROI RSA Pearson-r TSVs (Glasser-22)
-        ├── fmriprep_spm-unsmoothed_decoding/sub-*/       # ROI SVM accuracy TSVs (Glasser-22)
-        ├── fmriprep_spm-unsmoothed_searchlight-rsa/sub-*/ # Whole-brain searchlight r-maps
-        ├── fmriprep_spm-unsmoothed_manifold/sub-*/       # Per-ROI Participation Ratio TSVs
-        ├── fmriprep_spm-unsmoothed_rsa-run-matched/sub-*/
-        ├── fmriprep_spm-unsmoothed_rsa-subcortical/sub-*/
-        ├── fmriprep_spm-unsmoothed_decoding-subcortical/sub-*/
-        ├── behavioral-rsa/sub-*/                         # Per-subject preference RDMs
-        └── bidsmreye/sub-*/                              # Gaze-position estimates
+ ├── dataset_description.json
+ ├── participants.tsv # participant_id, age, sex, group, rating
+ ├── participants.json
+ ├── README
+ ├── task-exp_bold.json # TaskName via BIDS inheritance
+ ├── task-familiarisation_beh.json # Beh sidecar via BIDS inheritance
+ ├── stimuli/
+ │ ├── stimuli.tsv # Stimulus metadata (stim_id, check, strategy, ...)
+ │ └── *.png # 40 chess board images
+ ├── sourcedata/atlases/ # Reference atlases (never consumed
+ │ ├── glasser22/ # as derivatives — they are the input
+ │ ├── glasser180/ # side of the analysis pipeline).
+ │ ├── glasser180-surface/ # Surface parcellation (.annot)
+ │ ├── cab-np/ # Subcortical ROIs (CAB-NP)
+ │ └── neurosynth/terms/ # Meta-analytic term maps
+ ├── sub-01/
+ │ ├── anat/sub-01_T1w.nii.gz
+ │ ├── func/sub-01_task-exp_run-{1..6}_bold.nii.gz
+ │ ├── func/sub-01_task-exp_run-{1..6}_events.tsv
+ │ └── beh/sub-01_task-familiarisation_beh.tsv
+ ├── sub-02/ ... sub-44/
+ └── derivatives/
+ ├── fmriprep/ # fMRIPrep preprocessed data
+ ├── fmriprep_spm-unsmoothed/sub-*/exp/ # Unsmoothed SPM betas (for MVPA)
+ ├── fmriprep_spm-smoothed/ # Smoothed SPM first + group levels
+ │ ├── sub-*/exp/ # Smoothed SPM betas
+ │ └── group/ # Group contrasts (used by neurosynth)
+ ├── fmriprep_spm-unsmoothed_rsa/sub-*/ # ROI RSA Pearson-r TSVs (Glasser-22)
+ ├── fmriprep_spm-unsmoothed_decoding/sub-*/ # ROI SVM accuracy TSVs (Glasser-22)
+ ├── fmriprep_spm-unsmoothed_searchlight-rsa/sub-*/ # Whole-brain searchlight r-maps
+ ├── fmriprep_spm-unsmoothed_manifold/sub-*/ # Per-ROI Participation Ratio TSVs
+ ├── fmriprep_spm-unsmoothed_rsa-run-matched/sub-*/
+ ├── fmriprep_spm-unsmoothed_rsa-subcortical/sub-*/
+ ├── fmriprep_spm-unsmoothed_decoding-subcortical/sub-*/
+ ├── behavioral-rsa/sub-*/ # Per-subject preference RDMs
+ └── bidsmreye/sub-*/ # Gaze-position estimates
 ```
 
 ## Running Analyses
@@ -233,9 +232,9 @@ Run all analyses with one command. This script also disables pylustrator during 
 ```
 
 Key options:
-- `--levels analysis,tables,figures`  Select which stages to run
-- `--sequential`                      Run jobs sequentially (stream logs to console)
-- `--python /path/to/python`          Use explicit Python interpreter (overrides conda env)
+- `--levels analysis,tables,figures` Select which stages to run
+- `--sequential` Run jobs sequentially (stream logs to console)
+- `--python /path/to/python` Use explicit Python interpreter (overrides conda env)
 
 Environment note:
 - The script looks for a conda environment by name. Set `CONDA_ENV` at the top of `run_all_analyses.sh` (default is `ml`) to match your environment name (e.g., `chess-expertise`), or pass `--python $(which python)` to use the currently activated environment.
@@ -257,17 +256,28 @@ Each analysis directory has detailed instructions in its README. Basic workflow:
 # Always run from the analysis folder
 cd chess-behavioral
 conda activate <your-new-env-name>
-python 01_behavioral_rsa_subject.py         # Per-subject preference RDMs
-python 02_behavioral_rsa_group.py           # Group aggregate + stats
-python 81_table_behavioral_correlations.py  # Tables
-python 91_plot_behavioral_panels.py         # Figures
+python 01_behavioral_rsa_subject.py # 0x: Per-subject → derivatives/
+python 11_behavioral_rsa_group.py # 1x: Group aggregate → derivatives/group-results/
+python 81_table_behavioral_correlations.py # 8x: Tables (from derivatives/group-results/)
+python 91_plot_behavioral_panels.py # 9x: Figures (from derivatives/group-results/)
 ```
 
-Every analysis writes into the shared `results/<analysis>/{data,tables,figures}/`
-tree at the repo root. Subject-level stages that populate BIDS derivatives
-(`chess-behavioral/01_*_subject.py`, `chess-manifold/01_*_subject.py`, MATLAB
-pipelines under `chess-mvpa/`, etc.) should be re-run before the corresponding
-group stages if the derivatives themselves are being rebuilt.
+### Script numbering convention
+
+| Prefix | Level | Reads from | Writes to |
+|--------|-------|------------|-----------|
+| **0x** | Subject | BIDS raw / SPM derivatives | `BIDS/derivatives/` (per-subject data) |
+| **1x** | Group | `BIDS/derivatives/` | `BIDS/derivatives/group-results/` (group stats) |
+| **8x** | Tables | `derivatives/group-results/` | `derivatives/group-results/` (formatted tables) |
+| **9x** | Figures | `derivatives/group-results/` + derivatives | `derivatives/group-results/` (rendered figures) |
+
+All outputs — subject-level and group-level — live under `BIDS/derivatives/`.
+Group-level stats, tables, and figures are written to `derivatives/group-results/`.
+Bundle E contains everything needed to reproduce all results from the code repo.
+
+Subject-level stages (0x scripts, MATLAB pipelines under `chess-mvpa/`, etc.)
+should be re-run before the corresponding group stages if the derivatives
+themselves are being rebuilt.
 
 See individual analysis READMEs for details:
 - [`chess-behavioral/README.md`](chess-behavioral/README.md) - Behavioral RSA
@@ -278,56 +288,57 @@ See individual analysis READMEs for details:
 
 ## Outputs
 
-Every Python analysis writes into a single unified `results/` tree at the repo root. Each analysis owns one subfolder with three fixed buckets:
+Every Python analysis writes group-level outputs into `BIDS/derivatives/group-results/`. Each analysis owns one subfolder with four fixed buckets:
 
 ```
-results/
+BIDS/derivatives/group-results/
 ├── behavioral/
-│   ├── data/        # Numerical aggregates (CSV, TSV, JSON, NPY, PKL)
-│   ├── tables/      # Formatted tables (LaTeX, CSV)
-│   └── figures/     # Rendered figures (PDF, PNG, SVG)
-├── manifold/{data,tables,figures}/
-├── mvpa/{data,tables,figures}/
-├── neurosynth/{data,tables,figures}/
+│   ├── data/       # Numerical aggregates (CSV, TSV, JSON, NPY, PKL)
+│   ├── tables/     # Formatted tables (LaTeX, CSV)
+│   ├── figures/    # Rendered figures (PDF, PNG, SVG)
+│   └── logs/       # Script copies and execution logs
+├── manifold/{data,tables,figures,logs}/
+├── mvpa/{data,tables,figures,logs}/
+├── neurosynth/{data,tables,figures,logs}/
 └── supplementary/
-    ├── behavioral-reliability/{data,tables,figures}/
-    ├── eyetracking/{data,tables,figures}/
-    ├── mvpa-finer/{data,tables,figures}/
-    ├── neurosynth-terms/{data,tables,figures}/
-    ├── rdm-intercorrelation/{data,tables,figures}/
-    ├── rsa-rois/{data,tables,figures}/
-    ├── run-matching/{data,tables,figures}/
-    ├── skill-gradient/{data,tables,figures}/
-    ├── subcortical-rois/{data,tables,figures}/
-    ├── task-engagement/{data,tables,figures}/
-    └── univariate-rois/{data,tables,figures}/
+    ├── behavioral-reliability/{data,tables,figures,logs}/
+    ├── eyetracking/{data,tables,figures,logs}/
+    ├── mvpa-finer/{data,tables,figures,logs}/
+    ├── neurosynth-terms/{figures,logs}/
+    ├── rdm-intercorrelation/{data,tables,figures,logs}/
+    ├── rsa-rois/{data,tables,figures,logs}/
+    ├── run-matching/{data,tables,logs}/
+    ├── skill-gradient/{data,figures,logs}/
+    ├── subcortical-rois/{data,figures,logs}/
+    ├── task-engagement/{data,figures,logs}/
+    └── univariate-rois/{data,tables,figures,logs}/
 ```
 
-`results/` is regenerated locally by running the analysis scripts (`./run_all_analyses.sh group` runs every group/table/plot script in the repo). It is not tracked in git.
+This tree is regenerated by running `./run_all_analyses.sh group` (every 1x/8x/9x script). It lives inside the BIDS derivatives tree and ships as part of bundle E.
 
 ## Analysis Overview
 
 ### Main Analyses
 
 1. **Behavioral RSA** (`chess-behavioral/`)
-   - Pairwise preference judgments → behavioral RDMs
-   - Correlation with theoretical models (checkmate, strategy, visual)
-   - Expert vs novice comparison
+ - Pairwise preference judgments → behavioral RDMs
+ - Correlation with theoretical models (checkmate, strategy, visual)
+ - Expert vs novice comparison
 
 2. **Manifold Dimensionality** (`chess-manifold/`)
-   - Participation ratio (PR) quantifies effective dimensionality
-   - 22 bilateral cortical ROIs
-   - Expert vs novice classification and group comparisons
+ - Participation ratio (PR) quantifies effective dimensionality
+ - 22 bilateral cortical ROIs
+ - Expert vs novice classification and group comparisons
 
 3. **MVPA** (`chess-mvpa/`)
-   - **RSA**: Neural RDM correlation with model RDMs (22 ROIs)
-   - **Decoding**: SVM classification of checkmate/strategy (22 ROIs)
-   - Expert vs novice comparisons with FDR correction
+ - **RSA**: Neural RDM correlation with model RDMs (22 ROIs)
+ - **Decoding**: SVM classification of checkmate/strategy (22 ROIs)
+ - Expert vs novice comparisons with FDR correction
 
 4. **Neurosynth Meta-Analysis** (`chess-neurosynth/`)
-   - **Univariate**: GLM t-maps correlated with cognitive term maps
-   - **RSA**: Searchlight contrast maps correlated with cognitive terms
-   - Seven terms: working memory, retrieval, navigation, language, face, early visual, object
+ - **Univariate**: GLM t-maps correlated with cognitive term maps
+ - **RSA**: Searchlight contrast maps correlated with cognitive terms
+ - Seven terms: working memory, retrieval, navigation, language, face, early visual, object
 
 ### Supplementary Analyses
 
@@ -347,7 +358,7 @@ See [`chess-supplementary/README.md`](chess-supplementary/README.md) for details
 ### What to Expect
 
 **Byte-identical outputs:**
-- All publication tables (`results/*/tables/*.tex`)
+- All publication tables (`derivatives/group-results/*/tables/*.tex`)
 - Behavioral analysis data files (all `.npy`, `.pkl`, `.csv`)
 - Within-group t-tests (`*_vs_chance.csv`)
 - Behavioral reliability, eyetracking, RDM intercorrelation, and task engagement CSVs
@@ -362,7 +373,7 @@ These variations do **not** affect significance decisions, publication tables, o
 
 **Non-deterministic outputs (expected to differ):**
 - SVG/PDF figures (matplotlib rendering IDs and timestamps)
-- Script copies in `results/` directories (provenance snapshots)
+- Script copies in `derivatives/group-results/` directories (provenance snapshots)
 
 ### Environment
 
@@ -379,10 +390,9 @@ If you use this code or data in your research, please cite:
 
 The code repository contains every analysis pipeline needed to reproduce the
 paper. Group-level statistics, manuscript tables, and publication figures live
-under `results/<analysis>/{data,tables,figures}/` and ship as bundle F of the
-RDR dataset (also attached to each GitHub release as
-`chess-bids_F_code-results.zip`). Raw MRI, preprocessed data, and subject-level
-analysis derivatives live in the RDR repository above.
+under `derivatives/group-results/<analysis>/{data,tables,figures}/` in the
+RDR dataset (bundle E). Raw MRI, preprocessed data, and subject-level
+analysis derivatives also live in the RDR repository.
 
 ## Acknowledgments
 

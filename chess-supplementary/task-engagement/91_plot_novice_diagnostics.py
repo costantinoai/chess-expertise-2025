@@ -8,7 +8,6 @@ Generates one combined panel (2 rows):
 """
 
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -58,13 +57,22 @@ RNG = np.random.default_rng(CONFIG['RANDOM_SEED'])
 # Load data
 # ============================================================================
 
-resp_rate = pd.read_csv(results_dir / 'response_rate.csv')
-check_pref = pd.read_csv(results_dir / 'checkmate_preference.csv')
-transitivity = pd.read_csv(results_dir / 'transitivity.csv')
-board_profile = pd.read_csv(results_dir / 'board_preference_profile.csv')
+# Per-subject metrics from BIDS derivatives (single stacked file)
+TASK_ENGAGEMENT_ROOT = Path(CONFIG['BIDS_TASK_ENGAGEMENT'])
+_metrics_path = TASK_ENGAGEMENT_ROOT / "task_engagement_metrics.tsv"
+if not _metrics_path.exists():
+    raise FileNotFoundError(f"Metrics file not found: {_metrics_path}. Run 01_task_engagement_subject.py first.")
+_metrics = pd.read_csv(_metrics_path, sep='\t')
+
+resp_rate = _metrics[['group', 'response_rate']].copy()
+check_pref = _metrics[['group', 'n_pairs', 'n_check_preferred', 'prop_check_preferred']].dropna(subset=['prop_check_preferred']).copy()
+transitivity = _metrics[['group', 'n_triples', 'n_transitive', 'prop_transitive']].dropna(subset=['prop_transitive']).copy()
+board_profile = _metrics[['group', 'cnc_r', 'n_valid_pairs']].dropna(subset=['cnc_r']).copy()
+
+# Group-level board preference (computed by 11_task_engagement_group.py)
 board_group = pd.read_csv(results_dir / 'board_preference_group.csv')
 
-logger.info(f"Loaded novice diagnostic results from {results_dir}")
+logger.info(f"Loaded {len(_metrics)} subjects from derivatives, group data from {results_dir}")
 
 
 # ============================================================================
@@ -304,69 +312,9 @@ plt.close(fig)
 
 logger.info("Plotting response rate by condition panel...")
 
-# Reload events for condition analysis
-stim = pd.read_csv(CONFIG['STIMULI_FILE'], sep="\t")
-check_ids_set = set(stim.loc[stim['check_status'] == 'checkmate', 'stim_id'].astype(int))
-BIDS_ROOT = Path(CONFIG['BIDS_ROOT'])
-ppt = pd.read_csv(CONFIG['BIDS_PARTICIPANTS'], sep="\t")
+# Load pre-aggregated per-condition stats (produced by 11_task_engagement_group.py)
+sub_cond = pd.read_csv(results_dir / 'condition_stats_anonymous.csv')
 lw = PP['base_linewidth']
-
-all_ev = []
-for sub_dir in sorted(BIDS_ROOT.glob("sub-*")):
-    func_dir = sub_dir / "func"
-    if not func_dir.exists():
-        continue
-    sub_id = sub_dir.name
-    for ev_file in sorted(func_dir.glob("*_events.tsv")):
-        df = pd.read_csv(ev_file, sep="\t")
-        df['subject'] = sub_id
-        run_str = ev_file.stem.split("run-")[1].split("_")[0]
-        df['run'] = int(run_str)
-        all_ev.append(df)
-
-ev_all = pd.concat(all_ev, ignore_index=True)
-ev_all = ev_all.merge(ppt[['participant_id', 'group']],
-                       left_on='subject', right_on='participant_id', how='left')
-ev_all = ev_all[ev_all['subject'] != 'sub-04']
-
-# Compute per-subject per-condition stats
-cond_rows = []
-for sub_id in ev_all['subject'].unique():
-    sub_ev = ev_all[ev_all['subject'] == sub_id]
-    group = sub_ev['group'].iloc[0]
-    for run, grp in sub_ev.groupby('run'):
-        grp = grp.sort_values('onset').reset_index(drop=True)
-        for i in range(1, len(grp)):
-            curr = int(grp.iloc[i]['stim_id'])
-            prev = int(grp.iloc[i - 1]['stim_id'])
-            pref = str(grp.iloc[i]['preference'])
-            c_c = curr in check_ids_set
-            c_p = prev in check_ids_set
-            has = pref not in ('n/a', 'nan') and pd.notna(grp.iloc[i]['preference'])
-
-            if c_c and not c_p:
-                cond = 'Advantageous'
-            elif not c_c and c_p:
-                cond = 'Non-advantageous'
-            else:
-                cond = 'Same status'
-
-            cond_rows.append({
-                'subject': sub_id, 'group': group, 'condition': cond,
-                'responded': int(has),
-                'chose_current': int(has and pref == 'current_preferred'),
-            })
-
-cond_df = pd.DataFrame(cond_rows)
-
-# Per-subject per-condition aggregation
-sub_cond = (cond_df.groupby(['subject', 'group', 'condition'])
-            .agg(n_trials=('responded', 'count'),
-                 n_responded=('responded', 'sum'),
-                 n_current=('chose_current', 'sum'))
-            .reset_index())
-sub_cond['resp_rate'] = sub_cond['n_responded'] / sub_cond['n_trials']
-sub_cond['p_current'] = sub_cond['n_current'] / sub_cond['n_responded'].clip(lower=1)
 
 # Figure
 fig2 = plt.figure(2)

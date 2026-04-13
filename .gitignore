@@ -144,3 +144,4 @@ docs/
 /chess-supplementary/dataset-viz
 Makefile
 /chess-dnn
+/results_backup_pre_split

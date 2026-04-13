@@ -13,9 +13,16 @@
 #   subject-level - run every subject-level script that writes into BIDS/derivatives/
 #                   (MATLAB stubs + the two Python subject scripts: behavioral and
 #                   manifold)
-#   group         - run every Python group/table/plot script that writes into
+#   group         - run every Python 1x/8x/9x script that writes into
 #                   results/<analysis>/{data,tables,figures}/ (the default and the
 #                   only path that does NOT re-run MATLAB or external pipelines)
+#
+# Script numbering convention:
+#   0x = subject-level  (writes per-subject data to BIDS/derivatives/)
+#   1x = group-level    (reads derivatives → writes group aggregates to results/)
+#   8x = tables         (reads results/ → writes formatted tables)
+#   9x = figures        (reads results/ → writes rendered figures)
+#   x is the same digit for related scripts within a pipeline.
 #
 # The `group` level is what you normally want after the BIDS derivatives
 # (bundles C + D + E) are in place. It regenerates the entire `results/`
@@ -132,95 +139,104 @@ export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 # Order within each analysis is deterministic so plotting scripts always see
 # the latest table outputs.
 declare -a GROUP_SCRIPTS=(
-  # chess-behavioral (subject-level preference derivative -> group stats -> figures)
-  "chess-behavioral/01_behavioral_rsa_subject.py"
-  "chess-behavioral/02_behavioral_rsa_group.py"
+  # ── Numbering convention ────────────────────────────────────────────────
+  #   0x = subject-level  (writes per-subject data to BIDS/derivatives/)
+  #   1x = group-level    (reads from derivatives, writes group stats to results/)
+  #   8x = tables         (reads from results/, writes formatted tables)
+  #   9x = figures        (reads from results/, writes rendered figures)
+  #   x is the same digit for related subject/group/table/figure scripts.
+  #
+  #   Subject-level scripts (0x) are in SUBJECT_LEVEL_SCRIPTS_PY below.
+  #   This array lists everything from group-level onward.
+  # ────────────────────────────────────────────────────────────────────────
+
+  # chess-behavioral (group stats -> tables -> figures)
+  "chess-behavioral/11_behavioral_rsa_group.py"
   "chess-behavioral/81_table_behavioral_correlations.py"
   "chess-behavioral/91_plot_behavioral_panels.py"
 
-  # chess-manifold (subject-level PR derivative -> group stats -> figures)
-  "chess-manifold/01_manifold_subject.py"
-  "chess-manifold/02_manifold_group.py"
+  # chess-manifold (group stats -> tables -> figures)
+  "chess-manifold/11_manifold_group.py"
   "chess-manifold/81_table_manifold_pr.py"
   "chess-manifold/91_plot_manifold_panels.py"
 
   # chess-mvpa (group over MATLAB-produced per-subject TSVs)
-  "chess-mvpa/02_mvpa_group_rsa.py"
-  "chess-mvpa/03_mvpa_group_decoding.py"
+  "chess-mvpa/11_mvpa_group_rsa.py"
+  "chess-mvpa/12_mvpa_group_decoding.py"
   "chess-mvpa/81_table_mvpa_rsa.py"
   "chess-mvpa/82_table_mvpa_decoding.py"
-  "chess-mvpa/92_plot_mvpa_rsa.py"
-  "chess-mvpa/93_plot_mvpa_decoding.py"
+  "chess-mvpa/91_plot_mvpa_rsa.py"
+  "chess-mvpa/92_plot_mvpa_decoding.py"
 
   # chess-neurosynth (group-only reads of searchlight + SPM smoothed group maps)
-  "chess-neurosynth/01_univariate_neurosynth.py"
-  "chess-neurosynth/02_rsa_neurosynth.py"
+  "chess-neurosynth/11_univariate_neurosynth.py"
+  "chess-neurosynth/12_rsa_neurosynth.py"
   "chess-neurosynth/81_table_neurosynth_univariate.py"
   "chess-neurosynth/82_table_neurosynth_rsa.py"
   "chess-neurosynth/91_plot_neurosynth_univariate.py"
   "chess-neurosynth/92_plot_neurosynth_rsa.py"
 
   # chess-supplementary/behavioral-reliability
-  "chess-supplementary/behavioral-reliability/01_behavioral_split_half_reliability.py"
-  "chess-supplementary/behavioral-reliability/02_marginal_split_half.py"
+  "chess-supplementary/behavioral-reliability/11_behavioral_split_half_reliability.py"
+  "chess-supplementary/behavioral-reliability/12_marginal_split_half.py"
   "chess-supplementary/behavioral-reliability/81_table_split_half_reliability.py"
   "chess-supplementary/behavioral-reliability/91_plot_reliability_panels.py"
 
   # chess-supplementary/eyetracking
-  "chess-supplementary/eyetracking/01_eye_decoding.py"
+  "chess-supplementary/eyetracking/11_eye_decoding_group.py"
   "chess-supplementary/eyetracking/81_table_eyetracking_decoding.py"
   "chess-supplementary/eyetracking/91_plot_eyetracking_decoding.py"
 
   # chess-supplementary/mvpa-finer (Python group over MATLAB-appended TSVs)
-  "chess-supplementary/mvpa-finer/02_mvpa_finer_group_rsa.py"
-  "chess-supplementary/mvpa-finer/03_mvpa_finer_group_decoding.py"
+  "chess-supplementary/mvpa-finer/11_mvpa_finer_group_rsa.py"
+  "chess-supplementary/mvpa-finer/12_mvpa_finer_group_decoding.py"
   "chess-supplementary/mvpa-finer/81_table_mvpa_finer_rsa.py"
   "chess-supplementary/mvpa-finer/82_table_mvpa_finer_decoding.py"
   "chess-supplementary/mvpa-finer/82_table_mvpa_extended_dimensions.py"
-  "chess-supplementary/mvpa-finer/92_plot_mvpa_finer_panel.py"
+  "chess-supplementary/mvpa-finer/91_plot_mvpa_finer_panel.py"
 
   # chess-supplementary/neurosynth-terms (single figure over atlas terms)
   "chess-supplementary/neurosynth-terms/91_plot_neurosynth_terms.py"
 
   # chess-supplementary/rdm-intercorrelation
-  "chess-supplementary/rdm-intercorrelation/01_rdm_intercorrelation.py"
+  "chess-supplementary/rdm-intercorrelation/11_rdm_intercorrelation.py"
   "chess-supplementary/rdm-intercorrelation/81_table_rdm_intercorr.py"
   "chess-supplementary/rdm-intercorrelation/91_plot_rdm_intercorr.py"
 
   # chess-supplementary/rsa-rois
-  "chess-supplementary/rsa-rois/01_rsa_roi_summary.py"
+  "chess-supplementary/rsa-rois/11_rsa_roi_group.py"
   "chess-supplementary/rsa-rois/81_table_rsa_rois.py"
   "chess-supplementary/rsa-rois/82_table_roi_maps_rsa.py"
   "chess-supplementary/rsa-rois/91_plot_rsa_rois.py"
 
   # chess-supplementary/run-matching (Python group over MATLAB-produced TSVs)
-  "chess-supplementary/run-matching/02_pr_run_matched.py"
-  "chess-supplementary/run-matching/03_group_rsa_run_matched.py"
-  "chess-supplementary/run-matching/04_compare_run_matched.py"
-  "chess-supplementary/run-matching/05_table_rsa_run_matched.py"
-  "chess-supplementary/run-matching/06_table_pr_run_matched.py"
+  "chess-supplementary/run-matching/11_pr_run_matched.py"
+  "chess-supplementary/run-matching/12_group_rsa_run_matched.py"
+  "chess-supplementary/run-matching/13_compare_run_matched.py"
+  "chess-supplementary/run-matching/81_table_rsa_run_matched.py"
+  "chess-supplementary/run-matching/82_table_pr_run_matched.py"
 
   # chess-supplementary/skill-gradient
-  "chess-supplementary/skill-gradient/01_skill_gradient.py"
+  "chess-supplementary/skill-gradient/11_skill_gradient_group.py"
   "chess-supplementary/skill-gradient/91_plot_skill_gradient.py"
 
   # chess-supplementary/subcortical-rois (Python group over MATLAB TSVs)
-  "chess-supplementary/subcortical-rois/02_subcortical_group_rsa.py"
-  "chess-supplementary/subcortical-rois/03_subcortical_group_decoding.py"
+  "chess-supplementary/subcortical-rois/11_subcortical_group_rsa.py"
+  "chess-supplementary/subcortical-rois/12_subcortical_group_decoding.py"
   "chess-supplementary/subcortical-rois/91_plot_subcortical_rsa.py"
   "chess-supplementary/subcortical-rois/92_plot_atlas_on_mni.py"
   "chess-supplementary/subcortical-rois/93_plot_subcortical_decoding.py"
 
   # chess-supplementary/task-engagement
-  "chess-supplementary/task-engagement/01_task_engagement.py"
-  "chess-supplementary/task-engagement/02_familiarisation_accuracy.py"
-  "chess-supplementary/task-engagement/04_quantify_preference_drivers.py"
+  "chess-supplementary/task-engagement/11_task_engagement_group.py"
+  "chess-supplementary/task-engagement/12_familiarisation_group.py"
+  "chess-supplementary/task-engagement/13_quantify_preference_drivers.py"
   "chess-supplementary/task-engagement/91_plot_novice_diagnostics.py"
   "chess-supplementary/task-engagement/92_plot_preference_features.py"
   "chess-supplementary/task-engagement/93_plot_gradient_panel.py"
 
   # chess-supplementary/univariate-rois
-  "chess-supplementary/univariate-rois/01_univariate_roi_summary.py"
+  "chess-supplementary/univariate-rois/11_univariate_roi_group.py"
   "chess-supplementary/univariate-rois/81_table_univariate_rois.py"
   "chess-supplementary/univariate-rois/82_table_roi_maps_univ.py"
   "chess-supplementary/univariate-rois/91_plot_univariate_rois.py"
@@ -231,9 +247,16 @@ declare -a GROUP_SCRIPTS=(
 # comments: the task-12 refactor freezes MATLAB subject pipelines, and the
 # group scripts above already consume the existing derivatives on disk.
 declare -a SUBJECT_LEVEL_SCRIPTS_PY=(
+  # 0x scripts: write per-subject data to BIDS/derivatives/
   "chess-behavioral/01_behavioral_rsa_subject.py"
   "chess-manifold/01_manifold_subject.py"
-  "chess-supplementary/subcortical-rois/00_prepare_atlas.py"
+  "chess-supplementary/subcortical-rois/01_prepare_atlas.py"
+  "chess-supplementary/rsa-rois/01_rsa_roi_subject.py"
+  "chess-supplementary/univariate-rois/01_univariate_roi_subject.py"
+  "chess-supplementary/eyetracking/01_eye_decoding_subject.py"
+  "chess-supplementary/task-engagement/01_task_engagement_subject.py"
+  "chess-supplementary/task-engagement/02_familiarisation_subject.py"
+  "chess-supplementary/skill-gradient/01_skill_gradient_subject.py"
 )
 
 declare -a SUBJECT_LEVEL_SCRIPTS_MATLAB=(

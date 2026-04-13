@@ -6,28 +6,27 @@ This analysis quantifies the relationships among three theoretical model represe
 
 ## Required bundles
 
-- `01_rdm_intercorrelation.py` reads `BIDS/stimuli/stimuli.tsv` only → needs **A** (core) only.
-- `81_table_rdm_intercorr.py` and `91_plot_rdm_intercorr.py` only consume the outputs of `01` from the repo `results/` tree (no extra bundle).
+- `11_rdm_intercorrelation.py` reads `BIDS/stimuli/stimuli.tsv` only → needs **A** (core) only.
+- `81_table_rdm_intercorr.py` and `91_plot_rdm_intercorr.py` only consume the outputs of `11` from the group-results derivative folder (no extra bundle).
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-  classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
-  classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
-  classDef rl fill:#eee,stroke:#888,stroke-dasharray:3 3,color:#333
+ classDef in fill:#cfe9ff,stroke:#0366d6,color:#000
+ classDef sc fill:#d1f5d3,stroke:#1a7f37,color:#000
 
-  ST[stimuli/]:::in
-  R01["01_rdm_intercorrelation.py"]:::sc
-  R81["81_table_rdm_intercorr.py"]:::sc
-  R91["91_plot_rdm_intercorr.py"]:::sc
-  DATA["results/supplementary/rdm-intercorrelation/data/"]:::rl
-  TABLES["results/supplementary/rdm-intercorrelation/tables/"]:::rl
-  FIGURES["results/supplementary/rdm-intercorrelation/figures/"]:::rl
+ ST[stimuli/]:::in
+ R11["11_rdm_intercorrelation.py"]:::sc
+ R81["81_table_rdm_intercorr.py"]:::sc
+ R91["91_plot_rdm_intercorr.py"]:::sc
+ DATA["derivatives/group-results/supplementary/rdm-intercorrelation/data/"]:::out
+ TABLES["derivatives/group-results/supplementary/rdm-intercorrelation/tables/"]:::out
+ FIGURES["derivatives/group-results/supplementary/rdm-intercorrelation/figures/"]:::out
 
-  ST --> R01 --> DATA
-  DATA --> R81 --> TABLES
-  DATA --> R91 --> FIGURES
+ ST --> R11 --> DATA
+ DATA --> R81 --> TABLES
+ DATA --> R91 --> FIGURES
 ```
 
 ## Methods
@@ -41,13 +40,13 @@ Model RDMs may share representational structure if they capture overlapping aspe
 Three theoretical RDMs derived from stimulus annotations (N=40 stimuli, 780 unique pairwise dissimilarities per RDM):
 
 1. **Check Status**: Binary categorical RDM (0 if same status, 1 if different)
-   - Balanced design: 20 checkmate, 20 non-checkmate
+ - Balanced design: 20 checkmate, 20 non-checkmate
 
 2. **Strategy**: Binary categorical RDM (0 if same strategy, 1 if different)
-   - Five strategy categories (queen-rook, supported attacks, minor piece nets, bishop-driven, one-move mates)
+ - Five strategy categories (queen-rook, supported attacks, minor piece nets, bishop-driven, one-move mates)
 
 3. **Visual Similarity**: Binary categorical RDM (0 if same visual cluster, 1 if different)
-   - Four visual clusters based on piece configuration patterns
+ - Four visual clusters based on piece configuration patterns
 
 ### Statistical Analyses
 
@@ -60,22 +59,22 @@ Three theoretical RDMs derived from stimulus annotations (N=40 stimuli, 780 uniq
 - For each target-predictor pair, compute Spearman partial correlation controlling for all remaining model RDMs
 - Isolates unique relationship after accounting for shared variance with other models
 - Procedure:
-  1. Regress target RDM on covariate RDMs (OLS), extract residuals
-  2. Regress predictor RDM on same covariates, extract residuals
-  3. Compute Spearman correlation between residual vectors
-  4. P-values from t-distribution with df = n_observations − n_covariates − 2
+ 1. Regress target RDM on covariate RDMs (OLS), extract residuals
+ 2. Regress predictor RDM on same covariates, extract residuals
+ 3. Compute Spearman correlation between residual vectors
+ 4. P-values from t-distribution with df = n_observations − n_covariates − 2
 
 **Variance Partitioning**:
 - Hierarchical decomposition of variance (R²) explained by each predictor
 - Components: unique variance per predictor, shared variance, unexplained variance
 - Method:
-  1. Fit full model: target ~ all predictors (OLS)
-  2. Compute R²_full
-  3. For each predictor k:
-     - Fit reduced model: target ~ all predictors except k
-     - Unique variance for k: R²_unique(k) = R²_full − R²_reduced(k)
-  4. Shared variance: R²_shared = R²_full − Σ R²_unique
-  5. Unexplained variance: 1 − R²_full
+ 1. Fit full model: target ~ all predictors (OLS)
+ 2. Compute R²_full
+ 3. For each predictor k:
+ - Fit reduced model: target ~ all predictors except k
+ - Unique variance for k: R²_unique(k) = R²_full − R²_reduced(k)
+ 4. Shared variance: R²_shared = R²_full − Σ R²_unique
+ 5. Unexplained variance: 1 − R²_full
 
 All regressions use z-scored predictors and targets for comparable coefficients.
 
@@ -93,7 +92,7 @@ See `requirements.txt` in the repository root for complete dependencies.
 ### Input Files
 
 - **Stimulus metadata**: `stimuli/stimuli.tsv`
-  - Required columns: `stim_id`, `check`, `strategy`, `visual`
+ - Required columns: `stim_id`, `check`, `strategy`, `visual`
 
 ### Data Location
 
@@ -110,10 +109,10 @@ _EXTERNAL_DATA_ROOT = Path("/path/to/manuscript-data")
 
 ```bash
 # From repository root
-python chess-supplementary/rdm-intercorrelation/01_rdm_intercorrelation.py
+python chess-supplementary/rdm-intercorrelation/11_rdm_intercorrelation.py
 ```
 
-**Outputs** (saved to `results/supplementary/rdm-intercorrelation/data/`):
+**Outputs** (saved to `derivatives/group-results/supplementary/rdm-intercorrelation/data/`):
 - `pairwise_correlations.csv`: Spearman correlations between all RDM pairs
 - `partial_correlations.csv`: Partial correlations controlling for other RDMs
 - `variance_partitioning.csv`: Unique, shared, and unexplained variance per target
@@ -128,8 +127,8 @@ python chess-supplementary/rdm-intercorrelation/81_table_rdm_intercorr.py
 python chess-supplementary/rdm-intercorrelation/91_plot_rdm_intercorr.py
 ```
 
-- Tables → `results/supplementary/rdm-intercorrelation/tables/`
-- Figures → `results/supplementary/rdm-intercorrelation/figures/` (includes `rdm_intercorr_panel.pdf`, the combined visualization of pairwise correlations, partial correlations, and variance partitioning)
+- Tables → `derivatives/group-results/supplementary/rdm-intercorrelation/tables/`
+- Figures → `derivatives/group-results/supplementary/rdm-intercorrelation/figures/` (includes `rdm_intercorr_panel.pdf`, the combined visualization of pairwise correlations, partial correlations, and variance partitioning)
 
 ## Key Results
 
@@ -143,14 +142,14 @@ python chess-supplementary/rdm-intercorrelation/91_plot_rdm_intercorr.py
 
 ```
 chess-supplementary/rdm-intercorrelation/
-├── README.md                              # This file
-├── 01_rdm_intercorrelation.py             # Main analysis
-├── 81_table_rdm_intercorr.py              # Summary table
-├── 91_plot_rdm_intercorr.py               # Figure generation
-├── DISCREPANCIES.md                       # Notes on analysis discrepancies
-└── analyses/rdm_intercorrelation/         # Shared analysis modules (in repo root analyses/ package)
-    ├── __init__.py
-    └── plotting.py                        # Plotting utilities
+├── README.md # This file
+├── 11_rdm_intercorrelation.py # Main analysis
+├── 81_table_rdm_intercorr.py # Summary table
+├── 91_plot_rdm_intercorr.py # Figure generation
+├── DISCREPANCIES.md # Notes on analysis discrepancies
+└── analyses/rdm_intercorrelation/ # Shared analysis modules (in repo root analyses/ package)
+ ├── __init__.py
+ └── plotting.py # Plotting utilities
 ```
 
-Outputs are written to `results/supplementary/rdm-intercorrelation/{data,tables,figures}/` in the unified repo results tree.
+Outputs are written to `derivatives/group-results/supplementary/rdm-intercorrelation/{data,tables,figures}/` in the unified repo results tree. The `results/` tree contains **only group-level aggregates** (GDPR-compliant).
